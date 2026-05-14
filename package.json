@@ -16,6 +16,6 @@
     "start": "npm run build:client && npm --workspace server start"
   },
   "engines": {
-    "node": "18.x"
+    "node": "18"
   }
 }
