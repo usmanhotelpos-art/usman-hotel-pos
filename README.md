@@ -1,33 +1,85 @@
-# Usman Hotel POS
+# Usman Hotel POS System
 
-A full-stack web-based hotel point-of-sale and management system with a Tailwind CSS frontend and Express backend.
+A full-stack web-based hotel point-of-sale (POS) and management system with a React + Vite + Tailwind CSS frontend and Express.js backend.
 
-## Structure
+## Features
 
-- `server/` - Express API backend with JSON data storage
-- `client/` - React + Vite + Tailwind frontend
+- **Dashboard**: Real-time analytics and business metrics
+- **POS System**: Fast and efficient point-of-sale operations
+- **Order Management**: Track and manage customer orders
+- **Table Management**: Restaurant table reservation and management
+- **Inventory Management**: Stock control and tracking
+- **Staff Management**: Employee and staff administration
+- **Sales Reports**: Comprehensive sales analytics
+- **Customer Management**: Customer database and profiles
+- **Settings**: Customizable hotel configurations
 
-## Setup
+## Project Structure
 
-1. Install dependencies:
-   ```bash
-   npm run install:all
-   ```
+- `server/` - Express.js API backend with JSON data storage
+- `client/` - React + Vite + Tailwind CSS frontend
+- `package.json` - Monorepo workspace configuration
 
-2. Start the backend:
-   ```bash
-   npm run dev:server
-   ```
+## Requirements
 
-3. Start the frontend in a second terminal:
-   ```bash
-   npm run dev:client
-   ```
+- Node.js (v16 or higher)
+- npm or yarn
 
-4. Open the client URL shown by Vite (typically `http://localhost:5173`).
+## Quick Start
 
-## Notes
+### 1. Install Dependencies
+```bash
+npm run install:all
+```
 
-- The backend listens on port `4000`.
-- The frontend uses `http://localhost:4000/api` for data operations.
+### 2. Start Development Servers
+
+**Terminal 1 - Backend:**
+```bash
+npm run dev:server
+```
+Backend runs on: `http://localhost:4000`
+
+**Terminal 2 - Frontend:**
+```bash
+npm run dev:client
+```
+Frontend runs on: `http://localhost:5173`
+
+### 3. Access the Application
+Open your browser and navigate to `http://localhost:5173`
+
+## Build for Production
+
+```bash
+npm run build:client
+npm run start:server
+```
+
+## Technology Stack
+
+- **Frontend**: React 18, Vite, Tailwind CSS
+- **Backend**: Express.js, Node.js
+- **Database**: JSON file storage
+- **Authentication**: JWT, bcryptjs
+
+## Configuration
+
+- Backend API base URL: `http://localhost:4000/api`
+- Frontend development URL: `http://localhost:5173`
+- Backend will serve built frontend files from `/client/dist`
+
+## Troubleshooting
+
+- **Port 4000 already in use**: Change `PORT` environment variable
+- **Port 5173 already in use**: Vite will use next available port
+- **Database issues**: Check `server/data/db.json` file permissions
+
+## License
+
+Proprietary - Usman Hotel
+
+## Author
+
+Usman Hotel Team
                                                                                                                   
