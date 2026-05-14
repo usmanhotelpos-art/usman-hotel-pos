@@ -1,0 +1,8 @@
+{
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "startCommand": "npm run build:client && npm --workspace server start"
+  }
+}

@@ -11,6 +11,11 @@
     "dev:server": "npm --workspace server run dev",
     "dev:client": "npm --workspace client run dev",
     "build:client": "npm --workspace client run build",
-    "start:server": "npm --workspace server start"
+    "start:server": "npm --workspace server start",
+    "build": "npm run build:client",
+    "start": "npm run build:client && npm --workspace server start"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
