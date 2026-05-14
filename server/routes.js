@@ -196,6 +196,22 @@ router.post('/pos/categories', (req, res) => {
   res.status(201).send(created);
 });
 
+router.put('/pos/categories/:id', (req, res) => {
+  const updated = updateRecord('pos_categories', req.params.id, req.body);
+  if (!updated) {
+    return res.status(404).send({ error: 'Category not found' });
+  }
+  res.send(updated);
+});
+
+router.delete('/pos/categories/:id', (req, res) => {
+  const removed = removeRecord('pos_categories', req.params.id);
+  if (!removed) {
+    return res.status(404).send({ error: 'Category not found' });
+  }
+  res.send({ success: true });
+});
+
 router.get('/pos/products', (req, res) => {
   res.send(getCollection('pos_products'));
 });
@@ -204,6 +220,22 @@ router.post('/pos/products', (req, res) => {
   const product = req.body;
   const created = createRecord('pos_products', product);
   res.status(201).send(created);
+});
+
+router.put('/pos/products/:id', (req, res) => {
+  const updated = updateRecord('pos_products', req.params.id, req.body);
+  if (!updated) {
+    return res.status(404).send({ error: 'Product not found' });
+  }
+  res.send(updated);
+});
+
+router.delete('/pos/products/:id', (req, res) => {
+  const removed = removeRecord('pos_products', req.params.id);
+  if (!removed) {
+    return res.status(404).send({ error: 'Product not found' });
+  }
+  res.send({ success: true });
 });
 
 router.get('/pos/tables', (req, res) => {
@@ -267,11 +299,13 @@ router.post('/pos/orders', (req, res) => {
     address,
     tableNumber,
     deliveryAgent,
+    serviceType = '',
     deliveryFee = 0,
     discount = 0,
     taxPercent = 0,
     serviceCharge = 0,
     paymentMethod = 'Cash',
+    paymentStatus = '',
     notes = ''
   } = req.body;
 
@@ -283,8 +317,8 @@ router.post('/pos/orders', (req, res) => {
     return res.status(400).send({ error: 'Order type is required' });
   }
 
-  if (orderType === 'Delivery' && (!customerName || !phone || !address)) {
-    return res.status(400).send({ error: 'Delivery orders require customer name, phone, and address' });
+  if (orderType === 'Delivery' && !address) {
+    return res.status(400).send({ error: 'Delivery orders require an address' });
   }
 
   if (orderType === 'Dine-In' && !tableNumber) {
@@ -292,24 +326,36 @@ router.post('/pos/orders', (req, res) => {
   }
 
   const products = getCollection('pos_products');
-  const orderItems = items.map((item) => {
+  const orderItems = [];
+
+  for (const item of items) {
     const product = products.find((product) => product.id === item.productId);
     if (!product) {
-      throw new Error(`Product not found: ${item.productId}`);
+      return res.status(400).send({ error: `Product not found: ${item.productId}` });
     }
-    const stock = product.availableStock ?? Number(product.stock) ?? 0;
-    if (stock > 0 && stock < item.quantity) {
+
+    const quantity = Number(item.quantity || 0);
+    if (quantity <= 0) {
+      return res.status(400).send({ error: `Invalid quantity for ${product.name}` });
+    }
+
+    const stock = Number(product.availableStock ?? product.stock ?? 0);
+    if (stock > 0 && stock < quantity) {
       return res.status(400).send({ error: `Insufficient stock for ${product.name}` });
     }
-    return {
+
+    const price = Number(item.price || product.price) || 0;
+    orderItems.push({
       productId: product.id,
       name: product.name,
-      price: product.price,
-      quantity: item.quantity,
+      price,
+      quantity,
       notes: item.notes || '',
-      total: item.price * item.quantity
-    };
-  });
+      weight: item.weight || '',
+      flavor: item.flavor || '',
+      total: price * quantity
+    });
+  }
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.total, 0);
   const discountValue = Number(discount) || 0;
@@ -320,14 +366,24 @@ router.post('/pos/orders', (req, res) => {
 
   const customers = getCollection('pos_customers');
   let customerId;
-  if (customerName || phone) {
-    const existingCustomer = customers.find(
-      (customer) => customer.name === customerName && customer.phone === phone
-    );
+  if (phone || (orderType === 'Delivery' && address)) {
+    let existingCustomer;
+    if (orderType === 'Delivery' && address) {
+      // For delivery orders, match by address first
+      existingCustomer = customers.find(
+        (customer) => customer.address === address
+      );
+    }
+    if (!existingCustomer && customerName && phone) {
+      // Fallback to name and phone matching
+      existingCustomer = customers.find(
+        (customer) => customer.name === customerName && customer.phone === phone
+      );
+    }
     if (existingCustomer) {
       customerId = existingCustomer.id;
     } else {
-      customerId = createRecord('pos_customers', { name: customerName, phone, address }).id;
+      customerId = createRecord('pos_customers', { name: customerName || '', phone: phone || '', address: address || '' }).id;
     }
   }
 
@@ -345,8 +401,10 @@ router.post('/pos/orders', (req, res) => {
     taxPercent: Number(taxPercent) || 0,
     serviceCharge: serviceValue,
     paymentMethod,
+    paymentStatus,
     notes,
     items: orderItems,
+    serviceType,
     subtotal,
     total,
     status: orderStatus,
@@ -399,8 +457,20 @@ router.put('/pos/orders/:id/assign-rider', (req, res) => {
   res.send(updated);
 });
 
+router.put('/pos/orders/:id/assign-waiter', (req, res) => {
+  const { waiter } = req.body;
+  const updated = updateRecord('pos_orders', req.params.id, {
+    waiter,
+    updatedAt: new Date().toISOString()
+  });
+  if (!updated) {
+    return res.status(404).send({ error: 'Order not found' });
+  }
+  res.send(updated);
+});
+
 router.put('/pos/orders/:id', (req, res) => {
-  const { items, customerName, phone, address, tableNumber, deliveryAgent, serviceType, deliveryFee, discount, taxPercent, serviceCharge, paymentMethod, notes, status, subtotal, total } = req.body;
+  const { items, customerName, phone, address, tableNumber, deliveryAgent, serviceType, deliveryFee, discount, taxPercent, serviceCharge, paymentMethod, paymentStatus, notes, status, subtotal, total } = req.body;
   const updated = updateRecord('pos_orders', req.params.id, {
     items: items || [],
     customerName: customerName || '',
@@ -414,6 +484,7 @@ router.put('/pos/orders/:id', (req, res) => {
     taxPercent: Number(taxPercent) || 0,
     serviceCharge: Number(serviceCharge) || 0,
     paymentMethod: paymentMethod || 'Cash',
+    paymentStatus: paymentStatus || '',
     notes: notes || '',
     status: status || 'New',
     subtotal: Number(subtotal) || 0,
@@ -449,4 +520,9 @@ router.get('/search/:collection', (req, res) => {
     return Object.values(item).some((value) => value?.toString().toLowerCase().includes(term));
   });
   res.send(results);
+});
+
+router.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+  res.status(500).send({ error: err.message || 'Internal Server Error' });
 });

@@ -30,3 +30,4 @@ A full-stack web-based hotel point-of-sale and management system with a Tailwind
 
 - The backend listens on port `4000`.
 - The frontend uses `http://localhost:4000/api` for data operations.
+                                                                                                                  

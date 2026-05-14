@@ -93,8 +93,21 @@ function ensureDb() {
     return;
   }
 
-  const existingData = JSON.parse(fs.readFileSync(dbFile, 'utf-8'));
-  let merged = { ...defaultData, ...existingData };
+  const raw = fs.readFileSync(dbFile, 'utf-8');
+  let existingData = {};
+
+  if (raw.trim()) {
+    try {
+      existingData = JSON.parse(raw);
+    } catch (error) {
+      const backupPath = `${dbFile}.corrupt-${Date.now()}.bak`;
+      fs.writeFileSync(backupPath, raw, 'utf-8');
+      console.error(`Database file corrupted. Backed up invalid JSON to ${backupPath}. Resetting database.`);
+      existingData = {};
+    }
+  }
+
+  const merged = { ...defaultData, ...existingData };
   Object.keys(defaultData).forEach((key) => {
     if (existingData[key] === undefined) {
       merged[key] = defaultData[key];
@@ -106,12 +119,20 @@ function ensureDb() {
 export function readDb() {
   ensureDb();
   const raw = fs.readFileSync(dbFile, 'utf-8');
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error('Failed to parse database JSON. Resetting database.', error);
+    fs.writeFileSync(dbFile, JSON.stringify(defaultData, null, 2), 'utf-8');
+    return defaultData;
+  }
 }
 
 export function writeDb(data) {
   ensureDb();
-  fs.writeFileSync(dbFile, JSON.stringify(data, null, 2), 'utf-8');
+  const tempFile = `${dbFile}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+  fs.renameSync(tempFile, dbFile);
 }
 
 export function getCollection(name) {
