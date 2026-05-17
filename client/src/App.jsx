@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 
 const apiBase = '/api';
-const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'invoices', 'settings'];
+const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'settings'];
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -16,7 +16,13 @@ function App() {
     logo: '',
     receiptLogoWidth: '120',
     receiptHeader: '',
+    receiptCounterLabel: '',
     receiptFooter: '',
+    receiptFontTitle: '',
+    posHeaderSubtitle: 'POS Header',
+    posHeaderTitle: 'POS Counter',
+    posHeaderPhoto: '',
+    developerPhoto: '',
     receiptFontSize: '12',
     receiptFontStyle: 'Arial',
     receiptLineStyle: 'dashed',
@@ -43,6 +49,9 @@ function App() {
     receiptShowCustomerMessage: true,
     receiptShowNotes: true,
     receiptFontFamily: 'Arial',
+    tokenSlipEnabled: true,
+    tokenSlipPrefix: 'TS',
+    tokenSlipNextNumber: 1,
     receiptFontSizes: {
       title: 16,
       section: 14,
@@ -74,7 +83,29 @@ function App() {
   const [customers, setCustomers] = useState([]);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '' });
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const MASHALLAH_CATEGORY = 'مَا شَاءَ ٱللَّٰهُ';
+  const [selectedCategory, setSelectedCategory] = useState(MASHALLAH_CATEGORY);
+  const loadStoredMashallahSlots = () => {
+    const defaultSlots = Array.from({ length: 20 }, (_, index) => ({ slot: index + 1, productId: null }));
+    try {
+      const stored = JSON.parse(localStorage.getItem('mashallahSlots') || 'null');
+      if (!Array.isArray(stored)) return defaultSlots;
+      const normalized = stored.slice(0, 20).map((slot, index) => ({
+        slot: slot?.slot || index + 1,
+        productId: slot?.productId ?? null
+      }));
+      if (normalized.length < 20) {
+        return [...normalized, ...defaultSlots.slice(normalized.length)];
+      }
+      return normalized;
+    } catch {
+      return defaultSlots;
+    }
+  };
+  const [mashallahSlots, setMashallahSlots] = useState(loadStoredMashallahSlots);
+  const [activeMashallahSlot, setActiveMashallahSlot] = useState(null);
+  const [showMashallahSelector, setShowMashallahSelector] = useState(false);
+  const [mashallahSearch, setMashallahSearch] = useState('');
 
   const normalizeText = (value) => String(value || '').trim().toLowerCase();
   const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
@@ -100,7 +131,7 @@ function App() {
     tableNumber: '',
     deliveryAgent: '',
     serviceType: '',
-    deliveryFee: 50,
+    deliveryFee: 0,
     discount: 0,
     taxPercent: settings.taxRate || 0,
     serviceCharge: 0,
@@ -118,6 +149,10 @@ function App() {
     return customers.filter((customer) => normalizeText(customer.address).includes(query));
   }, [orderDetails.address, customers]);
 
+  useEffect(() => {
+    localStorage.setItem('mashallahSlots', JSON.stringify(mashallahSlots));
+  }, [mashallahSlots]);
+
   const handleAddressSelect = (customer) => {
     setOrderDetails((prev) => ({
       ...prev,
@@ -126,6 +161,31 @@ function App() {
       customerName: customer.name || prev.customerName
     }));
     setPopupError('');
+  };
+
+  const mashallahProducts = useMemo(() => {
+    return mashallahSlots
+      .map((slot) => {
+        const product = posProducts.find((item) => item.id === slot.productId);
+        return product ? { ...product, mashallahSlot: slot.slot } : null;
+      })
+      .filter(Boolean);
+  }, [mashallahSlots, posProducts]);
+
+  const openMashallahSelector = (slot) => {
+    setActiveMashallahSlot(slot);
+    setMashallahSearch('');
+    setShowMashallahSelector(true);
+  };
+
+  const assignProductToMashallah = (slotNumber, product) => {
+    setMashallahSlots((prev) => prev.map((slot) => (slot.slot === slotNumber ? { ...slot, productId: product.id } : slot)));
+    setShowMashallahSelector(false);
+    setActiveMashallahSlot(null);
+  };
+
+  const clearMashallahSlot = (slotNumber) => {
+    setMashallahSlots((prev) => prev.map((slot) => (slot.slot === slotNumber ? { ...slot, productId: null } : slot)));
   };
 
   const handleAddNewAddress = () => {
@@ -139,8 +199,21 @@ function App() {
       setPopupError('This address already exists in your customer list.');
       return;
     }
-    setCustomers((prev) => [...prev, { id: Date.now(), name: '', phone: '', address }]);
-    setPopupError('Address added to customer list.');
+    const newCustomer = { name: '', phone: orderDetails.phone || '', address };
+    setLoading(true);
+    persistCustomer(newCustomer)
+      .then((created) => {
+        if (created) {
+          setCustomers((prev) => [...prev, created]);
+          setPopupError('Address added to customer list.');
+        } else {
+          setPopupError('Failed to add address.');
+        }
+      })
+      .catch((error) => {
+        setPopupError(error.message || 'Failed to add address.');
+      })
+      .finally(() => setLoading(false));
   };
   const [editingOrder, setEditingOrder] = useState(null);
   const [currentSavedOrder, setCurrentSavedOrder] = useState(null);
@@ -153,7 +226,7 @@ function App() {
     tableNumber: '',
     deliveryAgent: '',
     serviceType: '',
-    deliveryFee: 50,
+    deliveryFee: 0,
     discount: 0,
     taxPercent: settings.taxRate || 0,
     serviceCharge: 0,
@@ -194,7 +267,7 @@ function App() {
   const [takeawaySubTab, setTakeawaySubTab] = useState('all');
   const [dineinSubTab, setDineinSubTab] = useState('tables');
   const [deliverySettingsSubTab, setDeliverySettingsSubTab] = useState('serviceTypes');
-  const [deliveryViewMode, setDeliveryViewMode] = useState('tile');
+  const [deliveryViewMode, setDeliveryViewMode] = useState('table');
   const [takeawayViewMode, setTakeawayViewMode] = useState('table');
   const [selectedRider, setSelectedRider] = useState('');
   const [bulkRiderAssignmentOpen, setBulkRiderAssignmentOpen] = useState(false);
@@ -202,6 +275,11 @@ function App() {
   const [orderFilterPayment, setOrderFilterPayment] = useState('');
   const [orderPageIndex, setOrderPageIndex] = useState(0);
   const [orderPageSize, setOrderPageSize] = useState(6);
+  const [recentOrderTab, setRecentOrderTab] = useState('Delivery');
+  const [recentOrderDateFilter, setRecentOrderDateFilter] = useState('today');
+  const [recentOrderCustomDate, setRecentOrderCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [recentOrderPageIndex, setRecentOrderPageIndex] = useState(0);
+  const [recentOrderPageSize, setRecentOrderPageSize] = useState(6);
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [isMobileSidebar, setIsMobileSidebar] = useState(false);
@@ -237,7 +315,6 @@ function App() {
     customers: '👥',
     orders: '🧾',
     'rider-book': '🚴',
-    invoices: '📄',
     settings: '⚙️'
   };
   const tabLabels = {
@@ -245,14 +322,8 @@ function App() {
     'rider-book': 'Rider Book'
   };
   const formatTabName = (tab) => tabLabels[tab] || tab.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-  const [deliveryServiceTypes, setDeliveryServiceTypes] = useState([
-    { id: 'standard', name: 'Standard Delivery', charge: 50, location: 'City', active: true },
-    { id: 'express', name: 'Express Delivery', charge: 120, location: '', active: true }
-  ]);
-  const [deliveryLocations, setDeliveryLocations] = useState([
-    { id: 'city', name: 'City Area', description: 'Standard city delivery zone' },
-    { id: 'suburbs', name: 'Suburbs', description: 'Extended suburb delivery zone' }
-  ]);
+  const [deliveryServiceTypes, setDeliveryServiceTypes] = useState([]);
+  const [deliveryLocations, setDeliveryLocations] = useState([]);
   const [deliveryServiceForm, setDeliveryServiceForm] = useState({ id: null, name: '', charge: 50, location: '', active: true });
   const [deliveryLocationForm, setDeliveryLocationForm] = useState({ id: null, name: '', description: '' });
   const [selectedOrders, setSelectedOrders] = useState([]);
@@ -264,6 +335,10 @@ function App() {
   useEffect(() => {
     setOrderPageIndex(0);
   }, [deliverySubTab, orderSearch, orderFilterRider, orderFilterPayment, orderPageSize]);
+
+  useEffect(() => {
+    setRecentOrderPageIndex(0);
+  }, [recentOrderTab, recentOrderPageSize]);
 
   const openBulkRiderAssignmentModal = () => {
     if (!selectedOrders.length) return;
@@ -317,6 +392,9 @@ function App() {
   const [markPaidOrder, setMarkPaidOrder] = useState(null);
   const [markPaidAmount, setMarkPaidAmount] = useState('');
   const [markPaidMethod, setMarkPaidMethod] = useState('Cash');
+  const [markDueOrder, setMarkDueOrder] = useState(null);
+  const [markDueAmount, setMarkDueAmount] = useState(0);
+  const [markDueMethod, setMarkDueMethod] = useState('Cash');
   const [editingProductSearch, setEditingProductSearch] = useState('');
 
   const [staffSubTab, setStaffSubTab] = useState('list');
@@ -338,69 +416,83 @@ function App() {
     loginEnabled: true
   });
   const [roles, setRoles] = useState([
-    { name: 'Admin', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, invoices: true, settings: true, login: true } },
-    { name: 'Cashier', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, invoices: false, settings: false, login: true } },
-    { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, invoices: true, settings: true, login: true } },
-    { name: 'Biker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, invoices: false, settings: false, login: true } },
-    { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, invoices: false, settings: false, login: true } },
-    { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, invoices: false, settings: false, login: true } },
-    { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, invoices: false, settings: false, login: true } },
-    { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, invoices: false, settings: false, login: true } }
+    { name: 'Admin', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
+    { name: 'Cashier', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, settings: false, login: true } },
+    { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, settings: true, login: true } },
+    { name: 'Biker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
+    { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
+    { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
+    { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
+    { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } }
   ]);
 
+  // Auto-fill delivery fee when a delivery service type is selected
   useEffect(() => {
-    const storedServiceTypes = localStorage.getItem('deliveryServiceTypes');
-    const storedLocations = localStorage.getItem('deliveryLocations');
-    if (storedServiceTypes) {
-      try {
-        setDeliveryServiceTypes(JSON.parse(storedServiceTypes));
-      } catch (error) {
-        console.error('Invalid stored service types', error);
-      }
+    if (!orderDetails.serviceType) return;
+    const type = deliveryServiceTypes.find((t) => t.name === orderDetails.serviceType || t.id === orderDetails.serviceType);
+    if (type) {
+      setOrderDetails((prev) => ({ ...prev, deliveryFee: Number(type.charge || prev.deliveryFee) }));
     }
-    if (storedLocations) {
-      try {
-        setDeliveryLocations(JSON.parse(storedLocations));
-      } catch (error) {
-        console.error('Invalid stored locations', error);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('deliveryServiceTypes', JSON.stringify(deliveryServiceTypes));
-  }, [deliveryServiceTypes]);
-
-  useEffect(() => {
-    localStorage.setItem('deliveryLocations', JSON.stringify(deliveryLocations));
-  }, [deliveryLocations]);
+  }, [orderDetails.serviceType, deliveryServiceTypes]);
 
   useEffect(() => {
     if (token) {
       validateToken();
+      loadDeliverySettings();
     }
   }, [token]);
 
-  useEffect(() => {
-    const storedCustomers = localStorage.getItem('customers');
-    if (storedCustomers) {
-      try {
-        setCustomers(JSON.parse(storedCustomers));
-      } catch (error) {
-        console.error('Invalid stored customers', error);
-      }
+  async function loadCustomers() {
+    try {
+      const data = await fetchJson(`${apiBase}/pos_customers`);
+      setCustomers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setMessage(error.message);
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    localStorage.setItem('customers', JSON.stringify(customers));
-  }, [customers]);
+  async function persistCustomer(customer) {
+    if (!customer) return null;
+    try {
+      if (customer.id) {
+        return await fetchJson(`${apiBase}/pos_customers/${customer.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(customer)
+        });
+      }
+      return await fetchJson(`${apiBase}/pos_customers`, {
+        method: 'POST',
+        body: JSON.stringify(customer)
+      });
+    } catch (error) {
+      setMessage(error.message);
+      return null;
+    }
+  }
+
+  async function deleteCustomerFromServer(customerId) {
+    if (!customerId) return false;
+    try {
+      await fetchJson(`${apiBase}/pos_customers/${customerId}`, { method: 'DELETE' });
+      return true;
+    } catch (error) {
+      setMessage(error.message);
+      return false;
+    }
+  }
 
   useEffect(() => {
     if (user) {
+      loadSettings();
       loadTab(activeTab);
     }
   }, [activeTab, user]);
+
+  useEffect(() => {
+    if (user) {
+      loadCustomers();
+    }
+  }, [user]);
 
   useEffect(() => {
     setOrderDetails((prev) => ({ ...prev, taxPercent: settings.taxRate || 0 }));
@@ -420,8 +512,6 @@ function App() {
         return 'Staff Management';
       case 'sales':
         return 'Sales History';
-      case 'invoices':
-        return 'Invoice Center';
       case 'catalogue-qr':
         return 'Catalogue QR';
       case 'customers':
@@ -527,6 +617,90 @@ function App() {
     setMessage('Logged out');
   }
 
+  async function loadSettings() {
+    try {
+      const data = await fetchJson(`${apiBase}/settings`);
+      setSettings((prev) => ({
+        ...prev,
+        ...data,
+        receiptFontSizes: {
+          ...prev.receiptFontSizes,
+          ...(data.receiptFontSizes || {})
+        }
+      }));
+
+      // If a Google Sheet is configured, trigger a one-time server->sheet sync on load
+      if (data && data.googleSpreadsheetId) {
+        try {
+          await fetchJson(`${apiBase}/google/save-db`, {
+            method: 'POST',
+            body: JSON.stringify({ spreadsheetId: data.googleSpreadsheetId })
+          });
+          setMessage('Synced server data to Google Sheet.');
+        } catch (err) {
+          console.warn('Auto sync to Google Sheet failed:', err.message);
+        }
+      }
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  // Create a new Google Sheet via the server and save its id to settings
+  async function createGoogleSheet() {
+    if (!user) return setMessage('Please login as admin to create sheet.');
+    setLoading(true);
+    try {
+      const res = await fetchJson(`${apiBase}/google/create-sheet`, { method: 'POST', body: JSON.stringify({ title: `${settings.hotelName || 'Usman POS'} Backup` }) });
+      const { spreadsheetId, url } = res;
+      // persist to server settings
+      const updated = await fetchJson(`${apiBase}/settings`, { method: 'PUT', body: JSON.stringify({ googleSpreadsheetId: spreadsheetId }) });
+      setSettings((prev) => ({ ...prev, ...updated }));
+      setMessage(`Created sheet: ${url}`);
+      try {
+        window.open(url, '_blank');
+      } catch (e) {
+        // ignore if popup blocked
+      }
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Manual sync: push server DB to configured Google Sheet
+  async function syncServerToGoogleSheet() {
+    if (!settings.googleSpreadsheetId) return setMessage('No Google Sheet configured in settings.');
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/google/save-db`, { method: 'POST', body: JSON.stringify({ spreadsheetId: settings.googleSpreadsheetId }) });
+      setMessage('Server data pushed to Google Sheet.');
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Restore server DB from Google Sheet (overwrites local DB) - use carefully
+  async function restoreServerFromGoogleSheet() {
+    if (!settings.googleSpreadsheetId) return setMessage('No Google Sheet configured in settings.');
+    if (!confirm('This will overwrite the server database with data from the Google Sheet. Continue?')) return;
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/google/restore-db`, { method: 'POST', body: JSON.stringify({ spreadsheetId: settings.googleSpreadsheetId }) });
+      setMessage('Server database restored from Google Sheet. Reloading data...');
+      // reload visible data
+      if (activeTab === 'settings') await loadSettings();
+      await loadTab(activeTab);
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function loadTab(tab) {
     setLoading(true);
     setMessage('');
@@ -535,15 +709,7 @@ function App() {
         const data = await fetchJson(`${apiBase}/dashboard`);
         setDashboard(data);
       } else if (tab === 'settings') {
-        const data = await fetchJson(`${apiBase}/settings`);
-        setSettings((prev) => ({
-          ...prev,
-          ...data,
-          receiptFontSizes: {
-            ...prev.receiptFontSizes,
-            ...(data.receiptFontSizes || {})
-          }
-        }));
+        await loadSettings();
       } else if (tab === 'inventory') {
         await loadInventoryData();
       } else if (tab === 'tables') {
@@ -557,6 +723,7 @@ function App() {
       } else if (tab === 'pos' || tab === 'catalogue-qr') {
         await loadPosData();
       } else if (tab === 'customers') {
+        await loadCustomers();
         await loadOrdersData();
       } else {
         const data = await fetchJson(`${apiBase}/${tab}`);
@@ -578,12 +745,31 @@ function App() {
       // Aggregate customers from delivery orders
       const deliveryCustomers = orders
         .filter((o) => o.orderType === 'Delivery' && o.address)
-        .map((o) => ({ id: o.id, name: o.customerName || '', phone: o.phone || '', address: o.address || '' }))
+        .map((o) => ({ id: o.id, name: o.customerName || '', phone: o.phone || '', address: o.address || '', lastOrderNumber: o.orderNumber || '' }))
         .filter((c, index, self) => self.findIndex((sc) => normalizeText(sc.address) === normalizeText(c.address)) === index);
+      // Persist any new delivery customers to server and update state
       setCustomers((prev) => {
         const existingAddresses = new Set(prev.map((c) => normalizeText(c.address)));
         const newCustomers = deliveryCustomers.filter((c) => !existingAddresses.has(normalizeText(c.address)));
-        return [...prev, ...newCustomers];
+        if (!newCustomers.length) return prev;
+        // Optimistically add them locally with temporary ids, then persist
+        const tempAdded = newCustomers.map((c) => ({ id: `temp-${Date.now()}-${Math.random()}`, ...c }));
+        // Persist in background
+        (async () => {
+          try {
+            const created = await Promise.all(newCustomers.map((nc) => persistCustomer(nc).catch(() => null)));
+            const valid = created.filter(Boolean);
+            if (valid.length) {
+              setCustomers((current) => {
+                const withoutTemp = current.filter((item) => !item.id.toString().startsWith('temp-'));
+                return [...withoutTemp, ...valid];
+              });
+            }
+          } catch (err) {
+            console.warn('Failed to persist delivery customers', err.message || err);
+          }
+        })();
+        return [...prev, ...tempAdded];
       });
     } catch (error) {
       setMessage(error.message);
@@ -631,8 +817,42 @@ function App() {
       ]);
       setStaff(staff);
       setPosOrders(orders);
-      setSelectedCategory('All');
+      setSelectedCategory((current) => current === 'All' ? MASHALLAH_CATEGORY : current);
       setPosSearch('');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadDeliverySettings() {
+    setLoading(true);
+    setMessage('');
+    try {
+      const [serviceTypes, locations] = await Promise.all([
+        fetchJson(`${apiBase}/delivery_service_types`),
+        fetchJson(`${apiBase}/delivery_locations`)
+      ]);
+      setDeliveryServiceTypes(Array.isArray(serviceTypes) ? serviceTypes : []);
+      setDeliveryLocations(Array.isArray(locations) ? locations : []);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveCatalogueLayoutSettings() {
+    setLoading(true);
+    setMessage('');
+    try {
+      const updated = await fetchJson(`${apiBase}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify({ catalogueLayout, catalogueHost })
+      });
+      setSettings((prev) => ({ ...prev, ...updated }));
+      setMessage('Catalogue layout settings saved.');
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -981,6 +1201,28 @@ function App() {
     }
   };
 
+  const handleDeveloperPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSettings((prev) => ({ ...prev, developerPhoto: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePosHeaderPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSettings((prev) => ({ ...prev, posHeaderPhoto: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   async function updateSettings() {
     setLoading(true);
     setMessage('');
@@ -1014,13 +1256,62 @@ function App() {
 
 
   function getFilteredProducts() {
+    const searchTerm = normalizeText(posSearch);
+    if (selectedCategory === MASHALLAH_CATEGORY) {
+      return mashallahProducts.filter((product) => {
+        const matchesSearch =
+          normalizeText(product.name).includes(searchTerm) ||
+          normalizeText(product.category).includes(searchTerm) ||
+          normalizeText(product.code).includes(searchTerm) ||
+          normalizeText(product.sku).includes(searchTerm) ||
+          normalizeText(product.id).includes(searchTerm);
+        return !searchTerm || matchesSearch;
+      });
+    }
+
     return posProducts.filter((product) => {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-      const searchTerm = posSearch.toLowerCase();
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm) || product.category.toLowerCase().includes(searchTerm);
+      const matchesSearch =
+        normalizeText(product.name).includes(searchTerm) ||
+        normalizeText(product.category).includes(searchTerm) ||
+        normalizeText(product.code).includes(searchTerm) ||
+        normalizeText(product.sku).includes(searchTerm) ||
+        normalizeText(product.id).includes(searchTerm);
       return matchesCategory && (!searchTerm || matchesSearch);
     });
   }
+
+  function mergeCartItem(newItem) {
+    setCart((prev) => {
+      const existingIndex = prev.findIndex(
+        (item) =>
+          item.productId === newItem.productId &&
+          item.weight === newItem.weight &&
+          item.flavor === newItem.flavor
+      );
+      if (existingIndex >= 0) {
+        return prev.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * (Number(item.price) || 0) }
+            : item
+        );
+      }
+      return [...prev, newItem];
+    });
+  }
+
+  useEffect(() => {
+    const searchTerm = normalizeText(posSearch);
+    if (!searchTerm) return;
+    const exactMatch = posProducts.find((product) =>
+      normalizeText(product.code) === searchTerm ||
+      normalizeText(product.sku) === searchTerm ||
+      normalizeText(product.id) === searchTerm
+    );
+    if (!exactMatch) return;
+    addToCart(exactMatch);
+    setPosSearch('');
+  }, [posSearch, posProducts]);
 
   function getProductStartingPrice(product) {
     if (product.flavors && product.flavors.length > 0) {
@@ -1070,7 +1361,7 @@ function App() {
       return;
     }
     // Otherwise add directly (no flavors, no variants)
-    setCart((prev) => [...prev, buildCartItem(product)]);
+    mergeCartItem(buildCartItem(product));
   }
 
   function handleFlavorSelect(flavor) {
@@ -1083,7 +1374,7 @@ function App() {
     }
     // Otherwise add to cart with just flavor (no variants)
     if (selectedCartProduct) {
-      setCart((prev) => [...prev, buildCartItem(selectedCartProduct, null, flavor)]);
+      mergeCartItem(buildCartItem(selectedCartProduct, null, flavor));
       setSelectedCartProduct(null);
       setSelectedFlavorOption(null);
     }
@@ -1093,7 +1384,7 @@ function App() {
     setShowWeightPopup(false);
     if (selectedCartProduct) {
       // Add with both selected flavor and variant
-      setCart((prev) => [...prev, buildCartItem(selectedCartProduct, weight, selectedFlavorOption)]);
+      mergeCartItem(buildCartItem(selectedCartProduct, weight, selectedFlavorOption));
       setSelectedCartProduct(null);
       setSelectedWeightOption(null);
       setSelectedFlavorOption(null);
@@ -1103,7 +1394,11 @@ function App() {
   function updateCartItem(itemId, delta) {
     setCart((prev) =>
       prev
-        .map((item) => (item.itemId === itemId ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item))
+        .map((item) => {
+          if (item.itemId !== itemId) return item;
+          const newQty = Math.max(1, (item.quantity || 0) + delta);
+          return { ...item, quantity: newQty, total: newQty * (Number(item.price) || 0) };
+        })
         .filter((item) => item.quantity > 0)
     );
   }
@@ -1114,6 +1409,18 @@ function App() {
 
   function updateCartNotes(itemId, notes) {
     setCart((prev) => prev.map((item) => (item.itemId === itemId ? { ...item, notes } : item)));
+  }
+
+  // Edit cart item's name and price temporarily (POS-only)
+  function editCartItemDetails(itemId) {
+    const item = cart.find((c) => c.itemId === itemId);
+    if (!item) return;
+    const newName = window.prompt('Edit product name:', item.name);
+    if (newName === null) return; // cancelled
+    const priceInput = window.prompt('Edit product price (PKR):', String(item.price));
+    if (priceInput === null) return; // cancelled
+    const newPrice = Number(priceInput) || 0;
+    setCart((prev) => prev.map((c) => (c.itemId === itemId ? { ...c, name: newName, price: newPrice, total: newPrice * c.quantity } : c)));
   }
 
   function updateOrderDetail(key, value) {
@@ -1141,6 +1448,47 @@ function App() {
     return '';
   }
 
+  function syncDeliveryCustomerFromOrder(address, phone, orderNumber) {
+    if (!address) return;
+    setCustomers((prev) => {
+      const normalizedAddress = normalizeText(address);
+      const existing = prev.find((customer) => normalizeText(customer.address) === normalizedAddress);
+      if (existing) {
+        const updatedFields = {};
+        if (phone && existing.phone !== phone) {
+          updatedFields.phone = phone;
+        }
+        if (orderNumber && existing.lastOrderNumber !== orderNumber) {
+          updatedFields.lastOrderNumber = orderNumber;
+        }
+        if (!Object.keys(updatedFields).length) return prev;
+        persistCustomer({ ...existing, ...updatedFields })
+          .then((updated) => {
+            if (updated) {
+              setCustomers((current) => current.map((customer) => customer.id === updated.id ? updated : customer));
+            }
+          })
+          .catch((err) => {
+            console.warn('Failed to update delivery customer', err.message || err);
+          });
+        return prev.map((customer) =>
+          customer.id === existing.id ? { ...customer, ...updatedFields } : customer
+        );
+      }
+      const newCustomer = { name: '', phone: phone || '', address, lastOrderNumber: orderNumber || '' };
+      persistCustomer(newCustomer)
+        .then((created) => {
+          if (created) {
+            setCustomers((current) => [...current, created]);
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to persist delivery customer', err.message || err);
+        });
+      return prev;
+    });
+  }
+
   async function savePosOrder(orderStatus = 'Pending', overrides = {}) {
     const error = validatePosOrder();
     if (error) {
@@ -1150,17 +1498,18 @@ function App() {
     setLoading(true);
     setMessage('');
     try {
-      const isPickupOrder = orderType === 'Takeaway' && (!orderDetails.customerName || !orderDetails.phone || !orderDetails.notes);
+      const isPickupOrder = orderType === 'Takeaway' && !orderDetails.customerName;
+      const dineInCustomerName = orderType === 'Dine-In' ? (orderDetails.customerName || orderDetails.tableNumber || 'Table') : null;
       const payload = {
         items: cart,
         orderType,
-        customerName: isPickupOrder ? 'PICK UP' : orderDetails.customerName,
+        customerName: isPickupOrder ? 'Pickup' : (dineInCustomerName ?? orderDetails.customerName),
         phone: orderDetails.phone,
-        address: orderDetails.address,
+        address: orderType === 'Delivery' ? orderDetails.address : '',
         tableNumber: orderDetails.tableNumber,
-        deliveryAgent: orderDetails.deliveryAgent,
-        serviceType: orderDetails.serviceType,
-        deliveryFee: Number(orderDetails.deliveryFee) || 0,
+        deliveryAgent: orderType === 'Delivery' ? orderDetails.deliveryAgent : '',
+        serviceType: orderType === 'Delivery' ? orderDetails.serviceType : '',
+        deliveryFee: orderType === 'Delivery' ? Number(orderDetails.deliveryFee) || 0 : 0,
         discount: Number(orderDetails.discount) || 0,
         taxPercent: Number(orderDetails.taxPercent) || 0,
         serviceCharge: Number(orderDetails.serviceCharge) || 0,
@@ -1184,15 +1533,10 @@ function App() {
       setOrderDetails((prev) => ({ ...prev, customerName: '', phone: '', address: '', tableNumber: '', deliveryAgent: '', paymentStatus: '' }));
       setEditingOrder(null);
       if (orderType === 'Delivery' && order.address) {
-        setCustomers((prev) => {
-          const existing = prev.find((c) => normalizeText(c.address) === normalizeText(order.address));
-          if (!existing) {
-            return [...prev, { id: Date.now(), name: order.customerName || '', phone: order.phone || '', address: order.address }];
-          }
-          return prev;
-        });
+        syncDeliveryCustomerFromOrder(order.address, order.phone, order.orderNumber);
       }
       await loadPosData();
+      await loadOrdersData();
       return order;
     } catch (error) {
       throw new Error(error.message || 'Failed to save order');
@@ -1234,6 +1578,14 @@ function App() {
       return;
     }
     setOrderType(type);
+    setOrderDetails((prev) => ({
+      ...prev,
+      deliveryFee: type === 'Delivery' ? prev.deliveryFee : 0,
+      serviceType: type === 'Delivery' ? prev.serviceType : '',
+      deliveryAgent: type === 'Delivery' ? prev.deliveryAgent : '',
+      address: type === 'Delivery' ? prev.address : '',
+      paymentStatus: type === 'Delivery' ? prev.paymentStatus : ''
+    }));
     setPopupError('');
     setShowCustomerDetailsPopup(true);
     setShowPaymentPopup(false);
@@ -1283,6 +1635,13 @@ function App() {
       if (order) {
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
+        const targetTab = orderType === 'Dine-In' ? 'dinein' : orderType === 'Delivery' ? 'delivery' : 'takeaway';
+        setOrdersMainTab(targetTab);
+        if (orderType === 'Dine-In') {
+          setDineinSubTab('tables');
+          setDineinOrderStatusFilter('all');
+          setDineinPageIndex(0);
+        }
         setActiveTab('orders');
       } else {
         setPopupError('Failed to save order. Please try again.');
@@ -1299,7 +1658,7 @@ function App() {
     }
     setPopupError('');
     try {
-      printReceipt(currentSavedOrder);
+      await printReceipt(currentSavedOrder);
     } catch (err) {
       setPopupError(`Print error: ${err.message}`);
     }
@@ -1324,12 +1683,23 @@ function App() {
     }
 
     try {
-      const saveStatus = orderType === 'Dine-In' ? 'Pending' : orderType === 'Delivery' ? 'Kitchen' : 'Completed';
+      const saveStatus = orderType === 'Dine-In'
+        ? 'Pending'
+        : orderType === 'Delivery'
+          ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
+          : 'Completed';
       const order = await savePosOrder(saveStatus);
       if (order) {
         setTimeout(() => printReceipt(order), 500);
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
+        const targetTab = orderType === 'Dine-In' ? 'dinein' : orderType === 'Delivery' ? 'delivery' : 'takeaway';
+        setOrdersMainTab(targetTab);
+        if (orderType === 'Dine-In') {
+          setDineinSubTab('tables');
+          setDineinOrderStatusFilter('all');
+          setDineinPageIndex(0);
+        }
         setActiveTab('orders');
       } else {
         setPopupError('Failed to save order. Please try again.');
@@ -1379,10 +1749,14 @@ function App() {
       return;
     }
 
-    const saveStatus = orderType === 'Dine-In' ? 'Pending' : orderType === 'Delivery' ? 'Kitchen' : 'Completed';
+    const saveStatus = orderType === 'Dine-In'
+      ? 'Pending'
+      : orderType === 'Delivery'
+        ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
+        : 'Completed';
     const order = await savePosOrder(saveStatus);
     if (order) {
-      printReceipt(order);
+      await printReceipt(order);
       setShowCustomerDetailsPopup(false);
       setShowPaymentPopup(false);
       await loadOrdersData();
@@ -1393,7 +1767,7 @@ function App() {
   async function handlePaymentSave() {
     const order = await completePayment();
     if (order) {
-      printReceipt(order);
+      await printReceipt(order);
       setShowPaymentPopup(false);
     }
   }
@@ -1407,7 +1781,7 @@ function App() {
     try {
       const order = await savePosOrder('Pay Later');
       if (order) {
-        printReceipt(order);
+        await printReceipt(order);
         setShowPaymentPopup(false);
       }
     } catch (err) {
@@ -1480,11 +1854,11 @@ function App() {
       orderType: order.orderType || 'Dine-In',
       customerName: order.customerName || '',
       phone: order.phone || '',
-      address: order.address || '',
+      address: order.orderType === 'Delivery' ? order.address || '' : '',
       tableNumber: order.tableNumber || '',
-      deliveryAgent: order.deliveryAgent || '',
-      serviceType: order.serviceType || '',
-      deliveryFee: order.deliveryFee || 0,
+      deliveryAgent: order.orderType === 'Delivery' ? order.deliveryAgent || '' : '',
+      serviceType: order.orderType === 'Delivery' ? order.serviceType || '' : '',
+      deliveryFee: order.orderType === 'Delivery' ? (order.deliveryFee || 0) : 0,
       discount: order.discount || 0,
       taxPercent: order.taxPercent || settings.taxRate || 0,
       serviceCharge: order.serviceCharge || 0,
@@ -1504,11 +1878,11 @@ function App() {
     setOrderDetails({
       customerName: order.customerName || '',
       phone: order.phone || '',
-      address: order.address || '',
+      address: order.orderType === 'Delivery' ? order.address || '' : '',
       tableNumber: order.tableNumber || '',
-      deliveryAgent: order.deliveryAgent || '',
-      serviceType: order.serviceType || '',
-      deliveryFee: order.deliveryFee || 0,
+      deliveryAgent: order.orderType === 'Delivery' ? order.deliveryAgent || '' : '',
+      serviceType: order.orderType === 'Delivery' ? order.serviceType || '' : '',
+      deliveryFee: order.orderType === 'Delivery' ? (order.deliveryFee || 0) : 0,
       discount: order.discount || 0,
       taxPercent: order.taxPercent || settings.taxRate || 0,
       serviceCharge: order.serviceCharge || 0,
@@ -1518,6 +1892,17 @@ function App() {
     setCurrentSavedOrder(order);
     setMessage('Loaded order for editing in POS. Adjust items and save to update.');
   };
+
+  const renderOrderEditButton = (order) => (
+    <button
+      type="button"
+      title="Edit order"
+      onClick={() => openOrderForEditInPos(order)}
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-violet-400 bg-gradient-to-br from-violet-500 via-purple-600 to-slate-950 text-white shadow-[0_0_25px_rgba(139,92,246,0.35)] transition hover:scale-105 hover:shadow-[0_0_35px_rgba(139,92,246,0.55)]"
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+    </button>
+  );
 
   async function saveOrderEdit() {
     if (!editingOrder) return;
@@ -1541,11 +1926,11 @@ function App() {
         items: editingOrderCart,
         customerName: orderEditForm.customerName,
         phone: orderEditForm.phone,
-        address: orderEditForm.address,
+        address: orderEditForm.orderType === 'Delivery' ? orderEditForm.address : '',
         tableNumber: orderEditForm.tableNumber,
-        deliveryAgent: orderEditForm.deliveryAgent,
-        serviceType: orderEditForm.serviceType,
-        deliveryFee: Number(orderEditForm.deliveryFee) || 0,
+        deliveryAgent: orderEditForm.orderType === 'Delivery' ? orderEditForm.deliveryAgent : '',
+        serviceType: orderEditForm.orderType === 'Delivery' ? orderEditForm.serviceType : '',
+        deliveryFee: orderEditForm.orderType === 'Delivery' ? Number(orderEditForm.deliveryFee) || 0 : 0,
         discount: Number(orderEditForm.discount) || 0,
         taxPercent: Number(orderEditForm.taxPercent) || 0,
         serviceCharge: Number(orderEditForm.serviceCharge) || 0,
@@ -1616,6 +2001,15 @@ function App() {
     setMarkPaidOrder(order);
     setMarkPaidAmount(order.total || order.amount || 0);
     setMarkPaidMethod(order.paymentMethod || 'Cash');
+    setMarkDueOrder(null);
+  }
+
+  function confirmMarkDue(order) {
+    // ensure mark-paid modal is closed
+    setMarkPaidOrder(null);
+    setMarkDueOrder(order);
+    setMarkDueAmount(0);
+    setMarkDueMethod(order.paymentMethod || 'Cash');
   }
 
   async function handleMarkPaid() {
@@ -1664,6 +2058,67 @@ function App() {
     }
   }
 
+  async function handleMarkDue() {
+    if (!markDueOrder) return;
+    setLoading(true);
+    setMessage('');
+    try {
+      const total = Number(markDueOrder.total || markDueOrder.amount || 0);
+      const collected = Number(markDueAmount) || 0;
+
+      // Update order: set to Payment Pending / Due and clear tableNumber so table becomes free
+      await fetchJson(`${apiBase}/pos/orders/${markDueOrder.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'Payment Pending', paymentStatus: 'Due', tableNumber: '' })
+      });
+
+      // If any amount was collected now, record a payment (partial)
+      if (collected > 0) {
+        const paymentStatus = collected >= total ? 'Completed' : 'Partial';
+        await fetchJson(`${apiBase}/pos/payments`, {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: markDueOrder.id,
+            amount: Number(collected) || 0,
+            paymentMethod: markDueMethod,
+            status: paymentStatus,
+            description: `Partial payment recorded for order ${markDueOrder.orderNumber || markDueOrder.id}`
+          })
+        });
+
+        // If collected covers total treat as paid
+        if (collected >= total) {
+          await fetchJson(`${apiBase}/pos/orders/${markDueOrder.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'Payment Collected', paymentStatus: 'Paid', tableNumber: '' })
+          });
+        }
+      }
+
+      // Free table if exists
+      const tableLabel = markDueOrder.tableNumber;
+      if (tableLabel) {
+        const table = posTables.find((item) => item.label === tableLabel || item.name === tableLabel || item.number === tableLabel);
+        if (table) {
+          await fetchJson(`${apiBase}/pos/tables/${table.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'available' })
+          });
+        }
+      }
+
+      setMessage('Order updated (marked due).');
+      setMarkDueOrder(null);
+      setMarkDueAmount(0);
+      await loadOrdersData();
+      await loadPosData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function cancelMarkPaid() {
     setMarkPaidOrder(null);
     setMarkPaidAmount('');
@@ -1671,7 +2126,101 @@ function App() {
   }
 
   
-function printReceipt(order) {
+  function printHtml(content) {
+    return new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentWindow?.document || iframe.document;
+      iframeDoc.open();
+      iframeDoc.write(content);
+      iframeDoc.close();
+
+      const cleanup = () => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        resolve();
+      };
+
+      const printFrame = () => {
+        const win = iframe.contentWindow;
+        if (!win) {
+          cleanup();
+          return;
+        }
+        win.focus();
+        win.onafterprint = cleanup;
+        win.print();
+        setTimeout(cleanup, 1000);
+      };
+
+      if (iframe.contentWindow) {
+        printFrame();
+      } else {
+        iframe.onload = printFrame;
+      }
+    });
+  }
+
+  async function printTokenSlip(order) {
+    const tokenNumber = Number(settings.tokenSlipNextNumber || 1);
+    const prefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
+    const tokenText = `${prefix}-${tokenNumber}`;
+    const dateText = formatReceiptDate(order.date || new Date().toISOString(), settings.receiptDateTimeFormat || 'DD/MM/YYYY HH:mm');
+    const fontFamily = settings.receiptFontFamily || settings.receiptFontStyle || 'Arial';
+    const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 8px;" /></div>` : '';
+
+    const content = `
+      <html>
+        <head>
+          <style>
+            body { font-family: ${fontFamily}, Arial, sans-serif; margin: 0; padding: 10px; color: #000; }
+            .receipt { width: 220px; max-width: 220px; margin: auto; }
+            .header { text-align: center; margin-bottom: 10px; }
+            .header h2 { font-size: 18px; margin: 0; }
+            .token-label { font-size: 14px; font-weight: 700; letter-spacing: 1px; margin-top: 4px; }
+            .token-number { font-size: 44px; font-weight: 900; margin: 10px 0; text-align: center; letter-spacing: 2px; }
+            .sub { font-size: 12px; text-align: center; margin-top: 8px; }
+            .footer { text-align: center; font-size: 12px; margin-top: 12px; }
+            .logo img { display: block; margin: 0 auto 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="header">
+              ${logoHtml}
+              <h2>${settings.receiptHeader || 'Usman Hotel'}</h2>
+              <div class="token-label">Token Slip</div>
+            </div>
+            <div class="token-number">${tokenText}</div>
+            <div class="sub">${dateText}</div>
+            <div class="footer">Please keep this token slip with you.</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    await printHtml(content);
+
+    const nextToken = tokenNumber + 1;
+    setSettings((prev) => ({ ...prev, tokenSlipNextNumber: nextToken }));
+    try {
+      await fetchJson(`${apiBase}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify({ tokenSlipNextNumber: nextToken })
+      });
+    } catch (error) {
+      console.warn('Unable to save token number to settings:', error.message);
+    }
+  }
+
+  function printReceipt(order) {
     const header = settings.receiptHeader || 'Usman Hotel';
     const footer = settings.receiptFooter || 'Thank you for your business';
     const slipNumber = settings.receiptShowReceiptNumber ? `${settings.slipPrefix || 'UH'}-${order.orderNumber || order.id || Date.now()}` : '';
@@ -1683,19 +2232,26 @@ function printReceipt(order) {
     const productSize = `${settings.receiptFontSizes?.product || 12}px`;
     const customerSize = `${settings.receiptFontSizes?.customer || 12}px`;
     const notesSize = `${settings.receiptFontSizes?.notes || 11}px`;
-    const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: ${settings.receiptLogoWidth || 120}px; width: auto; height: auto; display: block; margin: 0 auto 10px;" /></div>` : '';
+    const receiptTokenText = settings.tokenSlipEnabled ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}` : '';
+    const tokenHtml = receiptTokenText ? `<div class="receipt-token"><div class="token-label">Token</div><div class="token-number">${receiptTokenText}</div></div>` : '';
+    const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: ${settings.receiptLogoWidth || 120}px; max-height: 100px; width: auto; height: auto; display: block;" /></div>` : '<div class="logo empty"></div>';
+    const counterLabelHtml = settings.receiptCounterLabel ? `<div class="counter">${settings.receiptCounterLabel}</div>` : '';
 
-    const deliveryCharge = order.deliveryFee || order.deliveryCharge || 0;
-    const subtotal = order.subtotal || order.total - deliveryCharge - (order.serviceCharge || 0) - (order.discount || 0) || 0;
-    const discountAmount = order.discount || 0;
-    const serviceCharge = order.serviceCharge || 0;
-    const taxAmount = order.tax || 0;
-    const totalAmount = order.total || order.amount || 0;
+    const deliveryCharge = order.orderType === 'Delivery' ? Number(order.deliveryFee || order.deliveryCharge || 0) : 0;
+    const serviceCharge = Number(order.serviceCharge || 0);
+    const discountAmount = Number(order.discount || 0);
+    const taxPercent = Number(order.taxPercent) || 0;
+    const subtotal = (order.subtotal != null && order.subtotal !== 0)
+      ? Number(order.subtotal)
+      : (order.items || []).reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0) || Number(it.total) || 0), 0);
+    const taxAmount = Number(order.tax || ((subtotal - discountAmount) * taxPercent) / (taxPercent > 1 ? 100 : 1));
+    const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount + deliveryCharge + serviceCharge);
 
     const productRows = (order.items || []).map((item) => {
       const qty = settings.receiptShowProductQuantity ? item.quantity || 1 : '';
       const rate = settings.receiptShowProductUnitPrice ? item.price || item.unitPrice || 0 : '';
-      const amount = item.total || ((item.price || 0) * (item.quantity || 1));
+      const computedAmount = Number(item.price || 0) * Number(item.quantity || 1);
+      const amount = computedAmount || Number(item.total) || 0;
       const details = [];
       if (item.weight) details.push(`Weight: ${item.weight}`);
       if (item.flavor) details.push(`Flavor: ${item.flavor}`);
@@ -1713,15 +2269,37 @@ function printReceipt(order) {
     }).join('');
 
     const orderTypeDisplay = order.orderType === 'Takeaway' ? 'Pickup' : order.orderType || '';
+    const receiptCustomerName = order.orderType === 'Dine-In'
+      ? (order.customerName || order.tableNumber || 'Table')
+      : (order.customerName || (order.orderType === 'Takeaway' ? 'Pickup' : ''));
+    const receiptTable = order.orderType === 'Dine-In' ? (order.tableNumber || '-') : '';
+    const receiptWaiter = order.orderType === 'Dine-In' ? (order.waiter || '-') : '';
+    const receiptLocation = order.orderType === 'Delivery' ? (order.address || '-') : '';
+    const receiptServiceType = order.orderType === 'Delivery' ? (order.serviceType || '-') : '';
+    const receiptRider = order.orderType === 'Delivery' ? (order.deliveryAgent || '-') : '';
+    const receiptStatus = order.orderType === 'Delivery' ? (order.paymentStatus || order.status || '-') : '';
     const customerLines = [];
     if (orderTypeDisplay) customerLines.push(`<div class="meta-row"><span>Order Type</span><span>${orderTypeDisplay}</span></div>`);
     if (order.status === 'Completed') customerLines.push(`<div class="meta-row"><span>Payment</span><span>✔ Paid</span></div>`);
     if (order.status === 'Pay Later') customerLines.push(`<div class="meta-row"><span>Payment</span><span>✘ Pay Later</span></div>`);
-    if (settings.receiptShowCustomerName) customerLines.push(`<div class="meta-row"><span>Customer</span><span>${order.customerName || 'PICK UP'}</span></div>`);
-    if (settings.receiptShowCustomerPhone) customerLines.push(`<div class="meta-row"><span>Mobile</span><span>${order.phone || '-'}</span></div>`);
-    if (settings.receiptShowWaiterName && order.waiter) customerLines.push(`<div class="meta-row"><span>Sales Person</span><span>${order.waiter}</span></div>`);
-    if (settings.receiptShowRiderName && order.deliveryAgent) customerLines.push(`<div class="meta-row"><span>Rider</span><span>${order.deliveryAgent}</span></div>`);
-    if (settings.receiptShowDeliveryAddress) customerLines.push(`<div class="meta-row"><span>Location</span><span>${order.address || '-'}</span></div>`);
+    if (receiptCustomerName) customerLines.push(`<div class="meta-row"><span>Customer</span><span>${receiptCustomerName}</span></div>`);
+    if (order.orderType === 'Dine-In') {
+      customerLines.push(`<div class="meta-row"><span>Table</span><span>${receiptTable}</span></div>`);
+      customerLines.push(`<div class="meta-row"><span>Sales Person</span><span>${receiptWaiter}</span></div>`);
+    }
+    if (order.orderType === 'Delivery') {
+      customerLines.push(`<div class="meta-row"><span>Mobile</span><span>${order.phone || '-'}</span></div>`);
+      customerLines.push(`<div class="meta-row"><span>Location</span><span>${receiptLocation}</span></div>`);
+      customerLines.push(`<div class="meta-row"><span>Service Type</span><span>${receiptServiceType}</span></div>`);
+      customerLines.push(`<div class="meta-row"><span>Rider</span><span>${receiptRider}</span></div>`);
+      customerLines.push(`<div class="meta-row"><span>Status</span><span>${receiptStatus}</span></div>`);
+    }
+    if (order.orderType !== 'Dine-In' && order.orderType !== 'Delivery' && settings.receiptShowCustomerPhone) {
+      customerLines.push(`<div class="meta-row"><span>Mobile</span><span>${order.phone || '-'}</span></div>`);
+    }
+    if (order.orderType !== 'Dine-In' && order.orderType !== 'Delivery' && settings.receiptShowWaiterName && order.waiter) {
+      customerLines.push(`<div class="meta-row"><span>Sales Person</span><span>${order.waiter}</span></div>`);
+    }
 
     const contactBlock = customerLines.length ? `<div class="box">${customerLines.join('')}</div>` : '';
 
@@ -1734,9 +2312,15 @@ function printReceipt(order) {
           <style>
             body { font-family: ${fontFamily}, Arial, sans-serif; padding: 10px; color: #000; }
             .receipt { max-width: 320px; margin: auto; }
-            .header { text-align: center; margin-bottom: 8px; }
-            .header h2 { font-size: ${titleSize}; margin-bottom: 4px; }
-            .header .location { font-size: ${sectionSize}; margin-top: 4px; }
+            .header { margin-bottom: 8px; }
+            .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 12px; }
+            .header h2 { font-size: ${titleSize}; margin: 0 0 4px; text-align: center; }
+            .header .location { font-size: ${sectionSize}; margin-top: 4px; text-align: center; }
+            .receipt-token { text-align: left; }
+            .receipt-token .token-label { font-size: ${sectionSize}; font-weight: 700; margin-bottom: 4px; }
+            .receipt-token .token-number { font-size: 40px; font-weight: 900; line-height: 1; }
+            .logo img { max-width: 100px; max-height: 100px; width: auto; height: auto; display: block; margin: 0 auto; }
+            .logo.empty { width: 100px; }
             .top-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: ${customerSize}; }
             .box { border: 1px solid #000; padding: 8px; margin-bottom: 10px; }
             .box .meta-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: ${customerSize}; }
@@ -1748,14 +2332,19 @@ function printReceipt(order) {
             .summary .left div, .summary .right div { display: flex; justify-content: space-between; margin-bottom: 4px; }
             .total-line { font-weight: bold; margin-top: 6px; display: flex; justify-content: space-between; }
             .footer { text-align: center; margin-top: 12px; font-size: ${sectionSize}; }
+            .counter { font-size: ${sectionSize}; margin-top: 4px; color: #000; }
             .logo img { max-width: 100px; width: auto; height: auto; display: block; margin: 0 auto 8px; }
           </style>
         </head>
         <body>
           <div class="receipt">
             <div class="header">
-              ${logoHtml}
+              <div class="header-row">
+                ${tokenHtml}
+                ${logoHtml}
+              </div>
               <h2>${header}</h2>
+              ${counterLabelHtml}
               <div class="location">${settings.location || ''}</div>
             </div>
             <div class="top-row">
@@ -1782,7 +2371,7 @@ function printReceipt(order) {
               </div>
               <div class="right">
                 ${settings.receiptShowSubtotal ? `<div><span>Subtotal:</span><span>${subtotal} Rs</span></div>` : ''}
-                ${settings.receiptShowDeliveryCharge ? `<div><span>Delivery:</span><span>${deliveryCharge} Rs</span></div>` : ''}
+                ${order.orderType === 'Delivery' && settings.receiptShowDeliveryCharge ? `<div><span>Delivery:</span><span>${deliveryCharge} Rs</span></div>` : ''}
                 ${settings.receiptShowServiceCharge ? `<div><span>Service:</span><span>${serviceCharge} Rs</span></div>` : ''}
                 ${settings.receiptShowDiscount ? `<div><span>Discount:</span><span>${discountAmount} Rs</span></div>` : ''}
                 ${settings.receiptShowTax ? `<div><span>Tax:</span><span>${taxAmount} Rs</span></div>` : ''}
@@ -1797,37 +2386,15 @@ function printReceipt(order) {
       </html>
     `;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.visibility = 'hidden';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow?.document || iframe.document;
-    iframeDoc.open();
-    iframeDoc.write(content);
-    iframeDoc.close();
-
-    const printFrame = () => {
-      const win = iframe.contentWindow;
-      if (win) {
-        win.focus();
-        win.print();
-      }
-      setTimeout(() => {
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      }, 500);
-    };
-
-    if (iframe.contentWindow) {
-      iframe.contentWindow.onload = printFrame;
-    } else {
-      printFrame();
-    }
+    return printHtml(content)
+      .then(async () => {
+        if (settings.tokenSlipEnabled) {
+          await printTokenSlip(order);
+        }
+      })
+      .catch((err) => {
+        console.error('Print failed', err);
+      });
   }
 
   const toggleOrderSelection = (orderId) => {
@@ -1926,6 +2493,7 @@ function printReceipt(order) {
   const getOrderExtrasAmount = (order) => calculateOrderAmountByCategories(order, ['Extras']);
   const getOrderBbqTandoorAmount = (order) => calculateOrderAmountByCategories(order, ['BBQ', 'Tandoor']);
   const getOrderServiceTypeCharge = (order) => {
+    if (order.orderType !== 'Delivery') return 0;
     const fee = Number(order.deliveryFee || 0);
     if (order.serviceType) {
       const type = deliveryServiceTypes.find((type) => type.name === order.serviceType);
@@ -2406,6 +2974,7 @@ function printReceipt(order) {
         setMessage('Staff added successfully');
       }
       setShowStaffModal(false);
+      await loadPosData();
       await loadTab('staff');
     } catch (error) {
       setMessage(error.message);
@@ -2423,9 +2992,7 @@ function printReceipt(order) {
   };
 
   const getBikers = () => {
-    const bikers = (posDeliveryAgents || []).filter((agent) => agent.role === 'Biker');
-    if (bikers.length > 0) return bikers;
-    return (staff || []).filter((member) => member.role === 'Biker');
+    return (staff || []).filter((member) => member.role === 'Biker' && member.loginEnabled);
   };
 
   const getDeliveryServiceTypeById = (id) => deliveryServiceTypes.find((type) => type.id === id);
@@ -2475,58 +3042,106 @@ function printReceipt(order) {
     setEditingOrderCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, notes } : item)));
   };
 
-  const saveDeliveryServiceType = () => {
+  const saveDeliveryServiceType = async () => {
     if (!deliveryServiceForm.name.trim()) {
       setMessage('Service type name is required.');
       return;
     }
-    const payload = {
-      ...deliveryServiceForm,
-      id: deliveryServiceForm.id || `stype-${Date.now()}`
-    };
-    setDeliveryServiceTypes((prev) => {
-      const existing = prev.find((type) => type.id === payload.id);
-      if (existing) {
-        return prev.map((type) => (type.id === payload.id ? payload : type));
+    setLoading(true);
+    setMessage('');
+    try {
+      const payload = {
+        ...deliveryServiceForm,
+        id: deliveryServiceForm.id || `stype-${Date.now()}`
+      };
+      let saved;
+      if (deliveryServiceForm.id) {
+        saved = await fetchJson(`${apiBase}/delivery_service_types/${payload.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        setDeliveryServiceTypes((prev) => prev.map((type) => (type.id === saved.id ? saved : type)));
+      } else {
+        saved = await fetchJson(`${apiBase}/delivery_service_types`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        setDeliveryServiceTypes((prev) => [...prev, saved]);
       }
-      return [...prev, payload];
-    });
-    setDeliveryServiceForm({ id: null, name: '', charge: 50, location: '', active: true });
-    setMessage('Service type saved.');
+      setDeliveryServiceForm({ id: null, name: '', charge: 50, location: '', active: true });
+      setMessage('Service type saved.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteDeliveryServiceType = (id) => {
-    setDeliveryServiceTypes((prev) => prev.filter((type) => type.id !== id));
-    setMessage('Service type deleted.');
+  const deleteDeliveryServiceType = async (id) => {
+    setLoading(true);
+    setMessage('');
+    try {
+      await fetchJson(`${apiBase}/delivery_service_types/${id}`, { method: 'DELETE' });
+      setDeliveryServiceTypes((prev) => prev.filter((type) => type.id !== id));
+      setMessage('Service type deleted.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const editDeliveryServiceType = (type) => {
     setDeliveryServiceForm({ ...type });
   };
 
-  const saveDeliveryLocation = () => {
+  const saveDeliveryLocation = async () => {
     if (!deliveryLocationForm.name.trim()) {
       setMessage('Location name is required.');
       return;
     }
-    const payload = {
-      ...deliveryLocationForm,
-      id: deliveryLocationForm.id || `loc-${Date.now()}`
-    };
-    setDeliveryLocations((prev) => {
-      const existing = prev.find((loc) => loc.id === payload.id);
-      if (existing) {
-        return prev.map((loc) => (loc.id === payload.id ? payload : loc));
+    setLoading(true);
+    setMessage('');
+    try {
+      const payload = {
+        ...deliveryLocationForm,
+        id: deliveryLocationForm.id || `loc-${Date.now()}`
+      };
+      let saved;
+      if (deliveryLocationForm.id) {
+        saved = await fetchJson(`${apiBase}/delivery_locations/${payload.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        setDeliveryLocations((prev) => prev.map((loc) => (loc.id === saved.id ? saved : loc)));
+      } else {
+        saved = await fetchJson(`${apiBase}/delivery_locations`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        setDeliveryLocations((prev) => [...prev, saved]);
       }
-      return [...prev, payload];
-    });
-    setDeliveryLocationForm({ id: null, name: '', description: '' });
-    setMessage('Location saved.');
+      setDeliveryLocationForm({ id: null, name: '', description: '' });
+      setMessage('Location saved.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteDeliveryLocation = (id) => {
-    setDeliveryLocations((prev) => prev.filter((loc) => loc.id !== id));
-    setMessage('Location deleted.');
+  const deleteDeliveryLocation = async (id) => {
+    setLoading(true);
+    setMessage('');
+    try {
+      await fetchJson(`${apiBase}/delivery_locations/${id}`, { method: 'DELETE' });
+      setDeliveryLocations((prev) => prev.filter((loc) => loc.id !== id));
+      setMessage('Location deleted.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const editDeliveryLocation = (location) => {
@@ -2554,7 +3169,6 @@ function printReceipt(order) {
     if (activeTab === 'inventory') return renderInventory();
     if (activeTab === 'staff') return renderStaff();
     if (activeTab === 'sales') return renderSales();
-    if (activeTab === 'invoices') return renderInvoices();
     return null;
   }
 
@@ -2652,6 +3266,55 @@ function printReceipt(order) {
             </div>
           </div>
         )}
+
+          {markDueOrder && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/92 p-4 backdrop-blur-sm flex items-center justify-center">
+              <div className="relative w-full max-w-lg rounded-[32px] border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-rose-500/10">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-white">Mark Order Due</h2>
+                    <p className="mt-1 text-sm text-slate-400">Record amount collected (optional) and mark remaining as due.</p>
+                  </div>
+                  <button onClick={() => setMarkDueOrder(null)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-200 transition hover:bg-slate-700">
+                    <svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                  </button>
+                </div>
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
+                    <div className="text-sm text-slate-400">Order</div>
+                    <div className="mt-2 text-lg font-semibold text-white">{markDueOrder.orderNumber || markDueOrder.id}</div>
+                    <div className="text-sm text-slate-400">Table: {markDueOrder.tableNumber || 'N/A'}</div>
+                    <div className="text-sm text-slate-400">Customer: {markDueOrder.customerName || 'Walk-in'}</div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm text-slate-300 mb-2">Total amount</label>
+                      <div className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100">{markDueOrder.total || markDueOrder.amount || 0} PKR</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-300 mb-2">Amount collected now (optional)</label>
+                      <input type="number" value={markDueAmount} onChange={(e) => setMarkDueAmount(e.target.value)} className="w-full rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-rose-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-300 mb-2">Payment method</label>
+                      <select value={markDueMethod} onChange={(e) => setMarkDueMethod(e.target.value)} className="w-full rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none">
+                        {['Cash', 'Card', 'Transfer', 'Other'].map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-300 mb-2">Remaining due</label>
+                      <div className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100">{Math.max(0, (markDueOrder.total || markDueOrder.amount || 0) - (Number(markDueAmount) || 0))} PKR</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button onClick={() => setMarkDueOrder(null)} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Cancel</button>
+                  <button onClick={handleMarkDue} className="rounded-3xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500">Confirm Due</button>
+                </div>
+              </div>
+            </div>
+          )}
       </div>
     );
   }
@@ -2659,7 +3322,7 @@ function printReceipt(order) {
   function renderInventory() {
     return (
       <div className="space-y-6">
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => setInventorySubTab('categories')}
             className={`rounded-full px-4 py-2 text-sm font-semibold transition ${inventorySubTab === 'categories' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
@@ -2672,9 +3335,16 @@ function printReceipt(order) {
           >
             Products
           </button>
+          <button
+            onClick={() => setInventorySubTab('mashallah')}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${inventorySubTab === 'mashallah' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+          >
+            {MASHALLAH_CATEGORY}
+          </button>
         </div>
         {inventorySubTab === 'categories' && renderCategories()}
         {inventorySubTab === 'products' && renderProducts()}
+        {inventorySubTab === 'mashallah' && renderMashallahSlots()}
       </div>
     );
   }
@@ -2740,7 +3410,6 @@ function printReceipt(order) {
               <div className="mt-3 text-slate-400">Category: {product.category}</div>
               <div className="mt-1 text-slate-400">Price: {product.price} {product.unit}</div>
               {product.purchasePrice && <div className="mt-1 text-slate-400">Purchase: {product.purchasePrice} {product.unit}</div>}
-              <div className="mt-1 text-slate-400">Stock: {(product.stock != null ? product.stock : (product.availableStock != null ? product.availableStock : 'Unlimited'))}</div>
             </div>
           ))}
         </div>
@@ -2847,6 +3516,120 @@ function printReceipt(order) {
     );
   }
 
+  function renderMashallahSlots() {
+    const filteredProducts = posProducts.filter((product) => {
+      const searchTerm = normalizeText(mashallahSearch);
+      return (
+        !searchTerm ||
+        normalizeText(product.name).includes(searchTerm) ||
+        normalizeText(product.category).includes(searchTerm) ||
+        normalizeText(product.code).includes(searchTerm) ||
+        normalizeText(product.sku).includes(searchTerm) ||
+        normalizeText(product.id).includes(searchTerm)
+      );
+    });
+
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {mashallahSlots.map((slot) => {
+            const assignedProduct = posProducts.find((product) => product.id === slot.productId);
+            return (
+              <div key={slot.slot} className="rounded-[34px] border border-emerald-500/20 bg-slate-950 p-5 shadow-soft glow-border">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">Slot {slot.slot}</div>
+                    <div className="mt-3 text-lg font-semibold text-white">{assignedProduct ? assignedProduct.name : 'Unassigned'}</div>
+                    {assignedProduct ? (
+                      <>
+                        <div className="mt-1 text-sm text-slate-400">{assignedProduct.category}</div>
+                        <div className="mt-2 text-base font-semibold text-emerald-300">{assignedProduct.price} {assignedProduct.unit || 'PKR'}</div>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-400">Click assign to choose an existing product for this number.</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <button onClick={() => openMashallahSelector(slot)} className="rounded-full border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-600/15 transition">
+                      {assignedProduct ? 'Change' : 'Assign'}
+                    </button>
+                    {assignedProduct && (
+                      <button onClick={() => clearMashallahSlot(slot.slot)} className="rounded-full bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {assignedProduct && assignedProduct.photo && (
+                  <img src={assignedProduct.photo} alt={assignedProduct.name} className="mt-5 h-40 w-full rounded-3xl object-cover border border-emerald-500/20" />
+                )}
+                {!assignedProduct && (
+                  <div className="mt-5 rounded-3xl border border-dashed border-slate-700 bg-slate-900 p-4 text-sm text-slate-400">
+                    Empty product slot. Tap assign to select from existing products.
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">{MASHALLAH_CATEGORY} Slots</p>
+              <h3 className="mt-2 text-xl font-semibold text-white">Assign existing products to numbered slots</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-emerald-600 px-3 py-2 text-sm font-semibold text-slate-950">10 slots</span>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-slate-400">Click any number to open a selector of existing products. Each assigned item appears in POS under the same slot number and tab.</p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <input value={mashallahSearch} onChange={(e) => setMashallahSearch(e.target.value)} placeholder="Search products to assign" className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
+          </div>
+        </div>
+
+        {showMashallahSelector && activeMashallahSlot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] rounded-[32px] border border-slate-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-5 flex-shrink-0">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Select product for slot {activeMashallahSlot.slot}</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-white">Choose existing product</h3>
+                </div>
+                <button onClick={() => { setShowMashallahSelector(false); setActiveMashallahSlot(null); }} className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 flex-shrink-0">Close</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 modal-scrollable">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredProducts.length ? filteredProducts.map((product) => (
+                    <button key={product.id} onClick={() => assignProductToMashallah(activeMashallahSlot.slot, product)} className="group rounded-[28px] border border-slate-800 bg-slate-950 p-4 text-left transition hover:border-emerald-500/70 hover:bg-slate-900">
+                      {product.photo ? (
+                        <img src={product.photo} alt={product.name} className="h-32 w-full rounded-3xl object-cover" />
+                      ) : (
+                        <div className="flex h-32 items-center justify-center rounded-3xl bg-slate-800 text-slate-400">No image</div>
+                      )}
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-base font-semibold text-white">{product.name}</div>
+                          <div className="text-sm text-slate-400">{product.category}</div>
+                        </div>
+                        <div className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-slate-950">{product.price} PKR</div>
+                      </div>
+                    </button>
+                  )) : (
+                    <div className="col-span-full rounded-[28px] border border-dashed border-slate-700 bg-slate-950 p-6 text-center text-sm text-slate-400">
+                      No matching products found.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderStaff() {
     return (
       <div className="space-y-6">
@@ -2872,7 +3655,15 @@ function printReceipt(order) {
               <div className="flex justify-between gap-4">
                 <div>
                   <div className="text-lg font-semibold text-white">{member.name}</div>
-                  <div className="text-slate-400">{member.role}</div>
+                  <div className="flex flex-wrap items-center gap-2 text-slate-400">
+                    <span>{member.role}</span>
+                    {member.role === 'Biker' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-1 text-[11px] font-semibold text-emerald-400 shadow-[0_6px_12px_rgba(16,185,129,0.18)]">
+                        <span>🚴</span>
+                        <span>Bike</span>
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-slate-400 mt-1">{member.username}</div>
                   {member.phone && <div className="text-sm text-slate-400">{member.phone}</div>}
                 </div>
@@ -3010,38 +3801,7 @@ function printReceipt(order) {
     );
   }
 
-  function renderInvoices() {
-    return (
-      <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900 shadow-soft">
-        <table className="w-full min-w-[700px] divide-y divide-slate-700 text-left text-sm text-slate-300">
-          <thead className="bg-slate-950 text-slate-200">
-            <tr>
-              <th className="px-4 py-3">Invoice ID</th>
-              <th className="px-4 py-3">Guest</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800 bg-slate-950">
-            {items.map((invoice) => (
-              <tr key={invoice.id}>
-                <td className="px-4 py-3">{invoice.id}</td>
-                <td className="px-4 py-3">{invoice.guestName || invoice.description || 'N/A'}</td>
-                <td className="px-4 py-3">{invoice.amount}</td>
-                <td className="px-4 py-3">{invoice.date}</td>
-                <td className="px-4 py-3">{invoice.status || 'paid'}</td>
-                <td className="px-4 py-3">
-                  <button onClick={() => deleteRecord(invoice.id)} className="rounded-full bg-rose-600 px-3 py-1 text-xs text-white transition hover:bg-rose-700">Remove</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
+
 
   function renderPos() {
     const filteredProducts = getFilteredProducts();
@@ -3049,17 +3809,20 @@ function printReceipt(order) {
 
     return (
       <div className="space-y-6">
-        <section className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-          <div className={`rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] xl:grid-cols-[1.4fr_0.8fr]">
+          <div className={`min-w-0 rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>POS Catalog</p>
                 <h3 className={`mt-2 text-xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Select products</h3>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex flex-wrap items-center gap-2 pb-2">
                   <button onClick={() => setSelectedCategory('All')} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition ${selectedCategory === 'All' ? 'border-emerald-500 bg-emerald-600 text-white shadow-[0_8px_16px_rgba(16,185,129,0.3)]' : `border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}`}>
                     🎯 All
+                  </button>
+                  <button onClick={() => setSelectedCategory(MASHALLAH_CATEGORY)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition ${selectedCategory === MASHALLAH_CATEGORY ? 'border-emerald-500 bg-emerald-600 text-white shadow-[0_8px_16px_rgba(16,185,129,0.3)]' : `border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}`}>
+                    {MASHALLAH_CATEGORY} Products
                   </button>
                   {posCategories.map((category) => (
                     <button key={category.id || category.name} onClick={() => setSelectedCategory(category.name)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition ${selectedCategory === category.name ? 'border-emerald-500 bg-emerald-600 text-white shadow-[0_8px_16px_rgba(16,185,129,0.3)]' : `border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}`}>
@@ -3070,29 +3833,31 @@ function printReceipt(order) {
                     + Add
                   </button>
                 </div>
-                <input value={posSearch} onChange={(e) => setPosSearch(e.target.value)} placeholder="Search products" className={`w-full rounded-3xl border px-4 py-3 outline-none focus:border-emerald-500 ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                <input value={posSearch} onChange={(e) => setPosSearch(e.target.value)} placeholder="Search products or SKU" className={`w-full rounded-3xl border px-4 py-3 outline-none focus:border-emerald-500 ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
               </div>
             </div>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {filteredProducts.map((product) => (
-                <div key={product.id} className={`rounded-3xl border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}>
-                  {product.photo && <img src={product.photo} alt={product.name} className="w-full h-28 object-cover rounded-3xl mb-3" />}
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{product.name}</div>
-                      <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{product.category}</div>
-                    </div>
-                    <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-100">
-                      {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
-                    </span>
+                <button
+                  key={product.id}
+                  type="button"
+                  className="rounded-3xl border border-slate-200 bg-white p-4 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+                  onClick={() => addToCart(product)}
+                >
+                  <div className="flex flex-col items-center text-center mb-3">
+                    {product.photo ? (
+                      <img src={product.photo} alt={product.name} className="w-16 h-16 rounded-full object-cover mb-3 shadow-sm" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-3 text-slate-400 text-2xl">📦</div>
+                    )}
                   </div>
-                  <div className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Stock: {product.availableStock || product.stock || 0}</div>
-                  {product.flavors?.length ? (
-                    <button onClick={() => addToCart(product)} className="mt-4 w-full rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Select</button>
-                  ) : (
-                    <button onClick={() => addToCart(product)} className="mt-4 w-full rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Add</button>
-                  )}
-                </div>
+                  <div className="text-left">
+                    <div className="text-sm font-semibold text-slate-900 mb-2">{product.name}</div>
+                    <div className="text-base font-bold text-emerald-600">
+                      {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
           </div>
@@ -3144,8 +3909,13 @@ function printReceipt(order) {
             </div>
           )}
 
-          <div className={`rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-            <div className="mb-4">
+          <div className={`min-w-0 lg:sticky lg:top-20 self-start rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+            <div className="mb-4 relative">
+              <div className="absolute top-0 right-0">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-600 text-white text-sm font-semibold shadow-md">
+                  {cart.reduce((sum, it) => sum + (Number(it.price) || 0) * (it.quantity || 0), 0)} PKR
+                </div>
+              </div>
               <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cart summary</p>
               <h3 className={`mt-2 text-xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{cart.length} items</h3>
             </div>
@@ -3169,10 +3939,11 @@ function printReceipt(order) {
                         <span className="inline-flex h-8 min-w-[32px] items-center justify-center rounded-full bg-slate-950 px-3 text-sm font-semibold text-slate-100">{item.quantity}</span>
                         <button onClick={() => updateCartItem(item.itemId, 1)} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 active:translate-y-[1px]">+</button>
                       </div>
+                      <button onClick={() => editCartItemDetails(item.itemId)} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-xs font-bold text-white transition hover:from-blue-600 hover:to-blue-700 shadow-[0_4px_12px_rgba(59,130,246,0.3)] active:translate-y-[1px]" title="Edit product">✎</button>
                       <button onClick={() => { setCart(cart.filter(cartItem => cartItem.itemId !== item.itemId)); }} className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-xs font-bold text-white transition hover:from-red-600 hover:to-red-700 shadow-[0_4px_12px_rgba(239,68,68,0.3)] active:translate-y-[1px]" title="Delete product">✕</button>
                     </div>
                   </div>
-                  <textarea value={item.notes} onChange={(e) => updateCartNotes(item.itemId, e.target.value)} placeholder="Notes..." className={`mt-3 w-full rounded-3xl border px-3 py-2 text-xs outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} rows={2} />
+                  {/* notes removed per request; temporary edits available via Edit button */}
                 </div>
               ))}
             </div>
@@ -3191,7 +3962,9 @@ function printReceipt(order) {
               <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{summary.subtotal} PKR</span></div>
               <div className="flex justify-between text-sm text-slate-400"><span>Discount</span><span>{summary.discount} PKR</span></div>
               <div className="flex justify-between text-sm text-slate-400"><span>Tax</span><span>{summary.tax} PKR</span></div>
-              <div className="flex justify-between text-sm text-slate-400"><span>Delivery</span><span>{summary.deliveryFee} PKR</span></div>
+              {orderType === 'Delivery' && (
+                <div className="flex justify-between text-sm text-slate-400"><span>Delivery</span><span>{summary.deliveryFee} PKR</span></div>
+              )}
               <div className="flex justify-between text-sm text-slate-400"><span>Service</span><span>{summary.serviceCharge} PKR</span></div>
               <div className={`flex justify-between text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}><span>Total</span><span>{summary.total} PKR</span></div>
             </div>
@@ -3248,8 +4021,13 @@ function printReceipt(order) {
                       </select>
                     </div>
                     <div className="grid gap-3">
-                      <label className="text-sm text-slate-400">Customer name <span className="text-slate-500">(optional)</span></label>
-                      <input type="text" value={orderDetails.customerName} onChange={(e) => updateOrderDetail('customerName', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="Customer name" />
+                      <label className="text-sm text-slate-400">Rider <span className="text-slate-500">(optional)</span></label>
+                      <select value={orderDetails.deliveryAgent} onChange={(e) => updateOrderDetail('deliveryAgent', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
+                        <option value="">Select rider</option>
+                        {getBikers().map((rider) => (
+                          <option key={rider.id || rider.name} value={rider.name || rider.username}>{rider.name || rider.username}</option>
+                        ))}
+                      </select>
                     </div>
                   </>
                 )}
@@ -3265,21 +4043,29 @@ function printReceipt(order) {
                     </div>
                   </>
                 )}
-                <div className="grid gap-3">
-                  <label className="text-sm text-slate-400">Phone <span className="text-slate-500">(optional)</span></label>
-                  <input type="text" value={orderDetails.phone} onChange={(e) => updateOrderDetail('phone', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="Phone number" />
-                </div>
-                {orderType === 'Dine-In' && (
+                {(orderType === 'Delivery' || orderType === 'Takeaway') && (
                   <div className="grid gap-3">
-                    <label className="text-sm text-slate-400">Table / Room</label>
-                    <select value={orderDetails.tableNumber} onChange={(e) => updateOrderDetail('tableNumber', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
-                      <option value="">Select table or room</option>
-                      {availableDineInTables.length ? availableDineInTables.map((table) => {
-                        const tableLabel = getTableLabel(table);
-                        return <option key={table.id} value={tableLabel}>{tableLabel}</option>;
-                      }) : <option value="" disabled>No free tables available</option>}
-                    </select>
+                    <label className="text-sm text-slate-400">Phone <span className="text-slate-500">(optional)</span></label>
+                    <input type="text" value={orderDetails.phone} onChange={(e) => updateOrderDetail('phone', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="Phone number" />
                   </div>
+                )}
+                {orderType === 'Dine-In' && (
+                  <>
+                    <div className="grid gap-3">
+                      <label className="text-sm text-slate-400">Customer name <span className="text-slate-500">(optional)</span></label>
+                      <input type="text" value={orderDetails.customerName} onChange={(e) => updateOrderDetail('customerName', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="Customer name" />
+                    </div>
+                    <div className="grid gap-3">
+                      <label className="text-sm text-slate-400">Table / Room</label>
+                      <select value={orderDetails.tableNumber} onChange={(e) => updateOrderDetail('tableNumber', e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
+                        <option value="">Select table or room</option>
+                        {availableDineInTables.length ? availableDineInTables.map((table) => {
+                          const tableLabel = getTableLabel(table);
+                          return <option key={table.id} value={tableLabel}>{tableLabel}</option>;
+                        }) : <option value="" disabled>No free tables available</option>}
+                      </select>
+                    </div>
+                  </>
                 )}
                 {orderType === 'Delivery' && (
                   <div className="grid gap-3">
@@ -3382,48 +4168,7 @@ function printReceipt(order) {
           </div>
         )}
 
-        <section className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Order history</p>
-              <h3 className="mt-2 text-2xl font-semibold text-white">Recent POS orders</h3>
-            </div>
-          </div>
-          <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950">
-            <table className="w-full min-w-[720px] divide-y divide-slate-700 text-left text-sm text-slate-300">
-              <thead className="bg-slate-950 text-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Order #</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 bg-slate-950">
-                {posOrders.map((order) => (
-                  <tr key={order.id}>
-                    <td className="px-4 py-3">{order.orderNumber || order.id}</td>
-                    <td className="px-4 py-3">{order.orderType}</td>
-                    <td className="px-4 py-3">{order.customerName || 'Walk-in'}</td>
-                    <td className="px-4 py-3">{order.total || order.amount || 0} PKR</td>
-                    <td className="px-4 py-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status}</span></td>
-                    <td className="px-4 py-3">{order.createdAt || order.date || 'N/A'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => openOrderModal(order)} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700">Edit</button>
-                        <button onClick={() => deleteOrder(order.id)} className="rounded-full border border-slate-700 bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500">Delete</button>
-                        <button onClick={() => printReceipt(order)} className="rounded-full border border-slate-700 bg-emerald-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-500">Print</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {renderRecentOrders()}
       </div>
     );
   }
@@ -3487,6 +4232,49 @@ function printReceipt(order) {
             </div>
           </div>
 
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-400">POS Header Label</label>
+              <input value={settings.posHeaderSubtitle} onChange={(e) => setSettings((prev) => ({ ...prev, posHeaderSubtitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="e.g. POS Header" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">POS Header Title</label>
+              <input value={settings.posHeaderTitle} onChange={(e) => setSettings((prev) => ({ ...prev, posHeaderTitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="e.g. POS Counter" />
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Header Circle Photo</label>
+              <input type="file" accept="image/*" onChange={handlePosHeaderPhotoChange} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+              {settings.posHeaderPhoto && <img src={settings.posHeaderPhoto} alt="Header Circle Preview" className="mt-3 h-20 w-20 rounded-full object-cover border border-slate-700" />}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Receipt Logo</label>
+              <input type="file" accept="image/png,image/jpeg" onChange={handleSettingsLogoChange} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+              {settings.logo && <img src={settings.logo} alt="Receipt Logo preview" className="mt-3 h-20 w-full object-contain rounded-3xl border border-slate-700" />}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Logo Width (px)</label>
+              <input type="number" value={settings.receiptLogoWidth} onChange={(e) => setSettings((prev) => ({ ...prev, receiptLogoWidth: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Receipt Counter Label</label>
+              <input value={settings.receiptCounterLabel} onChange={(e) => setSettings((prev) => ({ ...prev, receiptCounterLabel: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="e.g. Counter 01" />
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Farhan Sardar Photo</label>
+              <input type="file" accept="image/*" onChange={handleDeveloperPhotoChange} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+              {settings.developerPhoto && <img src={settings.developerPhoto} alt="Farhan Sardar" className="mt-3 h-20 w-20 rounded-full object-cover border border-slate-700" />}
+            </div>
+          </div>
+
           <div className="mt-6 flex flex-wrap items-center gap-3">
             {['receipt', 'fonts'].map((tab) => (
               <button key={tab} onClick={() => setReceiptSettingsSubTab(tab)} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${receiptSettingsSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{tab === 'receipt' ? 'Receipt Layout' : 'Receipt Fonts'}</button>
@@ -3535,6 +4323,34 @@ function printReceipt(order) {
               {receiptField('Customer message', 'receiptShowCustomerMessage')}
               {receiptField('Notes', 'receiptShowNotes')}
             </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">Token slip settings</h4>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div>{receiptField('Enable token slip', 'tokenSlipEnabled')}</div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Token slip prefix</label>
+                  <input value={settings.tokenSlipPrefix} onChange={(e) => setSettings((prev) => ({ ...prev, tokenSlipPrefix: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="TS" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Next token number</label>
+                  <input type="number" min="1" value={settings.tokenSlipNextNumber} onChange={(e) => setSettings((prev) => ({ ...prev, tokenSlipNextNumber: Number(e.target.value) || 1 }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="lg:col-span-2">
+                  <button type="button" onClick={async () => {
+                      const nextTokenNumber = 1;
+                      setSettings((prev) => ({ ...prev, tokenSlipNextNumber: nextTokenNumber }));
+                      try {
+                        await fetchJson(`${apiBase}/settings`, { method: 'PUT', body: JSON.stringify({ tokenSlipNextNumber }) });
+                      } catch (error) {
+                        console.warn('Unable to save token slip reset:', error.message);
+                      }
+                    }} className="rounded-3xl border border-emerald-500 bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">
+                    Reset token number to 1
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
@@ -3581,7 +4397,12 @@ function printReceipt(order) {
         )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button onClick={updateSettings} className="rounded-3xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Save Settings</button>
+          <div className="flex gap-3">
+            <button onClick={updateSettings} className="rounded-3xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Save Settings</button>
+            <button onClick={createGoogleSheet} className="rounded-3xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">Create sheet</button>
+            <button onClick={syncServerToGoogleSheet} className="rounded-3xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500">Sync now</button>
+            <button onClick={restoreServerFromGoogleSheet} className="rounded-3xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500">Restore</button>
+          </div>
           <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Use these controls to define receipt layout, font styling and printing behavior.</p>
         </div>
       </div>
@@ -3697,7 +4518,7 @@ function printReceipt(order) {
                     <option value="list">List</option>
                   </select>
                 </div>
-                <button onClick={() => setMessage('Catalogue layout settings saved.')} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">Save layout settings</button>
+                  <button onClick={saveCatalogueLayoutSettings} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">Save layout settings</button>
               </div>
             </div>
             <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
@@ -3734,21 +4555,46 @@ function printReceipt(order) {
       setCustomerForm({ name: customer.name, phone: customer.phone, address: customer.address });
     };
 
-    const handleSaveCustomer = () => {
+    const handleSaveCustomer = async () => {
       if (!customerForm.address) {
         setMessage('Address is required.');
         return;
       }
-      setCustomers((prev) => prev.map((c) => c.id === editingCustomer.id ? { ...c, ...customerForm } : c));
+      if (!editingCustomer) {
+        setMessage('No customer selected for update.');
+        return;
+      }
+      setLoading(true);
+      setMessage('');
+      try {
+        const updated = await persistCustomer({ ...editingCustomer, ...customerForm });
+        if (updated) {
+          setCustomers((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+          setMessage('Customer updated successfully.');
+        }
+      } catch (error) {
+        setMessage(error.message);
+      } finally {
+        setLoading(false);
+      }
       setEditingCustomer(null);
       setCustomerForm({ name: '', phone: '', address: '' });
-      setMessage('Customer updated successfully.');
     };
 
-    const handleDeleteCustomer = (customerId) => {
-      if (confirm('Are you sure you want to delete this customer?')) {
-        setCustomers((prev) => prev.filter((c) => c.id !== customerId));
-        setMessage('Customer deleted.');
+    const handleDeleteCustomer = async (customerId) => {
+      if (!confirm('Are you sure you want to delete this customer?')) return;
+      setLoading(true);
+      setMessage('');
+      try {
+        const success = await deleteCustomerFromServer(customerId);
+        if (success) {
+          setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+          setMessage('Customer deleted.');
+        }
+      } catch (error) {
+        setMessage(error.message);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -3786,8 +4632,9 @@ function printReceipt(order) {
             <thead className="bg-slate-900 text-slate-200">
               <tr>
                 <th className="px-4 py-3">Address</th>
-                <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Order #</th>
+                <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -3795,8 +4642,9 @@ function printReceipt(order) {
               {filteredCustomers.map((customer) => (
                 <tr key={customer.id}>
                   <td className="px-4 py-3 font-semibold text-white">{customer.address}</td>
-                  <td className="px-4 py-3">{customer.name || '-'}</td>
                   <td className="px-4 py-3">{customer.phone || '-'}</td>
+                  <td className="px-4 py-3 text-slate-300">{customer.lastOrderNumber || '-'}</td>
+                  <td className="px-4 py-3 text-slate-300">{customer.createdAt ? new Date(customer.createdAt).toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button onClick={() => handleEditCustomer(customer)} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700">Edit</button>
@@ -3807,7 +4655,7 @@ function printReceipt(order) {
               ))}
               {!filteredCustomers.length && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-500">No customers found.</td>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">No customers found.</td>
                 </tr>
               )}
             </tbody>
@@ -3856,13 +4704,15 @@ function printReceipt(order) {
   }
 
   function getCatalogueFilteredProducts() {
-    const search = catalogueSearch.trim().toLowerCase();
+    const search = normalizeText(catalogueSearch);
     return posProducts.filter((product) => {
       const matchesCategory = catalogueCategory === 'All' || product.category === catalogueCategory;
       const matchesSearch = !search ||
-        product.name.toLowerCase().includes(search) ||
-        (product.category || '').toLowerCase().includes(search) ||
-        (product.description || '').toLowerCase().includes(search);
+        normalizeText(product.name).includes(search) ||
+        normalizeText(product.category).includes(search) ||
+        normalizeText(product.description).includes(search) ||
+        normalizeText(product.code).includes(search) ||
+        normalizeText(product.sku).includes(search);
       return matchesCategory && matchesSearch;
     });
   }
@@ -4056,6 +4906,184 @@ function printReceipt(order) {
     );
   }
 
+  function renderRecentOrders() {
+    const tabs = ['Delivery', 'Takeaway', 'Dine-In'];
+    const selectedDate = (() => {
+      const today = new Date();
+      if (recentOrderDateFilter === 'today') return today;
+      if (recentOrderDateFilter === 'yesterday') {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday;
+      }
+      return new Date(recentOrderCustomDate);
+    })();
+
+    const formatLocalDate = (date) => {
+      if (!date || Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    const getOrderDateString = (order) => {
+      const raw = order.createdAt || order.date;
+      if (!raw) return null;
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return null;
+      return date.toISOString().slice(0, 10);
+    };
+
+    const selectedDateString = Number.isNaN(selectedDate.getTime()) ? null : selectedDate.toISOString().slice(0, 10);
+    const recentOrders = posOrders.filter((order) => {
+      if (recentOrderTab === 'Delivery') return order.orderType === 'Delivery';
+      if (recentOrderTab === 'Takeaway') return order.orderType === 'Takeaway';
+      if (recentOrderTab === 'Dine-In') return order.orderType === 'Dine-In';
+      return false;
+    }).filter((order) => {
+      const orderDateString = getOrderDateString(order);
+      return orderDateString && selectedDateString ? orderDateString === selectedDateString : false;
+    });
+    const paginatedOrders = recentOrders.slice(recentOrderPageIndex * recentOrderPageSize, (recentOrderPageIndex + 1) * recentOrderPageSize);
+    const pageCount = Math.max(1, Math.ceil(recentOrders.length / recentOrderPageSize));
+    const isDelivery = recentOrderTab === 'Delivery';
+    const isTakeaway = recentOrderTab === 'Takeaway';
+    const isDinein = recentOrderTab === 'Dine-In';
+
+    return (
+      <section className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Order history</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white">Recent POS orders</h3>
+            <div className="mt-2 text-sm text-slate-400">
+              Total orders:
+              <span className="ml-1 font-semibold text-white">{posOrders.length}</span>
+              <span className="mx-2 text-slate-500">|</span>
+              {recentOrders.length} {recentOrderTab} orders
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setRecentOrderTab(tab)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${recentOrderTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
+            <div className="text-sm text-slate-400">Showing {paginatedOrders.length} of {recentOrders.length} orders</div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-sm text-slate-400">Date</label>
+              <select
+                value={recentOrderDateFilter}
+                onChange={(e) => setRecentOrderDateFilter(e.target.value)}
+                className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="custom">Custom</option>
+              </select>
+              {recentOrderDateFilter === 'custom' && (
+                <input
+                  type="date"
+                  value={recentOrderCustomDate}
+                  onChange={(e) => setRecentOrderCustomDate(e.target.value)}
+                  className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+                />
+              )}
+              <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100">
+                {selectedDateString ? formatLocalDate(selectedDate) : 'Invalid date'}
+              </div>
+              <label className="text-sm text-slate-400">Rows</label>
+              <select
+                value={recentOrderPageSize}
+                onChange={(e) => setRecentOrderPageSize(Number(e.target.value))}
+                className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+              >
+                {[6, 12, 18, 24].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="max-h-[420px] overflow-y-auto overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950">
+            <table className="w-full min-w-[900px] divide-y divide-slate-700 text-left text-sm text-slate-300">
+              <thead className="bg-slate-950 text-slate-200">
+                <tr>
+                  <th className="px-4 py-3">Order #</th>
+                  {isDelivery && <th className="px-4 py-3">Delivery address</th>}
+                  {isDelivery && <th className="px-4 py-3">Phone</th>}
+                  {isDelivery && <th className="px-4 py-3">Service type</th>}
+                  {isTakeaway && <th className="px-4 py-3">Customer</th>}
+                  {isTakeaway && <th className="px-4 py-3">Phone</th>}
+                  {isDinein && <th className="px-4 py-3">Table</th>}
+                  {isDinein && <th className="px-4 py-3">Customer</th>}
+                  <th className="px-4 py-3">Items</th>
+                  <th className="px-4 py-3">Total</th>
+                  {isDelivery && <th className="px-4 py-3">Rider</th>}
+                  {isDelivery && <th className="px-4 py-3">Payment</th>}
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 bg-slate-950">
+                {paginatedOrders.length ? paginatedOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-slate-950/80 transition">
+                    <td className="px-4 py-3 font-semibold text-white">{order.orderNumber || order.id}</td>
+                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.address || '-'}</td>}
+                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.phone || '-'}</td>}
+                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.serviceType || '-'}</td>}
+                    {isTakeaway && <td className="px-4 py-3 text-slate-300">{order.customerName || 'Pickup'}</td>}
+                    {isTakeaway && <td className="px-4 py-3 text-slate-300">{order.phone || '-'}</td>}
+                    {isDinein && <td className="px-4 py-3 text-slate-300">{order.tableNumber || '-'}</td>}
+                    {isDinein && <td className="px-4 py-3 text-slate-300">{order.customerName || 'Walk-in'}</td>}
+                    <td className="px-4 py-3 text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
+                        <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-white">{order.total || order.amount || 0} PKR</td>
+                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.deliveryAgent || 'Unassigned'}</td>}
+                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.paymentStatus || order.paymentMethod || '-'}</td>}
+                    <td className="px-4 py-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
+                    <td className="px-4 py-3 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString() : order.date || 'N/A'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {renderOrderEditButton(order)}
+                        <button onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500">Delete</button>
+                        <button onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-500">Print</button>
+                      </div>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={isDelivery ? 11 : isTakeaway ? 8 : 8} className="px-4 py-6 text-center text-sm text-slate-500">No orders found for {recentOrderTab}.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-300">
+            <div>{recentOrders.length ? `Page ${recentOrderPageIndex + 1} of ${pageCount}` : 'No orders available'}</div>
+            <div className="flex items-center gap-2">
+              <button disabled={recentOrderPageIndex === 0} onClick={() => setRecentOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50">Prev</button>
+              <button disabled={recentOrderPageIndex >= pageCount - 1} onClick={() => setRecentOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
     const filteredOrders = deliveryOrders.filter((o) => {
@@ -4215,9 +5243,7 @@ function printReceipt(order) {
                     <td className="px-2 py-2 text-slate-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
                     <td className="px-2 py-2">
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" title="Edit order" onClick={() => openOrderModal(order)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 transition hover:bg-slate-800">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>
-                        </button>
+                        {renderOrderEditButton(order)}
                         <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">
                           <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                         </button>
@@ -4235,12 +5261,12 @@ function printReceipt(order) {
             </table>
           </div>
         ) : (
-          <div className={`grid gap-4 ${deliveryViewMode === 'tile' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+          <div className="grid gap-4 lg:grid-cols-3">
             {paginatedOrders.map((order) => {
               const paidStatus = ['Completed', 'Payment Collected', 'Delivered'].includes(order.status) ? 'Paid' : 'Due';
               const isSelected = selectedOrders.includes(order.id);
               return (
-                <div key={order.id} className={`group relative rounded-[28px] border ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'} p-5 shadow-[0_18px_40px_rgba(0,0,0,0.12)] transition hover:-translate-y-1 hover:shadow-[0_24px_48px_rgba(0,0,0,0.18)]`}>
+                <div key={order.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-soft hover:shadow-lg transition relative">
                   {isSelected && (
                     <div className="absolute -top-2 -right-2 z-10 h-6 w-6 rounded-full bg-emerald-600 flex items-center justify-center">
                       <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -4258,17 +5284,23 @@ function printReceipt(order) {
                       />
                       <div>
                         <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
-                        <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName || 'Walk-In'}</div>
+                        {order.customerName && (
+                          <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-2 text-right">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${paidStatus === 'Paid' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>{paidStatus}</span>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Products</div>
+                        <div className="text-sm font-semibold text-white">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</div>
+                      </div>
                     </div>
                   </div>
                   <div className={`mt-4 space-y-3 divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-200'} text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     <div className="flex items-center justify-between gap-2 pb-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Items</span><span>{(order.items || []).length}</span></div>
-                    <div className="flex items-center justify-between gap-2 py-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Rider</span><span>{order.deliveryAgent || 'Unassigned'}</span></div>
+                    <div className="flex items-center justify-between gap-2 py-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Products</span><span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span></div>
                     <div className="flex items-center justify-between gap-2 pt-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Address</span><span className="truncate text-right">{order.address || '-'}</span></div>
                   </div>
                   <div className="space-y-4 pt-3">
@@ -4307,9 +5339,6 @@ function printReceipt(order) {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <button type="button" title="Edit order" onClick={() => openOrderModal(order)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800' : 'border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200'} shadow-[0_12px_18px_rgba(0,0,0,0.12)] transition hover:-translate-y-0.5`}>
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>
-                      </button>
                       <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-500`}>
                         <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                       </button>
@@ -4319,6 +5348,7 @@ function printReceipt(order) {
                       <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-purple-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-purple-500">
                         <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
                       </button>
+                      {renderOrderEditButton(order)}
                     </div>
                   </div>
                 </div>
@@ -4587,10 +5617,10 @@ function printReceipt(order) {
                     <td className="px-4 py-4 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" title="Edit order" onClick={() => openOrderModal(order)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 transition hover:bg-slate-800">Edit</button>
                         {order.status === 'Pay Later' && (
                           <button type="button" title="Mark Pay Later order as paid" onClick={() => markTakeawayOrderPaid(order.id)} className="rounded-full border border-amber-500 bg-amber-500 px-3 py-2 text-slate-950 transition hover:bg-amber-400">Pay Later</button>
                         )}
+                        {renderOrderEditButton(order)}
                         <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">Delete</button>
                         <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-2 text-slate-950 transition hover:bg-emerald-500">Print</button>
                       </div>
@@ -4636,9 +5666,7 @@ function printReceipt(order) {
                       {order.status === 'Pay Later' && (
                         <button onClick={() => markTakeawayOrderPaid(order.id)} className="rounded-3xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400">Pay Later</button>
                       )}
-                      <button onClick={() => openOrderModal(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700" title="Edit order">
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>
-                      </button>
+                      {renderOrderEditButton(order)}
                       <button onClick={() => deleteOrder(order.id)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-rose-600 text-white hover:bg-rose-500" title="Delete order">
                         <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                       </button>
@@ -4681,17 +5709,24 @@ function printReceipt(order) {
         .some((value) => value.toString().toLowerCase().includes(search));
     });
 
-    const statusFiltered = dineinOrderStatusFilter === 'all'
-      ? filteredBySearch
-      : filteredBySearch.filter((order) => {
-          if (dineinOrderStatusFilter === 'paid') {
-            return ['Completed', 'Payment Collected'].includes(order.status);
-          }
-          if (dineinOrderStatusFilter === 'pending') {
-            return !['Completed', 'Payment Collected'].includes(order.status);
-          }
-          return order.status === dineinOrderStatusFilter;
-        });
+    let statusFiltered;
+    if (dineinSubTab === 'paid') {
+      statusFiltered = filteredBySearch.filter((order) => ['Completed', 'Payment Collected'].includes(order.status));
+    } else if (dineinSubTab === 'due') {
+      statusFiltered = filteredBySearch.filter((order) => order.status === 'Payment Pending' || order.status === 'Pay Later' || order.paymentStatus === 'Due');
+    } else {
+      statusFiltered = dineinOrderStatusFilter === 'all'
+        ? filteredBySearch
+        : filteredBySearch.filter((order) => {
+            if (dineinOrderStatusFilter === 'paid') {
+              return ['Completed', 'Payment Collected'].includes(order.status);
+            }
+            if (dineinOrderStatusFilter === 'pending') {
+              return !['Completed', 'Payment Collected'].includes(order.status);
+            }
+            return order.status === dineinOrderStatusFilter;
+          });
+    }
 
     const summary = {
       orderCount: statusFiltered.length,
@@ -4708,68 +5743,20 @@ function printReceipt(order) {
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
-          {['tables', 'paid'].map((tab) => (
+          {['tables', 'paid', 'due'].map((tab) => (
             <button
               key={tab}
               onClick={() => {
                 setDineinSubTab(tab);
                 if (tab === 'paid') setDineinOrderStatusFilter('paid');
+                if (tab === 'due') setDineinOrderStatusFilter('pending');
               }}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${dineinSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-              {tab === 'tables' ? 'Table Management' : 'Paid Orders'}
+              {tab === 'tables' ? 'Table Management' : tab === 'paid' ? 'Paid Orders' : 'Due Orders'}
             </button>
           ))}
         </div>
 
-        {dineinSubTab === 'paid' && (
-          <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
-                <div className="text-sm text-slate-400">Orders</div>
-                <div className="mt-2 text-2xl font-semibold text-white">{summary.orderCount}</div>
-              </div>
-              <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
-                <div className="text-sm text-slate-400">Sales Total</div>
-                <div className="mt-2 text-2xl font-semibold text-white">{summary.totalSales} PKR</div>
-              </div>
-              <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
-                <div className="text-sm text-slate-400">Items Sold</div>
-                <div className="mt-2 text-2xl font-semibold text-white">{summary.itemCount}</div>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-3">
-              <input type="date" value={dineinDateFrom} onChange={(e) => setDineinDateFrom(e.target.value)} className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none" placeholder="From" />
-              <input type="date" value={dineinDateTo} onChange={(e) => setDineinDateTo(e.target.value)} className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none" placeholder="To" />
-              <input value={dineinOrderSearch} onChange={(e) => setDineinOrderSearch(e.target.value)} placeholder="Search orders" className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none" />
-            </div>
-
-            <div className="mt-4 rounded-3xl border border-slate-700 bg-slate-950 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {['all', 'pending', 'paid'].map((status) => (
-                  <button key={status} onClick={() => setDineinOrderStatusFilter(status)} className={`rounded-full px-3 py-2 text-sm font-semibold transition ${dineinOrderStatusFilter === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-                    {status === 'all' ? 'All' : status === 'pending' ? 'Pending' : 'Paid'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <button onClick={deleteSelectedDineinOrders} disabled={!selectedDineinOrders.length} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${selectedDineinOrders.length ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}>
-                  Delete Selected ({selectedDineinOrders.length})
-                </button>
-                <span className="text-sm text-slate-400">Showing {Math.min(1, pagedDineinOrders.length)} - {Math.min(statusFiltered.length, dineinPageSize)} of {statusFiltered.length} orders</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-slate-400">Per page</label>
-                <select value={dineinPageSize} onChange={(e) => { setDineinPageSize(Number(e.target.value)); setDineinPageIndex(0); }} className="rounded-3xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none">
-                  {[8, 12, 16, 20].map((size) => <option key={size} value={size}>{size}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
 
         {dineinSubTab === 'tables' && (
           <div className="space-y-6">
@@ -4828,11 +5815,14 @@ function printReceipt(order) {
                               </select>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-3">
-                              <button onClick={() => openOrderModal(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition">Edit</button>
                               <button onClick={() => printReceipt(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-green-600 text-white hover:bg-green-500 transition">Print</button>
+                              {renderOrderEditButton(tableOrder)}
                               <button onClick={() => deleteOrder(tableOrder.id)} className="rounded px-3 py-1 text-sm font-semibold bg-red-600 text-white hover:bg-red-500 transition">Delete</button>
                               {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
-                                <button onClick={() => confirmMarkPaid(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-amber-600 text-white hover:bg-amber-500 transition">Mark Paid</button>
+                                <>
+                                  <button onClick={() => confirmMarkPaid(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-amber-600 text-white hover:bg-amber-500 transition">Mark Paid</button>
+                                  <button onClick={() => confirmMarkDue(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-rose-600 text-white hover:bg-rose-500 transition">Mark Due</button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -4900,11 +5890,14 @@ function printReceipt(order) {
                               </select>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-3">
-                              <button onClick={() => openOrderModal(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition">Edit</button>
                               <button onClick={() => printReceipt(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-green-600 text-white hover:bg-green-500 transition">Print</button>
+                              {renderOrderEditButton(tableOrder)}
                               <button onClick={() => deleteOrder(tableOrder.id)} className="rounded px-3 py-1 text-sm font-semibold bg-red-600 text-white hover:bg-red-500 transition">Delete</button>
                               {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
-                                <button onClick={() => confirmMarkPaid(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-amber-600 text-white hover:bg-amber-500 transition">Mark Paid</button>
+                                <>
+                                  <button onClick={() => confirmMarkPaid(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-amber-600 text-white hover:bg-amber-500 transition">Mark Paid</button>
+                                  <button onClick={() => confirmMarkDue(tableOrder)} className="rounded px-3 py-1 text-sm font-semibold bg-rose-600 text-white hover:bg-rose-500 transition">Mark Due</button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -4941,51 +5934,65 @@ function printReceipt(order) {
               </div>
             </div>
             <div className="grid gap-4">
-              {pagedDineinOrders.map((order) => (
-                <div key={order.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-soft">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <input type="checkbox" checked={selectedDineinOrders.includes(order.id)} onChange={() => toggleDineinOrderSelection(order.id)} className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-emerald-500" />
-                      <div>
-                        <div className="text-lg font-semibold text-white">{order.orderNumber || order.id}</div>
-                        <div className="text-sm text-slate-400">Table: {order.tableNumber || 'N/A'}</div>
-                        <div className="text-sm text-slate-400">Customer: {order.customerName || 'Walk-in'}</div>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-right">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
-                      <div className="text-sm text-slate-400">Total: {order.total || order.amount || 0} PKR</div>
-                      <div className="text-sm text-slate-400">Items: {(order.items || []).reduce((count, item) => count + Number(item.quantity || 0), 0)}</div>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-                      <div className="font-semibold text-slate-100">Notes</div>
-                      <div className="mt-2">{order.notes || 'No special notes'}</div>
-                    </div>
-                    <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-                      <div className="font-semibold text-slate-100">Details</div>
-                      <div className="mt-2">Service: {order.serviceType || 'N/A'}</div>
-                      <div>Payment: {order.paymentMethod || 'Cash'}</div>
-                      <div>Date: {order.orderDate ? order.orderDate.toLocaleString() : 'N/A'}</div>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button onClick={() => openOrderModal(order)} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700">Edit</button>
-                    <button onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500">Delete</button>
-                    <button onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-500">Print</button>
-                    {order.status !== 'Completed' && order.status !== 'Payment Collected' && (
-                      <button onClick={() => confirmMarkPaid(order)} className="rounded-full border border-amber-600 bg-amber-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-amber-500">Mark Paid</button>
+              <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950 p-4">
+                <table className="w-full min-w-[900px] divide-y divide-slate-700 text-left text-sm text-slate-300">
+                  <thead className="bg-slate-900 text-slate-200">
+                    <tr>
+                      <th className="px-4 py-3">Select</th>
+                      <th className="px-4 py-3">Order #</th>
+                      <th className="px-4 py-3">Table</th>
+                      <th className="px-4 py-3">Waiter</th>
+                      <th className="px-4 py-3">Customer</th>
+                      <th className="px-4 py-3">Items</th>
+                      <th className="px-4 py-3">Total</th>
+                      <th className="px-4 py-3">Payment</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 bg-slate-950">
+                    {pagedDineinOrders.map((order) => (
+                      <tr key={order.id}>
+                        <td className="px-4 py-3"><input type="checkbox" checked={selectedDineinOrders.includes(order.id)} onChange={() => toggleDineinOrderSelection(order.id)} className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-emerald-500" /></td>
+                        <td className="px-4 py-3">{order.orderNumber || order.id}</td>
+                        <td className="px-4 py-3">{order.tableNumber || 'N/A'}</td>
+                        <td className="px-4 py-3">{order.waiter || '-'}</td>
+                        <td className="px-4 py-3">{order.customerName || 'Walk-in'}</td>
+                        <td className="px-4 py-3">{(order.items || []).reduce((c, it) => c + Number(it.quantity || 0), 0)}</td>
+                        <td className="px-4 py-3">{order.total || order.amount || 0} PKR</td>
+                        <td className="px-4 py-3">{order.paymentMethod || order.paymentStatus || '-'}</td>
+                        <td className="px-4 py-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
+                        <td className="px-4 py-3">{order.orderDate ? order.orderDate.toLocaleString() : order.createdAt || order.date || 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => openOrderForEditInPos(order)} className="rounded px-2 py-1 bg-violet-500 text-white text-xs">Edit</button>
+                            <button onClick={() => deleteOrder(order.id)} className="rounded px-2 py-1 bg-rose-600 text-white text-xs">Delete</button>
+                            <button onClick={() => printReceipt(order)} className="rounded px-2 py-1 bg-emerald-600 text-white text-xs">Print</button>
+                            {order.status !== 'Completed' && order.status !== 'Payment Collected' ? (
+                              <>
+                                <button onClick={() => confirmMarkPaid(order)} className="rounded px-2 py-1 bg-amber-600 text-slate-950 text-xs">Mark Paid</button>
+                                <button onClick={() => confirmMarkDue(order)} className="rounded px-2 py-1 bg-rose-600 text-white text-xs">Mark Due</button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {!pagedDineinOrders.length && (
+                      <tr>
+                        <td colSpan={11} className="px-4 py-6 text-center text-sm text-slate-500">No orders found.</td>
+                      </tr>
                     )}
-                  </div>
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-400">
+                <span>Page {dineinPageIndex + 1} of {totalDineinPages}</span>
+                <div className="flex items-center gap-2">
+                  <button disabled={dineinPageIndex <= 0} onClick={() => setDineinPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+                  <button disabled={dineinPageIndex >= totalDineinPages - 1} onClick={() => setDineinPageIndex((prev) => Math.min(prev + 1, totalDineinPages - 1))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Next</button>
                 </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-400">
-              <span>Page {dineinPageIndex + 1} of {totalDineinPages}</span>
-              <div className="flex items-center gap-2">
-                <button disabled={dineinPageIndex <= 0} onClick={() => setDineinPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
-                <button disabled={dineinPageIndex >= totalDineinPages - 1} onClick={() => setDineinPageIndex((prev) => Math.min(prev + 1, totalDineinPages - 1))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Next</button>
               </div>
             </div>
           </div>
@@ -5000,7 +6007,7 @@ function printReceipt(order) {
         <div className="w-full max-w-md rounded-[32px] border border-slate-800 bg-slate-900 p-8 shadow-soft">
           <div className="mb-6 text-center">
             <h1 className="text-3xl font-semibold text-white">Usman Hotel POS</h1>
-            <p className="mt-2 text-sm text-slate-400">Login to manage reservations, invoices, and hotel operations.</p>
+            <p className="mt-2 text-sm text-slate-400">Login to manage reservations and hotel operations.</p>
           </div>
           {authMessage && <div className="mb-4 rounded-3xl border border-rose-700 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{authMessage}</div>}
           <div className="space-y-4">
@@ -5045,10 +6052,16 @@ function printReceipt(order) {
         <div className={`rounded-[32px] border p-5 shadow-soft transition ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-sky-500 to-indigo-500 text-white shadow-[0_0_24px_rgba(59,130,246,0.25)] text-2xl">🛒</div>
+              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-emerald-500 via-sky-500 to-indigo-500 text-white shadow-[0_0_24px_rgba(59,130,246,0.25)] text-2xl">
+                {settings.posHeaderPhoto ? (
+                  <img src={settings.posHeaderPhoto} alt="POS Header" className="h-full w-full object-cover" />
+                ) : (
+                  '🛒'
+                )}
+              </div>
               <div>
-                <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>POS Header</p>
-                <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>POS Counter</h1>
+                <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{settings.posHeaderSubtitle || 'POS Header'}</p>
+                <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{settings.posHeaderTitle || 'POS Counter'}</h1>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -5080,7 +6093,11 @@ function printReceipt(order) {
             </div>
             <div className={`rounded-[28px] border p-4 mb-6 flex items-center gap-3 transition ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-slate-200 bg-amber-50 text-slate-900'} ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
               <div className="developer-photo relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-500 via-sky-500 to-emerald-500 shadow-[0_0_24px_rgba(59,130,246,0.25)] transition-transform duration-300 hover:-translate-y-1">
-                <span className="text-2xl font-bold text-white">FS</span>
+                {settings.developerPhoto ? (
+                  <img src={settings.developerPhoto} alt="Farhan Sardar" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-bold text-white">FS</span>
+                )}
                 <div className="absolute inset-0 rounded-full border border-white/20 opacity-70"></div>
               </div>
               <div className={`${isSidebarOpen ? 'block' : 'hidden'}`}>
@@ -5135,7 +6152,7 @@ function printReceipt(order) {
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'rider-book' && renderRiderBook()}
 
-            {(activeTab === 'tables' || activeTab === 'inventory' || activeTab === 'staff' || activeTab === 'sales' || activeTab === 'invoices') && (
+            {(activeTab === 'tables' || activeTab === 'inventory' || activeTab === 'staff' || activeTab === 'sales') && (
               <section className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft">
                 <div>{renderTable()}</div>
               </section>
@@ -5166,7 +6183,12 @@ function printReceipt(order) {
                           <input value={editingProductSearch} onChange={(e) => setEditingProductSearch(e.target.value)} placeholder="Search products" className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
                         </div>
                         <div className="grid gap-3 max-h-[350px] overflow-y-auto">
-                          {posProducts.filter((product) => !editingProductSearch || product.name.toLowerCase().includes(editingProductSearch.toLowerCase())).map((product) => (
+                          {posProducts.filter((product) => {
+                            const search = editingProductSearch.toLowerCase();
+                            return !search ||
+                              String(product.name || '').toLowerCase().includes(search) ||
+                              String(product.code || '').toLowerCase().includes(search);
+                          }).map((product) => (
                             <div key={product.id} className="rounded-3xl border border-slate-800 bg-slate-950 p-3 shadow-soft hover:border-emerald-600/50 transition">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
@@ -5217,22 +6239,6 @@ function printReceipt(order) {
                         <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Details</p>
                         <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-soft space-y-3 max-h-[350px] overflow-y-auto">
                           <div>
-                            <label className="block text-xs font-medium text-slate-300 mb-1">Type</label>
-                            <input value={orderEditForm.orderType} disabled className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-400" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-300 mb-1">Status</label>
-                            <select value={orderEditForm.status} onChange={(e) => setOrderEditForm({ ...orderEditForm, status: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500">
-                              {['New', 'Kitchen', 'Ready', 'Riders Assigned', 'Delivered', 'Payment Collected', 'Payment Pending', 'Completed'].map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-300 mb-1">Customer Name</label>
-                            <input value={orderEditForm.customerName} onChange={(e) => setOrderEditForm({ ...orderEditForm, customerName: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" />
-                          </div>
-                          <div>
                             <label className="block text-xs font-medium text-slate-300 mb-1">Phone</label>
                             <input value={orderEditForm.phone} onChange={(e) => setOrderEditForm({ ...orderEditForm, phone: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" />
                           </div>
@@ -5251,39 +6257,8 @@ function printReceipt(order) {
                                   ))}
                                 </select>
                               </div>
-                              <div>
-                                <label className="block text-xs font-medium text-slate-300 mb-1">Rider</label>
-                                <select value={orderEditForm.deliveryAgent} onChange={(e) => setOrderEditForm({ ...orderEditForm, deliveryAgent: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500">
-                                  <option value="">Assign Rider</option>
-                                  {getBikers().map((biker) => (
-                                    <option key={biker.id} value={biker.name}>{biker.name}</option>
-                                  ))}
-                                </select>
-                              </div>
                             </>
                           )}
-                          {orderEditForm.orderType === 'Dine-In' && (
-                            <div>
-                              <label className="block text-xs font-medium text-slate-300 mb-1">Table</label>
-                              <select value={orderEditForm.tableNumber} onChange={(e) => setOrderEditForm({ ...orderEditForm, tableNumber: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500">
-                                <option value="">Select table</option>
-                                {posTables.map((table) => {
-                                  const tableLabel = table.label || table.name || table.number || `Table ${table.id}`;
-                                  return (
-                                    <option key={table.id} value={tableLabel}>{tableLabel}</option>
-                                  );
-                                })}
-                              </select>
-                            </div>
-                          )}
-                          <div>
-                            <label className="block text-xs font-medium text-slate-300 mb-1">Discount</label>
-                            <input type="number" value={orderEditForm.discount} onChange={(e) => setOrderEditForm({ ...orderEditForm, discount: Number(e.target.value) })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-300 mb-1">Tax %</label>
-                            <input type="number" value={orderEditForm.taxPercent} onChange={(e) => setOrderEditForm({ ...orderEditForm, taxPercent: Number(e.target.value) })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" />
-                          </div>
                         </div>
                       </div>
                     </div>

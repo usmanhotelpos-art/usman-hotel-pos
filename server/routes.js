@@ -10,6 +10,8 @@ import {
   updateRecord,
   writeDb
 } from './db.js';
+import { createSpreadsheet, saveDbAsJson, loadDbFromSheet } from './google-sheets.js';
+import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup-restore.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'usman-hotel-secret';
 export const router = express.Router();
@@ -27,6 +29,10 @@ function createToken(user) {
   );
 }
 
+function safe(handler) {
+  return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
+
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -42,7 +48,7 @@ function authenticate(req, res, next) {
   }
 }
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', safe(async (req, res) => {
   const { email, password } = req.body;
   const user = findUserByEmail(email || '');
   if (!user) {
@@ -56,7 +62,7 @@ router.post('/auth/login', async (req, res) => {
 
   const token = createToken(user);
   res.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-});
+}));
 
 router.get('/auth/me', authenticate, (req, res) => {
   const db = readDb();
@@ -69,7 +75,7 @@ router.get('/auth/me', authenticate, (req, res) => {
 
 router.use(authenticate);
 
-const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'pos_customers', 'pos_payments', 'pos_orders'];
+const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders'];
 
 router.get('/dashboard', (req, res) => {
   const db = readDb();
@@ -360,7 +366,7 @@ router.post('/pos/orders', (req, res) => {
   const subtotal = orderItems.reduce((sum, item) => sum + item.total, 0);
   const discountValue = Number(discount) || 0;
   const taxValue = ((subtotal - discountValue) * (Number(taxPercent) || 0)) / 100;
-  const deliveryValue = Number(deliveryFee) || 0;
+  const deliveryValue = orderType === 'Delivery' ? (Number(deliveryFee) || 0) : 0;
   const serviceValue = Number(serviceCharge) || 0;
   const total = Math.max(0, subtotal - discountValue + taxValue + deliveryValue + serviceValue);
 
@@ -387,7 +393,7 @@ router.post('/pos/orders', (req, res) => {
     }
   }
 
-  const orderStatus = req.body.status || (orderType === 'Delivery' ? 'Pending' : 'New');
+  const orderStatus = req.body.status || (orderType === 'Delivery' ? (deliveryAgent ? 'Riders Assigned' : 'Pending') : 'New');
   const order = createRecord('pos_orders', {
     orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
     orderType,
@@ -470,25 +476,37 @@ router.put('/pos/orders/:id/assign-waiter', (req, res) => {
 });
 
 router.put('/pos/orders/:id', (req, res) => {
-  const { items, customerName, phone, address, tableNumber, deliveryAgent, serviceType, deliveryFee, discount, taxPercent, serviceCharge, paymentMethod, paymentStatus, notes, status, subtotal, total } = req.body;
+  const { items, customerName, phone, address, tableNumber, deliveryAgent, serviceType, deliveryFee, discount, taxPercent, serviceCharge, paymentMethod, paymentStatus, notes, status } = req.body;
+
+  const itemsList = items || [];
+  const computedSubtotal = itemsList.reduce((sum, item) => sum + (Number(item.total) || (Number(item.price || 0) * Number(item.quantity || 0))), 0);
+  const discountValue = Number(discount) || 0;
+  const taxValue = ((computedSubtotal - discountValue) * (Number(taxPercent) || 0)) / 100;
+  // Determine orderType: prefer provided, otherwise use existing order's type
+  const existingOrder = getCollection('pos_orders').find((o) => o.id === req.params.id) || {};
+  const effectiveOrderType = req.body.orderType || existingOrder.orderType || 'Dine-In';
+  const deliveryValue = effectiveOrderType === 'Delivery' ? (Number(deliveryFee) || 0) : 0;
+  const serviceValue = Number(serviceCharge) || 0;
+  const computedTotal = Math.max(0, computedSubtotal - discountValue + taxValue + deliveryValue + serviceValue);
+
   const updated = updateRecord('pos_orders', req.params.id, {
-    items: items || [],
+    items: itemsList,
     customerName: customerName || '',
     phone: phone || '',
     address: address || '',
     tableNumber: tableNumber || '',
     deliveryAgent: deliveryAgent || '',
     serviceType: serviceType || '',
-    deliveryFee: Number(deliveryFee) || 0,
-    discount: Number(discount) || 0,
+    deliveryFee: Number(deliveryValue) || 0,
+    discount: discountValue,
     taxPercent: Number(taxPercent) || 0,
-    serviceCharge: Number(serviceCharge) || 0,
+    serviceCharge: serviceValue,
     paymentMethod: paymentMethod || 'Cash',
     paymentStatus: paymentStatus || '',
     notes: notes || '',
     status: status || 'New',
-    subtotal: Number(subtotal) || 0,
-    total: Number(total) || 0,
+    subtotal: computedSubtotal,
+    total: computedTotal,
     updatedAt: new Date().toISOString()
   });
   if (!updated) {
@@ -526,3 +544,31 @@ router.use((err, req, res, next) => {
   console.error('Unhandled server error:', err);
   res.status(500).send({ error: err.message || 'Internal Server Error' });
 });
+
+// Google Sheets endpoints
+router.post('/google/create-sheet', safe(async (req, res) => {
+  const title = req.body.title || 'Usman POS Backup';
+  const sheet = await createSpreadsheet(title);
+  res.send({ spreadsheetId: sheet.spreadsheetId, url: sheet.spreadsheetUrl });
+}));
+
+router.post('/google/save-db', safe(async (req, res) => {
+  const { spreadsheetId } = req.body;
+  if (!spreadsheetId) return res.status(400).send({ error: 'spreadsheetId is required' });
+  await saveDbAsJson(spreadsheetId);
+  res.send({ success: true });
+}));
+
+router.get('/google/load-db', safe(async (req, res) => {
+  const spreadsheetId = req.query.spreadsheetId;
+  if (!spreadsheetId) return res.status(400).send({ error: 'spreadsheetId is required' });
+  const db = await loadDbFromSheet(spreadsheetId);
+  res.send({ db });
+}));
+
+router.post('/google/restore-db', safe(async (req, res) => {
+  const { spreadsheetId } = req.body;
+  if (!spreadsheetId) return res.status(400).send({ error: 'spreadsheetId is required' });
+  const db = await restoreDbFromSheet(spreadsheetId);
+  res.send({ success: true, db });
+}));

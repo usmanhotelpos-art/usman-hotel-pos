@@ -69,23 +69,6 @@
       "role": "Manager",
       "phone": "+923009876543",
       "status": "active"
-    },
-    {
-      "id": "a0ba580b-8800-40c6-ab40-9f58531031c2",
-      "name": "mustafa",
-      "otherName": "",
-      "phone": "03225552",
-      "username": "farhan",
-      "password": "123456",
-      "role": "Biker",
-      "facePhoto": "",
-      "idCardNumber": "",
-      "idCardFront": "",
-      "idCardBack": "",
-      "description": "",
-      "address": "",
-      "loginEnabled": true,
-      "status": "active"
     }
   ],
   "sales": [
@@ -103,7 +86,7 @@
       "name": "Admin",
       "email": "admin@usmanhotel.com",
       "role": "admin",
-      "passwordHash": "$2a$10$IvyBc8xbut9clfvpfN2kOeE3YViCb0gRMdzL.rFIXjkLkcfqP1OSe"
+      "passwordHash": "$2a$10$8aIpJuh6irLYrcqA7zGSN.dgLnxpnEi4lg1tQZsl15HPtATPWRPTq"
     }
   ],
   "pos_categories": [
@@ -128,8 +111,32 @@
       "name": "Desserts"
     },
     {
-      "id": "cb0bd8e0-7d58-4f82-9928-595fe63204fb",
-      "name": "Tandoor"
+      "id": "cat6",
+      "name": "ناشتے کی آئٹمز"
+    },
+    {
+      "id": "cat7",
+      "name": "چکن کڑاہی مینیو"
+    },
+    {
+      "id": "cat8",
+      "name": "سیخ کباب"
+    },
+    {
+      "id": "cat9",
+      "name": "بوٹی آئٹمز"
+    },
+    {
+      "id": "cat10",
+      "name": "چکن پیسز"
+    },
+    {
+      "id": "cat11",
+      "name": "نان اور روٹی"
+    },
+    {
+      "id": "cat12",
+      "name": "اسپیشل نان"
     }
   ],
   "pos_products": [
@@ -137,93 +144,17 @@
       "id": "p1",
       "name": "Chicken Karahi",
       "category": "Karahi",
-      "price": "1598",
-      "availableStock": 0,
+      "price": 1200,
+      "availableStock": 18,
       "image": "",
-      "description": "Spicy chicken karahi with fresh spices.",
-      "purchasePrice": "",
-      "unit": "PKR",
-      "photo": "",
-      "code": "",
-      "stock": "",
-      "flavors": [
-        {
-          "label": "Red",
-          "variants": [
-            {
-              "label": "1000g",
-              "price": 1600
-            },
-            {
-              "label": "500g",
-              "price": 800
-            },
-            {
-              "label": "250g",
-              "price": 500
-            }
-          ]
-        },
-        {
-          "label": "White",
-          "variants": [
-            {
-              "label": "1000g",
-              "price": 2000
-            },
-            {
-              "label": "500g",
-              "price": 1000
-            }
-          ]
-        },
-        {
-          "label": "Green",
-          "variants": [
-            {
-              "label": "1000g",
-              "price": 1800
-            },
-            {
-              "label": "500g",
-              "price": 900
-            }
-          ]
-        },
-        {
-          "label": "Achaari",
-          "variants": [
-            {
-              "label": "1000g",
-              "price": 1800
-            },
-            {
-              "label": "500g",
-              "price": 900
-            }
-          ]
-        },
-        {
-          "label": "Makhani",
-          "variants": [
-            {
-              "label": "1000g",
-              "price": 2000
-            },
-            {
-              "label": "500g",
-              "price": 1000
-            }
-          ]
-        }
-      ]
+      "description": "Spicy chicken karahi with fresh spices."
     },
     {
       "id": "p2",
       "name": "Mutton Karahi",
       "category": "Karahi",
       "price": 1500,
-      "availableStock": 2,
+      "availableStock": 12,
       "image": "",
       "description": "Rich mutton karahi with traditional taste."
     },
@@ -232,7 +163,7 @@
       "name": "Beef Biryani",
       "category": "Biryani",
       "price": 980,
-      "availableStock": 16,
+      "availableStock": 22,
       "image": "",
       "description": "Fragrant beef biryani with raita."
     },
@@ -250,7 +181,7 @@
       "name": "French Fries",
       "category": "Fast Food",
       "price": 300,
-      "availableStock": 44,
+      "availableStock": 45,
       "image": "",
       "description": "Crispy golden french fries."
     },
@@ -271,6 +202,483 @@
       "availableStock": 30,
       "image": "",
       "description": "Sweet syrup-soaked gulab jamun."
+    },
+    {
+      "id": "p8",
+      "name": "سادہ چنے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 150,
+      "availableStock": 20,
+      "image": "",
+      "description": "سادہ چنے ہاف سروس۔"
+    },
+    {
+      "id": "p9",
+      "name": "سادہ چنے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 250,
+      "availableStock": 15,
+      "image": "",
+      "description": "سادہ چنے فل سروس۔"
+    },
+    {
+      "id": "p10",
+      "name": "انڈہ چنے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 180,
+      "availableStock": 18,
+      "image": "",
+      "description": "انڈہ چنے ہاف سروس۔"
+    },
+    {
+      "id": "p11",
+      "name": "انڈہ چنے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 300,
+      "availableStock": 12,
+      "image": "",
+      "description": "انڈہ چنے فل سروس۔"
+    },
+    {
+      "id": "p12",
+      "name": "کوفتہ چنے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 200,
+      "availableStock": 18,
+      "image": "",
+      "description": "کوفتہ چنے ہاف سروس۔"
+    },
+    {
+      "id": "p13",
+      "name": "کوفتہ چنے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 320,
+      "availableStock": 12,
+      "image": "",
+      "description": "کوفتہ چنے فل سروس۔"
+    },
+    {
+      "id": "p14",
+      "name": "اسپیشل حلیم — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 150,
+      "availableStock": 10,
+      "image": "",
+      "description": "بہترین اسپیشل حلیم ہاف۔"
+    },
+    {
+      "id": "p15",
+      "name": "اسپیشل حلیم — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 250,
+      "availableStock": 8,
+      "image": "",
+      "description": "بہترین اسپیشل حلیم فل۔"
+    },
+    {
+      "id": "p16",
+      "name": "اسپیشل پائے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 400,
+      "availableStock": 6,
+      "image": "",
+      "description": "اسپیشل پائے ہاف سروس۔"
+    },
+    {
+      "id": "p17",
+      "name": "اسپیشل پائے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 600,
+      "availableStock": 4,
+      "image": "",
+      "description": "اسپیشل پائے فل سروس۔"
+    },
+    {
+      "id": "p18",
+      "name": "رائتہ",
+      "category": "ناشتے کی آئٹمز",
+      "price": 50,
+      "availableStock": 30,
+      "image": "",
+      "description": "تازہ رائتہ۔"
+    },
+    {
+      "id": "p19",
+      "name": "توہ پراٹھا",
+      "category": "ناشتے کی آئٹمز",
+      "price": 60,
+      "availableStock": 40,
+      "image": "",
+      "description": "گرم توہ پراٹھا۔"
+    },
+    {
+      "id": "p20",
+      "name": "ریڈ چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 800,
+      "availableStock": 8,
+      "image": "",
+      "description": "ریڈ چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p21",
+      "name": "ریڈ چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1600,
+      "availableStock": 5,
+      "image": "",
+      "description": "ریڈ چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p22",
+      "name": "وائٹ چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1000,
+      "availableStock": 8,
+      "image": "",
+      "description": "وائٹ چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p23",
+      "name": "وائٹ چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 2000,
+      "availableStock": 5,
+      "image": "",
+      "description": "وائٹ چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p24",
+      "name": "گرین چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 900,
+      "availableStock": 8,
+      "image": "",
+      "description": "گرین چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p25",
+      "name": "گرین چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1800,
+      "availableStock": 5,
+      "image": "",
+      "description": "گرین چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p26",
+      "name": "اچاری چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 900,
+      "availableStock": 8,
+      "image": "",
+      "description": "اچاری چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p27",
+      "name": "اچاری چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1800,
+      "availableStock": 5,
+      "image": "",
+      "description": "اچاری چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p28",
+      "name": "مکھنی چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1000,
+      "availableStock": 8,
+      "image": "",
+      "description": "مکھنی چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p29",
+      "name": "مکھنی چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 2000,
+      "availableStock": 5,
+      "image": "",
+      "description": "مکھنی چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p30",
+      "name": "چکن کباب",
+      "category": "سیخ کباب",
+      "price": 170,
+      "availableStock": 20,
+      "image": "",
+      "description": "چیپسی چکن کباب۔"
+    },
+    {
+      "id": "p31",
+      "name": "بیف کباب",
+      "category": "سیخ کباب",
+      "price": 250,
+      "availableStock": 15,
+      "image": "",
+      "description": "گرما گرم بیف کباب۔"
+    },
+    {
+      "id": "p32",
+      "name": "چکن ریشمی کباب",
+      "category": "سیخ کباب",
+      "price": 300,
+      "availableStock": 12,
+      "image": "",
+      "description": "نرم چکن ریشمی کباب۔"
+    },
+    {
+      "id": "p33",
+      "name": "چکن چیز کباب",
+      "category": "سیخ کباب",
+      "price": 300,
+      "availableStock": 10,
+      "image": "",
+      "description": "مزیدار چکن چیز کباب۔"
+    },
+    {
+      "id": "p34",
+      "name": "تکہ بوٹی",
+      "category": "بوٹی آئٹمز",
+      "price": 220,
+      "availableStock": 18,
+      "image": "",
+      "description": "رسیلا تکہ بوٹی۔"
+    },
+    {
+      "id": "p35",
+      "name": "ملائی بوٹی",
+      "category": "بوٹی آئٹمز",
+      "price": 350,
+      "availableStock": 14,
+      "image": "",
+      "description": "ملائی بوٹی خاص۔"
+    },
+    {
+      "id": "p36",
+      "name": "گرین بوٹی",
+      "category": "بوٹی آئٹمز",
+      "price": 400,
+      "availableStock": 12,
+      "image": "",
+      "description": "گرین بوٹی مصالحہ دار۔"
+    },
+    {
+      "id": "p37",
+      "name": "ساسمی بوٹی",
+      "category": "بوٹی آئٹمز",
+      "price": 450,
+      "availableStock": 12,
+      "image": "",
+      "description": "خَوشبودار ساسمی بوٹی۔"
+    },
+    {
+      "id": "p38",
+      "name": "پاشا بوٹی",
+      "category": "بوٹی آئٹمز",
+      "price": 450,
+      "availableStock": 10,
+      "image": "",
+      "description": "خاص پاشا بوٹی۔"
+    },
+    {
+      "id": "p39",
+      "name": "چیز ملائی بوٹی",
+      "category": "بوٹی آئٹمز",
+      "price": 450,
+      "availableStock": 10,
+      "image": "",
+      "description": "چیز ملائی بوٹی۔"
+    },
+    {
+      "id": "p40",
+      "name": "لیگ پیس",
+      "category": "چکن پیسز",
+      "price": 370,
+      "availableStock": 12,
+      "image": "",
+      "description": "گرم لیگ پیس۔"
+    },
+    {
+      "id": "p41",
+      "name": "چیسٹ پیس",
+      "category": "چکن پیسز",
+      "price": 400,
+      "availableStock": 12,
+      "image": "",
+      "description": "رسیلا چیسٹ پیس۔"
+    },
+    {
+      "id": "p42",
+      "name": "نان سادہ",
+      "category": "نان اور روٹی",
+      "price": 30,
+      "availableStock": 80,
+      "image": "",
+      "description": "گرم نان سادہ۔"
+    },
+    {
+      "id": "p43",
+      "name": "سادہ روٹی",
+      "category": "نان اور روٹی",
+      "price": 14,
+      "availableStock": 90,
+      "image": "",
+      "description": "تازہ سادہ روٹی۔"
+    },
+    {
+      "id": "p44",
+      "name": "خمیری روٹی",
+      "category": "نان اور روٹی",
+      "price": 30,
+      "availableStock": 60,
+      "image": "",
+      "description": "خمیری روٹی۔"
+    },
+    {
+      "id": "p45",
+      "name": "دھنیا نان",
+      "category": "نان اور روٹی",
+      "price": 35,
+      "availableStock": 50,
+      "image": "",
+      "description": "دھنیا نان۔"
+    },
+    {
+      "id": "p46",
+      "name": "کلچہ نان",
+      "category": "نان اور روٹی",
+      "price": 35,
+      "availableStock": 50,
+      "image": "",
+      "description": "کلچہ نان۔"
+    },
+    {
+      "id": "p47",
+      "name": "کلونجی نان",
+      "category": "نان اور روٹی",
+      "price": 35,
+      "availableStock": 50,
+      "image": "",
+      "description": "کلونجی نان۔"
+    },
+    {
+      "id": "p48",
+      "name": "روغنی نان",
+      "category": "اسپیشل نان",
+      "price": 90,
+      "availableStock": 40,
+      "image": "",
+      "description": "روغنی نان۔"
+    },
+    {
+      "id": "p49",
+      "name": "ہاف روغنی",
+      "category": "اسپیشل نان",
+      "price": 60,
+      "availableStock": 45,
+      "image": "",
+      "description": "ہاف روغنی نان۔"
+    },
+    {
+      "id": "p50",
+      "name": "گارلک نان",
+      "category": "اسپیشل نان",
+      "price": 120,
+      "availableStock": 35,
+      "image": "",
+      "description": "خوشبودار گارلک نان۔"
+    },
+    {
+      "id": "p51",
+      "name": "اسپیشل کلچہ",
+      "category": "اسپیشل نان",
+      "price": 50,
+      "availableStock": 48,
+      "image": "",
+      "description": "اسپیشل کلچہ نان۔"
+    },
+    {
+      "id": "p52",
+      "name": "تندوری پراٹھا",
+      "category": "اسپیشل نان",
+      "price": 70,
+      "availableStock": 40,
+      "image": "",
+      "description": "گرم تندوری پراٹھا۔"
+    },
+    {
+      "id": "p53",
+      "name": "آلو نان",
+      "category": "اسپیشل نان",
+      "price": 150,
+      "availableStock": 32,
+      "image": "",
+      "description": "آلو نان۔"
+    },
+    {
+      "id": "p54",
+      "name": "چکن قیمہ نان",
+      "category": "اسپیشل نان",
+      "price": 350,
+      "availableStock": 28,
+      "image": "",
+      "description": "چکن قیمہ نان۔"
+    },
+    {
+      "id": "p55",
+      "name": "بیف قیمہ نان",
+      "category": "اسپیشل نان",
+      "price": 450,
+      "availableStock": 22,
+      "image": "",
+      "description": "بیف قیمہ نان۔"
+    },
+    {
+      "id": "p56",
+      "name": "چیز نان",
+      "category": "اسپیشل نان",
+      "price": 350,
+      "availableStock": 26,
+      "image": "",
+      "description": "چیز نان۔"
+    },
+    {
+      "id": "p57",
+      "name": "چکن چیز نان",
+      "category": "اسپیشل نان",
+      "price": 450,
+      "availableStock": 20,
+      "image": "",
+      "description": "چکن چیز نان۔"
+    },
+    {
+      "id": "p58",
+      "name": "چاکلیٹ نان",
+      "category": "اسپیشل نان",
+      "price": 400,
+      "availableStock": 18,
+      "image": "",
+      "description": "مٹھاس دار چاکلیٹ نان۔"
+    },
+    {
+      "id": "p59",
+      "name": "نٹیلا نان",
+      "category": "اسپیشل نان",
+      "price": 400,
+      "availableStock": 18,
+      "image": "",
+      "description": "نٹیلا نان۔"
+    },
+    {
+      "id": "p60",
+      "name": "اچاری نان",
+      "category": "اسپیشل نان",
+      "price": 120,
+      "availableStock": 30,
+      "image": "",
+      "description": "مسالہ دار اچاری نان۔"
     }
   ],
   "pos_tables": [
@@ -319,723 +727,35 @@
       "status": "online"
     }
   ],
-  "pos_orders": [
+  "delivery_service_types": [
     {
-      "id": "d071cd5e-9e26-4cae-84e6-316a35d79749",
-      "orderNumber": "ORD-759761",
-      "orderType": "Dine-In",
-      "customerName": "",
-      "phone": "87857575",
-      "address": "",
-      "tableNumber": "",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0.18,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "notes": "",
-      "items": [
-        {
-          "itemId": "p2-base-no-flavor-1778706817049",
-          "productId": "p2",
-          "name": "Mutton Karahi",
-          "price": 1500,
-          "quantity": 1,
-          "weight": "",
-          "flavor": "",
-          "notes": "",
-          "total": 1500
-        },
-        {
-          "itemId": "p1-1000g-White-1778706822217",
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 2000,
-          "quantity": 1,
-          "weight": "1000g",
-          "flavor": "White",
-          "notes": "",
-          "total": 2000
-        }
-      ],
-      "serviceType": "Standard Delivery",
-      "subtotal": 0,
-      "total": 0,
-      "status": "Completed",
-      "customerId": "382c9e47-1dd5-4dd4-bcdd-fb3c5acb9244",
-      "createdAt": "2026-05-13T21:12:39.762Z",
-      "updatedAt": "2026-05-13T21:13:54.808Z"
+      "id": "standard",
+      "name": "Standard Delivery",
+      "charge": 50,
+      "location": "City",
+      "active": true
     },
     {
-      "id": "a3004b58-8474-454d-8b8b-2945044f20f5",
-      "orderNumber": "ORD-436378",
-      "orderType": "Takeaway",
-      "customerName": "yrtyeryt",
-      "phone": "8888888",
-      "address": "",
-      "tableNumber": "",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "notes": "tyet",
-      "items": [
-        {
-          "productId": "p2",
-          "name": "Mutton Karahi",
-          "price": 1500,
-          "quantity": 1,
-          "notes": "",
-          "weight": "",
-          "flavor": "",
-          "total": 1500
-        },
-        {
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 2000,
-          "quantity": 1,
-          "notes": "",
-          "weight": "1000g",
-          "flavor": "White",
-          "total": 2000
-        }
-      ],
-      "serviceType": "",
-      "subtotal": 3500,
-      "total": 3550,
-      "status": "Completed",
-      "customerId": "26ba1022-d516-4e0a-932b-881ba7864934",
-      "createdAt": "2026-05-13T22:30:36.379Z",
-      "updatedAt": "2026-05-13T22:41:40.902Z"
-    },
-    {
-      "id": "9b0e73ab-9022-44b9-9545-884b9c951b22",
-      "orderNumber": "ORD-571652",
-      "orderType": "Takeaway",
-      "customerName": "ghfghhgfh",
-      "phone": "33366",
-      "address": "",
-      "tableNumber": "",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "notes": "hfdhg",
-      "items": [
-        {
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 1800,
-          "quantity": 1,
-          "notes": "",
-          "weight": "1000g",
-          "flavor": "Green",
-          "total": 1800
-        }
-      ],
-      "serviceType": "",
-      "subtotal": 1800,
-      "total": 1850,
-      "status": "Completed",
-      "customerId": "1b03f2db-f57d-438c-b0ac-0061d77afff9",
-      "createdAt": "2026-05-13T22:32:51.652Z",
-      "updatedAt": "2026-05-13T22:32:51.795Z"
-    },
-    {
-      "id": "04015d60-cafd-4d34-a932-8afc43947c02",
-      "orderNumber": "ORD-128403",
-      "orderType": "Takeaway",
-      "customerName": "bn",
-      "phone": "555548",
-      "address": "1552",
-      "tableNumber": "",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "notes": "jkjk",
-      "items": [
-        {
-          "itemId": "p1-1000g-White-1778712324477",
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 2000,
-          "quantity": 1,
-          "weight": "1000g",
-          "flavor": "White",
-          "notes": "",
-          "total": 2000
-        }
-      ],
-      "serviceType": "Standard Delivery",
-      "subtotal": 0,
-      "total": 0,
-      "status": "Completed",
-      "customerId": "e7dc2584-3877-454d-bb75-a48d7da2608b",
-      "createdAt": "2026-05-13T22:42:08.403Z",
-      "updatedAt": "2026-05-14T03:05:41.456Z"
-    },
-    {
-      "id": "ed3a5f1b-9f64-4ce5-bcc5-d9ec908466a7",
-      "orderNumber": "ORD-160639",
-      "orderType": "Takeaway",
-      "customerName": "jkhjk",
-      "phone": "2558588",
-      "address": "",
-      "tableNumber": "",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "notes": "jkjk",
-      "items": [
-        {
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 1000,
-          "quantity": 1,
-          "notes": "",
-          "weight": "500g",
-          "flavor": "White",
-          "total": 1000
-        }
-      ],
-      "serviceType": "",
-      "subtotal": 1000,
-      "total": 1050,
-      "status": "Completed",
-      "customerId": "f4b5cb0c-9aa9-4b1b-a8a6-30a56e224d20",
-      "createdAt": "2026-05-13T22:42:40.639Z",
-      "updatedAt": "2026-05-13T22:44:17.706Z"
-    },
-    {
-      "id": "2822a435-a230-4a88-bb68-3eca1448d083",
-      "orderNumber": "ORD-754508",
-      "orderType": "Delivery",
-      "customerName": "",
-      "phone": "6566666",
-      "address": "ghjfghdgh",
-      "tableNumber": "",
-      "deliveryAgent": "mustafa",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "paymentStatus": "Paid",
-      "notes": "",
-      "items": [
-        {
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 1800,
-          "quantity": 1,
-          "notes": "",
-          "weight": "1000g",
-          "flavor": "Green",
-          "total": 1800
-        }
-      ],
-      "serviceType": "Express Delivery",
-      "subtotal": 1800,
-      "total": 1850,
-      "status": "Payment Collected",
-      "customerId": "c7d0afa1-f80f-4fbe-a841-db65d1eda47f",
-      "createdAt": "2026-05-14T08:35:54.508Z",
-      "updatedAt": "2026-05-14T08:36:33.722Z"
-    },
-    {
-      "id": "73762f94-9bae-4a12-8c89-beca1bb2b340",
-      "orderNumber": "ORD-827001",
-      "orderType": "Delivery",
-      "customerName": "",
-      "phone": "666666",
-      "address": "uiutiuyi",
-      "tableNumber": "",
-      "deliveryAgent": "mustafa",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "paymentStatus": "Due",
-      "notes": "",
-      "items": [
-        {
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 1000,
-          "quantity": 1,
-          "notes": "",
-          "weight": "500g",
-          "flavor": "Makhani",
-          "total": 1000
-        }
-      ],
-      "serviceType": "Standard Delivery",
-      "subtotal": 1000,
-      "total": 1050,
-      "status": "Payment Pending",
-      "customerId": "84213fcd-a1e3-4233-9e9e-a4bcfd86334b",
-      "createdAt": "2026-05-14T08:37:07.001Z",
-      "updatedAt": "2026-05-14T08:37:56.468Z"
-    },
-    {
-      "id": "66f0d17e-485b-4254-919c-557a9826a04e",
-      "orderNumber": "ORD-036428",
-      "orderType": "Takeaway",
-      "customerName": "PICK UP",
-      "phone": "",
-      "address": "",
-      "tableNumber": "",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "Cash",
-      "paymentStatus": "",
-      "notes": "",
-      "items": [
-        {
-          "productId": "p1",
-          "name": "Chicken Karahi",
-          "price": 1800,
-          "quantity": 1,
-          "notes": "",
-          "weight": "1000g",
-          "flavor": "Green",
-          "total": 1800
-        }
-      ],
-      "serviceType": "",
-      "subtotal": 1800,
-      "total": 1850,
-      "status": "Completed",
-      "createdAt": "2026-05-14T08:40:36.428Z",
-      "updatedAt": "2026-05-14T08:40:36.559Z"
-    },
-    {
-      "id": "e758171d-710a-42f4-95bf-13a225df6899",
-      "orderNumber": "ORD-084967",
-      "orderType": "Dine-In",
-      "customerName": "",
-      "phone": "",
-      "address": "",
-      "tableNumber": "Room 101",
-      "deliveryAgent": "",
-      "deliveryFee": 50,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "",
-      "paymentStatus": "",
-      "notes": "",
-      "items": [
-        {
-          "productId": "p2",
-          "name": "Mutton Karahi",
-          "price": 1500,
-          "quantity": 1,
-          "notes": "",
-          "weight": "",
-          "flavor": "",
-          "total": 1500
-        },
-        {
-          "productId": "p5",
-          "name": "French Fries",
-          "price": 300,
-          "quantity": 1,
-          "notes": "",
-          "weight": "",
-          "flavor": "",
-          "total": 300
-        }
-      ],
-      "serviceType": "",
-      "subtotal": 1800,
-      "total": 1850,
-      "status": "Pending",
-      "createdAt": "2026-05-14T08:41:24.967Z",
-      "updatedAt": "2026-05-14T08:41:24.968Z"
+      "id": "express",
+      "name": "Express Delivery",
+      "charge": 120,
+      "location": "",
+      "active": true
     }
   ],
-  "pos_customers": [
+  "delivery_locations": [
     {
-      "id": "9b45d72a-e61e-4abc-8331-d7c82e24bc2d",
-      "name": "y7467",
-      "phone": "777777",
-      "address": "55552"
+      "id": "city",
+      "name": "City Area",
+      "description": "Standard city delivery zone"
     },
     {
-      "id": "382c9e47-1dd5-4dd4-bcdd-fb3c5acb9244",
-      "name": "",
-      "phone": "414552",
-      "address": ""
-    },
-    {
-      "id": "7dcfa5bb-fd93-4ab6-8266-c5560a11ba44",
-      "name": "7u8tuy",
-      "phone": "555",
-      "address": "74575"
-    },
-    {
-      "id": "3b9037fd-a651-4465-b844-6ed9821de86d",
-      "name": "",
-      "phone": "5262425",
-      "address": ""
-    },
-    {
-      "id": "0a113d09-b125-4504-9092-dc7e6eb9b9db",
-      "name": "gg",
-      "phone": "585855",
-      "address": "22222"
-    },
-    {
-      "id": "d83b674d-fad7-4ba7-9549-1be4e7d72814",
-      "name": "",
-      "phone": "7585858",
-      "address": ""
-    },
-    {
-      "id": "74ab4956-48e0-417f-b613-d984caf4cdcb",
-      "name": "oiiou",
-      "phone": "822555",
-      "address": "88888"
-    },
-    {
-      "id": "cd258ff0-1a58-4789-998b-c16bb1b19d67",
-      "name": "",
-      "phone": "4444",
-      "address": ""
-    },
-    {
-      "id": "4ef24e11-204f-4b65-93fe-7e721e9e3fa6",
-      "name": "",
-      "phone": "25222",
-      "address": ""
-    },
-    {
-      "id": "26ba1022-d516-4e0a-932b-881ba7864934",
-      "name": "yrtyeryt",
-      "phone": "8888888",
-      "address": ""
-    },
-    {
-      "id": "1b03f2db-f57d-438c-b0ac-0061d77afff9",
-      "name": "ghfghhgfh",
-      "phone": "33366",
-      "address": ""
-    },
-    {
-      "id": "e7dc2584-3877-454d-bb75-a48d7da2608b",
-      "name": "jnmbmj",
-      "phone": "555855555",
-      "address": ""
-    },
-    {
-      "id": "f4b5cb0c-9aa9-4b1b-a8a6-30a56e224d20",
-      "name": "jkhjk",
-      "phone": "2558588",
-      "address": ""
-    },
-    {
-      "id": "59d17304-ce27-47f1-ba1c-7167a1b0d415",
-      "name": "",
-      "phone": "03254",
-      "address": "1552"
-    },
-    {
-      "id": "c442a6e9-36d0-4bb4-88d1-169cb3cdce6c",
-      "name": "kkkj",
-      "phone": "9696585",
-      "address": "65555"
-    },
-    {
-      "id": "bc2b294d-3840-47da-8793-e606023f684d",
-      "name": "",
-      "phone": "454444444",
-      "address": "tyryrtyrty"
-    },
-    {
-      "id": "c9dd9aca-d7a1-4f60-a036-2177b8ba2c57",
-      "name": "",
-      "phone": "45555",
-      "address": "gfgfdgf"
-    },
-    {
-      "id": "c9b5478e-ed24-4ef1-ad24-967f7d29d1f7",
-      "name": "",
-      "phone": "uytu",
-      "address": "uuyu"
-    },
-    {
-      "id": "c6b7409a-a404-44e1-b266-6474288ca483",
-      "name": "",
-      "phone": "55554",
-      "address": "yutuu"
-    },
-    {
-      "id": "58ff736d-2b6c-4b3e-9782-75f957be0b66",
-      "name": "",
-      "phone": "4544444",
-      "address": "uifgj"
-    },
-    {
-      "id": "1b9f34be-00e1-4079-b2fb-97c6ae31f536",
-      "name": "",
-      "phone": "4477",
-      "address": "uytutu"
-    },
-    {
-      "id": "54f9546e-f8b1-40ce-aa18-8ae22d36c115",
-      "name": "",
-      "phone": "44444",
-      "address": "878u"
-    },
-    {
-      "id": "2f72d9cf-d673-49af-843c-f3ba01d38fd3",
-      "name": "",
-      "phone": "55555",
-      "address": "hgyjhufujfuf"
-    },
-    {
-      "id": "ecba6996-93a1-4a5e-a5d6-fc2d6f8e1b2f",
-      "name": "",
-      "phone": "8888888",
-      "address": "ghgfh"
-    },
-    {
-      "id": "7362d25a-9170-481b-b3df-e2da33fc62b6",
-      "name": "",
-      "phone": "5555555",
-      "address": "uii"
-    },
-    {
-      "id": "a1871108-fe28-4be6-8cf6-294d7b1b4ecb",
-      "name": "",
-      "phone": "555555",
-      "address": "kjkgh"
-    },
-    {
-      "id": "7856a0cf-b8d8-446c-9761-8908adfaad38",
-      "name": "",
-      "phone": "444",
-      "address": "hgh"
-    },
-    {
-      "id": "36ccfe8d-8fc3-4e6b-9ae1-e3bcca696523",
-      "name": "",
-      "phone": "22525225",
-      "address": "ghfgh"
-    },
-    {
-      "id": "ccc10fab-3bfc-4c8f-8fa7-b15f3afd31fa",
-      "name": "",
-      "phone": "2525522",
-      "address": "ughjg"
-    },
-    {
-      "id": "dbbdbc95-2369-4d7a-b6af-10ac2357341e",
-      "name": "",
-      "phone": "4555555",
-      "address": "fsdfsdaf"
-    },
-    {
-      "id": "13286822-2e37-494b-9bff-2a5b5636230b",
-      "name": "",
-      "phone": "52252",
-      "address": "jkhj"
-    },
-    {
-      "id": "fbee944c-f217-4683-b89b-99cf6e6ff9ad",
-      "name": "",
-      "phone": "233255",
-      "address": "jhgjhgjhg"
-    },
-    {
-      "id": "45c8af66-e6f0-4c4a-b2e0-fad749f453db",
-      "name": "",
-      "phone": "56555",
-      "address": "uiioijgj"
-    },
-    {
-      "id": "97593589-ca05-43f0-bdd6-cbe77ebff3aa",
-      "name": "",
-      "phone": "5855555",
-      "address": "fgsfg"
-    },
-    {
-      "id": "7b59f363-880b-49b0-8dc8-3b6f21f12d22",
-      "name": "",
-      "phone": "525555",
-      "address": "eds4e"
-    },
-    {
-      "id": "25516f12-f4cf-4e5c-85cd-4682a55dd8af",
-      "name": "",
-      "phone": "55555",
-      "address": "rfgdfgv"
-    },
-    {
-      "id": "c8148884-6f4d-4d06-bb57-b3809a7cd2d7",
-      "name": "",
-      "phone": "412121",
-      "address": "558"
-    },
-    {
-      "id": "50b346d7-2180-47ec-b8fe-3de77a1848a9",
-      "name": "",
-      "phone": "0010221",
-      "address": "698"
-    },
-    {
-      "id": "b0bea435-86ec-40cd-8000-949128556cde",
-      "name": "",
-      "phone": "5656",
-      "address": ";p;"
-    },
-    {
-      "id": "84332169-1139-45c4-ae59-227f0c51dd42",
-      "name": "",
-      "phone": "22",
-      "address": "tgggggh"
-    },
-    {
-      "id": "648dd02f-826f-4a0e-ab2f-5fdcf917014a",
-      "name": "",
-      "phone": "555",
-      "address": "987"
-    },
-    {
-      "id": "3a3d470b-e0ed-4466-a603-7b61a1ba4389",
-      "name": "",
-      "phone": "555555",
-      "address": "jhjjvjh"
-    },
-    {
-      "id": "780bd973-d2cc-41e9-a70c-252fc165b1bc",
-      "name": "",
-      "phone": "22222",
-      "address": "jhfjhfjf"
-    },
-    {
-      "id": "ca0b69b3-04a3-4131-a47a-9342ace2aefa",
-      "name": "",
-      "phone": "75555",
-      "address": "bnbnvbn"
-    },
-    {
-      "id": "6bacf486-7646-4f07-9b6c-b816f83628d2",
-      "name": "",
-      "phone": "5455",
-      "address": "gfgf"
-    },
-    {
-      "id": "c7d0afa1-f80f-4fbe-a841-db65d1eda47f",
-      "name": "",
-      "phone": "6566666",
-      "address": "ghjfghdgh"
-    },
-    {
-      "id": "84213fcd-a1e3-4233-9e9e-a4bcfd86334b",
-      "name": "",
-      "phone": "666666",
-      "address": "uiutiuyi"
+      "id": "suburbs",
+      "name": "Suburbs",
+      "description": "Extended suburb delivery zone"
     }
   ],
-  "pos_payments": [
-    {
-      "id": "8d447e86-7842-4144-a6dc-2573c2f633a2",
-      "orderId": "d071cd5e-9e26-4cae-84e6-316a35d79749",
-      "amount": 3506.3,
-      "paymentMethod": "Transfer",
-      "status": "Completed",
-      "description": "Payment collected for order ORD-759761",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "1246748a-c805-48e4-8072-e0bd83efb9a0",
-      "orderId": "d071cd5e-9e26-4cae-84e6-316a35d79749",
-      "amount": 3506.3,
-      "paymentMethod": "Transfer",
-      "status": "Completed",
-      "description": "Payment collected for order ORD-759761",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "e2fd01be-96f5-4995-ac86-55b847c09d41",
-      "orderId": "d071cd5e-9e26-4cae-84e6-316a35d79749",
-      "amount": 0,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-759761",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "423ac26f-1071-416d-b992-f2bda92bb9da",
-      "orderId": "e2e8a03a-0091-41d1-bc8d-8d7105b97d1a",
-      "amount": 2534.464,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-961098",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "f973480d-3c62-46ce-bcaa-3a8cf9c9985d",
-      "orderId": "41f807a4-3bbb-440b-9a2c-dac2bf0a7ff1",
-      "amount": 3350,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-594377",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "47e059e7-5b40-4f09-89d0-14f3aa652d6c",
-      "orderId": "f75be66a-d637-4aa3-8a2b-72848b7d9e29",
-      "amount": 1550,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-406820",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "afb685e7-a2cb-452e-98fa-3160b9e7778b",
-      "orderId": "db21d051-dafe-47e1-b206-e6333f2fb086",
-      "amount": 2010,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-424747",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "301cf29f-bbb4-4117-a25e-f1a5d6966e90",
-      "orderId": "9b0e73ab-9022-44b9-9545-884b9c951b22",
-      "amount": 1850,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-571652",
-      "date": "2026-05-13"
-    },
-    {
-      "id": "fb8fd9ce-ea83-439a-90ad-ebc5881a7b72",
-      "orderId": "66f0d17e-485b-4254-919c-557a9826a04e",
-      "amount": 1850,
-      "paymentMethod": "Cash",
-      "status": "Completed",
-      "description": "Payment for order ORD-036428",
-      "date": "2026-05-14"
-    }
-  ]
+  "pos_orders": [],
+  "pos_customers": [],
+  "pos_payments": []
 }

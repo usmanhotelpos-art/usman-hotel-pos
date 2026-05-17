@@ -1,6 +1,108 @@
 import React, { useState, useMemo } from 'react';
-import { Eye, Download } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import './OrdersPanel.css';
+
+const menuCategories = [
+  {
+    id: 'breakfast',
+    title: 'ناشتے کی آئٹمز',
+    items: [
+      { id: 'sada-chana', name: 'سادہ چنے', options: [{ label: 'ہاف', price: 150 }, { label: 'فل', price: 250 }] },
+      { id: 'anda-chana', name: 'انڈہ چنے', options: [{ label: 'ہاف', price: 180 }, { label: 'فل', price: 300 }] },
+      { id: 'kofta-chana', name: 'کوفتہ چنے', options: [{ label: 'ہاف', price: 200 }, { label: 'فل', price: 320 }] },
+      { id: 'special-haleem', name: 'اسپیشل حلیم', options: [{ label: 'ہاف', price: 150 }, { label: 'فل', price: 250 }] },
+      { id: 'special-paya', name: 'اسپیشل پائے', options: [{ label: 'ہاف', price: 400 }, { label: 'فل', price: 600 }] },
+      { id: 'raita', name: 'رائتہ', price: 50 },
+      { id: 'tawa-paratha', name: 'توہ پراٹھا', price: 60 },
+    ],
+  },
+  {
+    id: 'karahi',
+    title: 'چکن کڑاہی مینیو',
+    items: [
+      { id: 'red-chicken-karahi', name: 'ریڈ چکن کڑاہی', options: [{ label: 'ہاف', price: 800 }, { label: 'فل', price: 1600 }] },
+      { id: 'white-chicken-karahi', name: 'وائٹ چکن کڑاہی', options: [{ label: 'ہاف', price: 1000 }, { label: 'فل', price: 2000 }] },
+      { id: 'green-chicken-karahi', name: 'گرین چکن کڑاہی', options: [{ label: 'ہاف', price: 900 }, { label: 'فل', price: 1800 }] },
+      { id: 'achari-chicken-karahi', name: 'اچاری چکن کڑاہی', options: [{ label: 'ہاف', price: 900 }, { label: 'فل', price: 1800 }] },
+      { id: 'makkhani-chicken-karahi', name: 'مکھنی چکن کڑاہی', options: [{ label: 'ہاف', price: 1000 }, { label: 'فل', price: 2000 }] },
+    ],
+  },
+  {
+    id: 'seekh-kabab',
+    title: 'سیخ کباب',
+    items: [
+      { id: 'chicken-kabab', name: 'چکن کباب', price: 170 },
+      { id: 'beef-kabab', name: 'بیف کباب', price: 250 },
+      { id: 'chicken-reshmi-kabab', name: 'چکن ریشمی کباب', price: 300 },
+      { id: 'chicken-cheese-kabab', name: 'چکن چیز کباب', price: 300 },
+    ],
+  },
+  {
+    id: 'boti-items',
+    title: 'بوٹی آئٹمز',
+    items: [
+      { id: 'tikka-boti', name: 'تکہ بوٹی', price: 220 },
+      { id: 'malai-boti', name: 'ملائی بوٹی', price: 350 },
+      { id: 'green-boti', name: 'گرین بوٹی', price: 400 },
+      { id: 'sasami-boti', name: 'ساسمی بوٹی', price: 450 },
+      { id: 'pasha-boti', name: 'پاشا بوٹی', price: 450 },
+      { id: 'cheese-malai-boti', name: 'چیز ملائی بوٹی', price: 450 },
+    ],
+  },
+  {
+    id: 'chicken-pieces',
+    title: 'چکن پیسز',
+    items: [
+      { id: 'leg-piece', name: 'لیگ پیس', price: 370 },
+      { id: 'chest-piece', name: 'چیسٹ پیس', price: 400 },
+    ],
+  },
+  {
+    id: 'naan-roti',
+    title: 'نان اور روٹی',
+    items: [
+      { id: 'naan-sada', name: 'نان سادہ', price: 30 },
+      { id: 'sada-roti', name: 'سادہ روٹی', price: 14 },
+      { id: 'khameeri-roti', name: 'خمیری روٹی', price: 30 },
+      { id: 'dhaniya-naan', name: 'دھنیا نان', price: 35 },
+      { id: 'kulcha-naan', name: 'کلچہ نان', price: 35 },
+      { id: 'kalonji-naan', name: 'کلونجی نان', price: 35 },
+      { id: 'tawa-paratha', name: 'توہ پراٹھا', price: 60 },
+    ],
+  },
+  {
+    id: 'special-naan',
+    title: 'اسپیشل نان',
+    items: [
+      { id: 'roghni-naan', name: 'روغنی نان', price: 90 },
+      { id: 'half-roghni', name: 'ہاف روغنی', price: 60 },
+      { id: 'garlic-naan', name: 'گارلک نان', price: 120 },
+      { id: 'special-kulcha', name: 'اسپیشل کلچہ', price: 50 },
+      { id: 'tandoori-paratha', name: 'تندوری پراٹھا', price: 70 },
+      { id: 'aloo-naan', name: 'آلو نان', price: 150 },
+      { id: 'chicken-keema-naan', name: 'چکن قیمہ نان', price: 350 },
+      { id: 'beef-keema-naan', name: 'بیف قیمہ نان', price: 450 },
+      { id: 'cheese-naan', name: 'چیز نان', price: 350 },
+      { id: 'chicken-cheese-naan', name: 'چکن چیز نان', price: 450 },
+      { id: 'chocolate-naan', name: 'چاکلیٹ نان', price: 400 },
+      { id: 'nutella-naan', name: 'نٹیلا نان', price: 400 },
+      { id: 'achari-naan', name: 'اچاری نان', price: 120 },
+    ],
+  },
+  {
+    id: 'extras',
+    title: 'Extras',
+    items: [
+      { id: 'extra-1', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+      { id: 'extra-2', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+      { id: 'extra-3', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+      { id: 'extra-4', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+      { id: 'extra-5', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+      { id: 'extra-6', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+      { id: 'extra-7', name: 'Extra', options: [{ label: 'Extra', price: 200 }] },
+    ],
+  },
+];
 
 const OrdersPanel = () => {
   const [orders, setOrders] = useState([
@@ -14,11 +116,16 @@ const OrdersPanel = () => {
 
   const [dateFilter, setDateFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [timeFilter, setTimeFilter] = useState('');
+  const [activeMenuCategory, setActiveMenuCategory] = useState(menuCategories[0].id);
+  const [selectedOptions, setSelectedOptions] = useState({});
+  const [cartItems, setCartItems] = useState([]);
+  const [editingCartIndex, setEditingCartIndex] = useState(null);
+  const [editingData, setEditingData] = useState({ name: '', price: 0 });
 
   const categories = ['Biryani', 'Karahi', 'Nihari', 'Tikka', 'Kebab', 'Haleem', 'Tandoori', 'Raita', 'Naan'];
 
-  // Filter orders based on selected filters
+  const activeMenu = menuCategories.find(category => category.id === activeMenuCategory) || menuCategories[0];
+
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const dateMatch = !dateFilter || order.date === dateFilter;
@@ -27,12 +134,11 @@ const OrdersPanel = () => {
     });
   }, [orders, dateFilter, categoryFilter]);
 
-  // Calculate statistics
   const stats = useMemo(() => {
     return {
       totalOrders: filteredOrders.length,
       totalSales: filteredOrders.reduce((sum, order) => sum + order.total, 0),
-      averageOrder: filteredOrders.length > 0 
+      averageOrder: filteredOrders.length > 0
         ? Math.round(filteredOrders.reduce((sum, order) => sum + order.total, 0) / filteredOrders.length)
         : 0,
     };
@@ -41,7 +147,6 @@ const OrdersPanel = () => {
   const handleClearFilters = () => {
     setDateFilter('');
     setCategoryFilter('');
-    setTimeFilter('');
   };
 
   const handleExportCSV = () => {
@@ -67,11 +172,86 @@ const OrdersPanel = () => {
     alert(`Order Details:\n\nOrder #: ${order.orderNum}\nTable: ${order.table}\nItems: ${order.items}\nTotal: Rs. ${order.total}\nStatus: ${order.status}\nTime: ${order.time}`);
   };
 
+  const handleSelectOption = (itemId, optionLabel) => {
+    setSelectedOptions(prev => ({ ...prev, [itemId]: optionLabel }));
+  };
+
+  const handleAddToCart = (item) => {
+    const optionLabel = item.options ? (selectedOptions[item.id] || item.options[0].label) : null;
+    const option = item.options ? item.options.find(opt => opt.label === optionLabel) : undefined;
+    const price = option ? option.price : item.price;
+    const label = option ? `${item.name} (${option.label})` : item.name;
+
+    setCartItems(prev => {
+      return [...prev, {
+        id: item.id,
+        name: item.name,
+        option: optionLabel,
+        label,
+        price,
+        quantity: 1,
+        originalName: label,
+        originalPrice: price
+      }];
+    });
+  };
+
+  const handleAddExtrasToCart = () => {
+    // Placeholder - no longer used
+  };
+
+  const handleCancelExtrasModal = () => {
+    // Placeholder - no longer used
+  };
+
+  const handleEditCartItem = (index) => {
+    const item = cartItems[index];
+    setEditingCartIndex(index);
+    setEditingData({ name: item.label, price: item.price });
+  };
+
+  const handleSaveEdit = () => {
+    if (editingCartIndex !== null) {
+      setCartItems(prev => prev.map((item, idx) => {
+        if (idx !== editingCartIndex) return item;
+        return {
+          ...item,
+          label: editingData.name,
+          price: Number(editingData.price) || 0
+        };
+      }));
+      setEditingCartIndex(null);
+      setEditingData({ name: '', price: 0 });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCartIndex(null);
+    setEditingData({ name: '', price: 0 });
+  };
+
+  const handleQuantityChange = (index, delta) => {
+    setCartItems(prev => prev.map((cartItem, idx) => {
+      if (idx !== index) return cartItem;
+      const newQuantity = cartItem.quantity + delta;
+      return newQuantity < 1 ? cartItem : { ...cartItem, quantity: newQuantity };
+    }).filter(item => item.quantity > 0));
+  };
+
+  const handleRemoveCartItem = (index) => {
+    setCartItems(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleClearCart = () => {
+    setCartItems([]);
+  };
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
   return (
     <div className="orders-panel">
       <h2>Orders & Sales</h2>
 
-      {/* Statistics */}
       <div className="stats-container">
         <div className="stat-card">
           <div className="stat-label">Total Orders</div>
@@ -87,7 +267,6 @@ const OrdersPanel = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="filters-container">
         <div className="filter-group">
           <label htmlFor="date-filter">📅 Date:</label>
@@ -126,7 +305,159 @@ const OrdersPanel = () => {
         </button>
       </div>
 
-      {/* Orders Table */}
+      <div className="menu-cart-layout">
+        <section className="product-section">
+          <div className="section-header">
+            <div>
+              <h3>مینو</h3>
+              <p>کٹیگریز کے ذریعے فاسٹ آئٹم تلاش کریں</p>
+            </div>
+            <div className="category-count">{menuCategories.length} Categories</div>
+          </div>
+
+          <div className="menu-categories">
+            {menuCategories.map(category => (
+              <button
+                key={category.id}
+                className={`menu-category-btn ${activeMenuCategory === category.id ? 'active' : ''}`}
+                onClick={() => setActiveMenuCategory(category.id)}
+              >
+                {category.title}
+              </button>
+            ))}
+          </div>
+
+          <div className="menu-grid">
+            {activeMenu.items.map(item => (
+              <div
+                key={item.id}
+                className="menu-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleAddToCart(item)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleAddToCart(item);
+                  }
+                }}
+              >
+                {item.image && (
+                  <div className="menu-card-image-wrapper">
+                    <img src={item.image} alt={item.name} className="menu-card-image" />
+                  </div>
+                )}
+
+                <div className="menu-card-header">
+                  <h4>{item.name}</h4>
+                  <span className="menu-price">
+                    {item.options ? `${item.options[0].price} / ${item.options[1]?.price || ''}` : item.price} تومان
+                  </span>
+                </div>
+
+                <p className="menu-price-note">{item.options ? 'ہاف / فل دستیاب' : 'قیمت فی پیس'}</p>
+
+                {item.options && (
+                  <select
+                    className="option-select"
+                    value={selectedOptions[item.id] || item.options[0].label}
+                    onChange={(e) => handleSelectOption(item.id, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    {item.options.map(option => (
+                      <option key={option.label} value={option.label}>
+                        {option.label} - Rs. {option.price}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <div className="menu-card-action-note">کسی بھی جگہ پر ٹچ کریں، آئٹم فوری طور پر کارٹ میں چلا جائے گا</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <aside className="cart-section">
+          <div className="section-header cart-header">
+            <div>
+              <h3>کارٹ</h3>
+              <p>منتخب آئٹمز یہاں دکھیں</p>
+            </div>
+            <span className="cart-badge">{cartItems.length} آئٹمز</span>
+          </div>
+
+          {cartItems.length === 0 ? (
+            <div className="cart-empty">
+              <p>کوئی آئٹم ابھی کارٹ میں نہیں ہے</p>
+            </div>
+          ) : (
+            <div className="cart-list">
+              {cartItems.map((item, index) => (
+                <div key={`${item.id}-${item.option}-${index}`} className="cart-item">
+                  {editingCartIndex === index ? (
+                    <div className="cart-item-editing">
+                      <div className="editing-fields">
+                        <input
+                          type="text"
+                          className="edit-name-input"
+                          value={editingData.name}
+                          onChange={(e) => setEditingData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Product name"
+                        />
+                        <input
+                          type="number"
+                          className="edit-price-input"
+                          value={editingData.price}
+                          onChange={(e) => setEditingData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                          placeholder="Price"
+                          step="0.01"
+                        />
+                      </div>
+                      <div className="editing-buttons">
+                        <button className="save-edit-btn" onClick={handleSaveEdit}>✓</button>
+                        <button className="cancel-edit-btn" onClick={handleCancelEdit}>✕</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="cart-item-name">{item.label}</div>
+                        <div className="cart-item-price">Rs. {item.price.toLocaleString()}</div>
+                      </div>
+                      <div className="cart-item-controls">
+                        <button onClick={() => handleQuantityChange(index, -1)}>−</button>
+                        <span>{item.quantity}</span>
+                        <button onClick={() => handleQuantityChange(index, 1)}>+</button>
+                      </div>
+                      <div className="cart-item-actions">
+                        <button className="edit-item-btn" onClick={() => handleEditCartItem(index)} title="Edit">
+                          ✎ Edit
+                        </button>
+                        <button className="remove-item-btn" onClick={() => handleRemoveCartItem(index)}>
+                          ×
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="cart-summary">
+            <div>
+              <span>کل</span>
+              <strong>Rs. {cartTotal.toLocaleString()}</strong>
+            </div>
+            <button className="clear-cart-btn" onClick={handleClearCart}>
+              کارٹ خالی کریں
+            </button>
+          </div>
+        </aside>
+      </div>
+
       <div className="table-wrapper">
         <table className="orders-table">
           <thead>

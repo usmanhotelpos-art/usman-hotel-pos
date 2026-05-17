@@ -1,6 +1,10 @@
+// IMPORTANT: This file initializes the backend server and must remain stable.
+// Avoid changing this file unless you are fixing a server-level issue.
+
 import express from 'express';
 import cors from 'cors';
 import { router } from './routes.js';
+import { readDb } from './db.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { join } from 'path';
@@ -24,6 +28,14 @@ app.use((err, req, res, next) => {
   console.error('Express error handler caught:', err);
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
+
+// Validate DB before serving requests. If the DB is invalid, it will be reset safely.
+try {
+  readDb();
+} catch (startupError) {
+  console.error('Failed to initialize database on startup:', startupError);
+  process.exit(1);
+}
 
 // Serve static frontend files
 app.use(express.static(join(__dirname, '../client/dist')));

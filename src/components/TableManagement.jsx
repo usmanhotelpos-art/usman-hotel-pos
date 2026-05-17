@@ -33,6 +33,14 @@ const TableManagement = () => {
     alert(`Table ${tableId} marked as paid and cleared`);
   };
 
+  const handleMarkDue = (tableId) => {
+    const updatedTables = tables.map(table =>
+      table.id === tableId ? { ...table, status: 'occupied' } : table
+    );
+    setTables(updatedTables);
+    alert(`Table ${tableId} marked as payment due (local)`);
+  };
+
   const handleDelete = (tableId) => {
     const updatedTables = tables.filter(table => table.id !== tableId);
     setTables(updatedTables);
@@ -113,6 +121,15 @@ const TableManagement = () => {
                     >
                       <Check size={20} />
                       <span>Paid</span>
+                    </button>
+
+                    <button
+                      className="action-btn due-btn"
+                      onClick={() => handleMarkDue(table.id)}
+                      title="Mark Due"
+                    >
+                      <User size={20} />
+                      <span>Due</span>
                     </button>
 
                     <button

@@ -13,6 +13,7 @@
     "build:client": "npm --workspace client run build",
     "start:server": "npm --workspace server start",
     "build": "npm run build:client",
+    "serve": "npm run build:client && npm --workspace server start",
     "start": "npm run build:client && npm --workspace server start"
   },
   "engines": {
