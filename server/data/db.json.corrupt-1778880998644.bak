@@ -1,0 +1,354 @@
+{
+  "settings": {
+    "hotelName": "Usman Hotel",
+    "currency": "PKR",
+    "location": "Karachi",
+    "taxRate": 0.18
+  },
+  "rooms": [
+    {
+      "id": "r1",
+      "number": "101",
+      "type": "Single",
+      "status": "available",
+      "rate": 3800
+    },
+    {
+      "id": "r2",
+      "number": "102",
+      "type": "Double",
+      "status": "occupied",
+      "rate": 5200
+    },
+    {
+      "id": "r3",
+      "number": "103",
+      "type": "Suite",
+      "status": "available",
+      "rate": 9800
+    }
+  ],
+  "reservations": [
+    {
+      "id": "res1",
+      "guestName": "Ali Khan",
+      "roomId": "r2",
+      "status": "checked-in",
+      "checkIn": "2026-05-05",
+      "checkOut": "2026-05-09",
+      "total": 20800
+    }
+  ],
+  "inventory": [
+    {
+      "id": "i1",
+      "name": "Laundry Detergent",
+      "category": "Housekeeping",
+      "quantity": 24,
+      "cost": 220
+    },
+    {
+      "id": "i2",
+      "name": "Breakfast Bundle",
+      "category": "Food",
+      "quantity": 12,
+      "cost": 560
+    }
+  ],
+  "staff": [
+    {
+      "id": "s1",
+      "name": "Ayesha",
+      "role": "Receptionist",
+      "phone": "+923001234567",
+      "status": "active"
+    },
+    {
+      "id": "s2",
+      "name": "Usman",
+      "role": "Manager",
+      "phone": "+923009876543",
+      "status": "active"
+    }
+  ],
+  "sales": [
+    {
+      "id": "sale1",
+      "description": "Room 102 payment",
+      "amount": 20800,
+      "date": "2026-05-05"
+    }
+  ],
+  "invoices": [],
+  "users": [
+    {
+      "id": "u1",
+      "name": "Admin",
+      "email": "admin@usmanhotel.com",
+      "role": "admin",
+      "passwordHash": "$2a$10$AOYnvTci2MdSVQEZytP8tO3XkETCgWfEbEvUrGAo.JuAQwVeJm3ly"
+    }
+  ],
+  "pos_categories": [
+    {
+      "id": "cat1",
+      "name": "Karahi"
+    },
+    {
+      "id": "cat2",
+      "name": "Biryani"
+    },
+    {
+      "id": "cat3",
+      "name": "Fast Food"
+    },
+    {
+      "id": "cat4",
+      "name": "Drinks"
+    },
+    {
+      "id": "cat5",
+      "name": "Desserts"
+    },
+    {
+      "id": "cat6",
+      "name": "ناشتے کی آئٹمز"
+    },
+    {
+      "id": "cat7",
+      "name": "چکن کڑاہی مینیو"
+    },
+    {
+      "id": "cat8",
+      "name": "سیخ کباب"
+    },
+    {
+      "id": "cat9",
+      "name": "بوٹی آئٹمز"
+    },
+    {
+      "id": "cat10",
+      "name": "چکن پیسز"
+    },
+    {
+      "id": "cat11",
+      "name": "نان اور روٹی"
+    },
+    {
+      "id": "cat12",
+      "name": "اسپیشل نان"
+    }
+  ],
+  "pos_products": [
+    {
+      "id": "p1",
+      "name": "Chicken Karahi",
+      "category": "Karahi",
+      "price": 1200,
+      "availableStock": 18,
+      "image": "",
+      "description": "Spicy chicken karahi with fresh spices."
+    },
+    {
+      "id": "p2",
+      "name": "Mutton Karahi",
+      "category": "Karahi",
+      "price": 1500,
+      "availableStock": 12,
+      "image": "",
+      "description": "Rich mutton karahi with traditional taste."
+    },
+    {
+      "id": "p3",
+      "name": "Beef Biryani",
+      "category": "Biryani",
+      "price": 980,
+      "availableStock": 22,
+      "image": "",
+      "description": "Fragrant beef biryani with raita."
+    },
+    {
+      "id": "p4",
+      "name": "Chicken Biryani",
+      "category": "Biryani",
+      "price": 900,
+      "availableStock": 25,
+      "image": "",
+      "description": "Aromatic chicken biryani with spices."
+    },
+    {
+      "id": "p5",
+      "name": "French Fries",
+      "category": "Fast Food",
+      "price": 300,
+      "availableStock": 45,
+      "image": "",
+      "description": "Crispy golden french fries."
+    },
+    {
+      "id": "p6",
+      "name": "Cold Drink",
+      "category": "Drinks",
+      "price": 120,
+      "availableStock": 60,
+      "image": "",
+      "description": "Chilled soft drink."
+    },
+    {
+      "id": "p7",
+      "name": "Gulab Jamun",
+      "category": "Desserts",
+      "price": 220,
+      "availableStock": 30,
+      "image": "",
+      "description": "Sweet syrup-soaked gulab jamun."
+    },
+    {
+      "id": "p8",
+      "name": "سادہ چنے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 150,
+      "availableStock": 20,
+      "image": "",
+      "description": "سادہ چنے ہاف سروس۔"
+    },
+    {
+      "id": "p9",
+      "name": "سادہ چنے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 250,
+      "availableStock": 15,
+      "image": "",
+      "description": "سادہ چنے فل سروس۔"
+    },
+    {
+      "id": "p10",
+      "name": "انڈہ چنے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 180,
+      "availableStock": 18,
+      "image": "",
+      "description": "انڈہ چنے ہاف سروس۔"
+    },
+    {
+      "id": "p11",
+      "name": "انڈہ چنے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 300,
+      "availableStock": 12,
+      "image": "",
+      "description": "انڈہ چنے فل سروس۔"
+    },
+    {
+      "id": "p12",
+      "name": "کوفتہ چنے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 200,
+      "availableStock": 18,
+      "image": "",
+      "description": "کوفتہ چنے ہاف سروس۔"
+    },
+    {
+      "id": "p13",
+      "name": "کوفتہ چنے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 320,
+      "availableStock": 12,
+      "image": "",
+      "description": "کوفتہ چنے فل سروس۔"
+    },
+    {
+      "id": "p14",
+      "name": "اسپیشل حلیم — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 150,
+      "availableStock": 10,
+      "image": "",
+      "description": "بہترین اسپیشل حلیم ہاف۔"
+    },
+    {
+      "id": "p15",
+      "name": "اسپیشل حلیم — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 250,
+      "availableStock": 8,
+      "image": "",
+      "description": "بہترین اسپیشل حلیم فل۔"
+    },
+    {
+      "id": "p16",
+      "name": "اسپیشل پائے — ہاف",
+      "category": "ناشتے کی آئٹمز",
+      "price": 400,
+      "availableStock": 6,
+      "image": "",
+      "description": "اسپیشل پائے ہاف سروس۔"
+    },
+    {
+      "id": "p17",
+      "name": "اسپیشل پائے — فل",
+      "category": "ناشتے کی آئٹمز",
+      "price": 600,
+      "availableStock": 4,
+      "image": "",
+      "description": "اسپیشل پائے فل سروس۔"
+    },
+    {
+      "id": "p18",
+      "name": "رائتہ",
+      "category": "ناشتے کی آئٹمز",
+      "price": 50,
+      "availableStock": 30,
+      "image": "",
+      "description": "تازہ رائتہ۔"
+    },
+    {
+      "id": "p19",
+      "name": "توہ پراٹھا",
+      "category": "ناشتے کی آئٹمز",
+      "price": 60,
+      "availableStock": 40,
+      "image": "",
+      "description": "گرم توہ پراٹھا۔"
+    },
+    {
+      "id": "p20",
+      "name": "ریڈ چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 800,
+      "availableStock": 8,
+      "image": "",
+      "description": "ریڈ چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p21",
+      "name": "ریڈ چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1600,
+      "availableStock": 5,
+      "image": "",
+      "description": "ریڈ چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p22",
+      "name": "وائٹ چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 1000,
+      "availableStock": 8,
+      "image": "",
+      "description": "وائٹ چکن کڑاہی ہاف۔"
+    },
+    {
+      "id": "p23",
+      "name": "وائٹ چکن کڑاہی — فل",
+      "category": "چکن کڑاہی مینیو",
+      "price": 2000,
+      "availableStock": 5,
+      "image": "",
+      "description": "وائٹ چکن کڑاہی فل۔"
+    },
+    {
+      "id": "p24",
+      "name": "گرین چکن کڑاہی — ہاف",
+      "category": "چکن کڑاہی مینیو",
+      "price": 900
