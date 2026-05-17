@@ -4,4 +4,4 @@
   publish = "dist"
 
   [build.environment]
-    VITE_API_BASE = "https://usman-hotel-pos-server-production.up.railway.app"
+    VITE_API_BASE = "https://usman-hotel-pos-server-production.up.railway.app/api"
