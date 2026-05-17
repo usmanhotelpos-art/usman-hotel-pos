@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 
-const apiBase = '/api';
+const apiBase = import.meta.env.VITE_API_BASE || '/api';
 const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'settings'];
 
 function App() {
