@@ -5,3 +5,9 @@
 
   [build.environment]
     VITE_API_BASE = "https://usman-hotel-pos-server-production.up.railway.app/api"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
