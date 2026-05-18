@@ -1780,7 +1780,10 @@ function App() {
     }
     setPopupError('');
     try {
-      const order = await savePosOrder('Kitchen', { paymentStatus: status });
+      const saveStatus = orderType === 'Delivery'
+        ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
+        : 'Kitchen';
+      const order = await savePosOrder(saveStatus, { paymentStatus: status });
       if (order) {
         setTimeout(() => printReceipt(order), 500);
         setShowCustomerDetailsPopup(false);
