@@ -2,38 +2,33 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-# Copy monorepo files
+# Copy monorepo root
 COPY package*.json ./
+
+# Copy source folders
 COPY client/ client/
 COPY server/ server/
 
-# Install dependencies
+# Install all dependencies
 RUN npm install
 
 # Build frontend
-WORKDIR /app/client
 RUN npm run build
 
-# Runtime stage
+# Runtime stage  
 FROM node:24-alpine
 WORKDIR /app
 
-# Copy built frontend
+# Copy built frontend (will be served by Express)
 COPY --from=builder /app/client/dist client/dist
 
-# Copy server code
-COPY server/ server/
-COPY package*.json ./
+# Copy server code and dependencies
+COPY --from=builder /app/server server/
+COPY --from=builder /app/node_modules node_modules/
+COPY --from=builder /app/package*.json ./
 
-# Install production dependencies only for server
-WORKDIR /app/server
-RUN npm install --production
-
-# Set working directory
-WORKDIR /app
-
-# Expose port for Railway
+# Expose port
 EXPOSE 4000
 
-# Start the server
+# Start the backend server (serves frontend + API)
 CMD ["node", "server/index.js"]

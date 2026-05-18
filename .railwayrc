@@ -1,9 +1,0 @@
-{
-  "services": {
-    "frontend": {
-      "buildPack": "dockerfile",
-      "dockerfile": "Dockerfile",
-      "startCommand": "npm --workspace client run preview"
-    }
-  }
-}
