@@ -1,14 +1,7 @@
 [build]
+  base = "client"
   command = "npm run build"
-  publish = "client/dist"
+  publish = "dist"
 
   [build.environment]
     VITE_API_BASE = "https://usman-hotel-pos-server-production.up.railway.app/api"
-    NODE_VERSION = "24"
-    NPM_FLAGS = "--legacy-peer-deps"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = true

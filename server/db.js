@@ -4,12 +4,29 @@
 
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { Client } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbFile = path.join(__dirname, 'data', 'db.json');
+const postgresUrl = process.env.DATABASE_URL || process.env.PG_CONNECTION_STRING || '';
+
+// Railway and most hosted Postgres providers expose a connection string through
+// DATABASE_URL or PG_CONNECTION_STRING. If provided, the app will use Postgres
+// for persistence; otherwise it falls back to local JSON storage for development.
+const pgClient = postgresUrl
+  ? new Client({
+      connectionString: postgresUrl,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    })
+  : null;
+
+let dbCache = null;
+let pgConnected = false;
 
 const defaultData = {
   settings: {
@@ -155,57 +172,137 @@ const defaultData = {
   pos_payments: []
 };
 
-function ensureDb() {
+function ensureLocalDataDir() {
   const dir = path.dirname(dbFile);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
 
-  if (!fs.existsSync(dbFile)) {
-    fs.writeFileSync(dbFile, JSON.stringify(defaultData, null, 2), 'utf-8');
-    return;
-  }
-
-  const raw = fs.readFileSync(dbFile, 'utf-8');
-  let existingData = {};
-
-  if (raw.trim()) {
-    try {
-      existingData = JSON.parse(raw);
-    } catch (error) {
-      const backupPath = `${dbFile}.corrupt-${Date.now()}.bak`;
-      fs.writeFileSync(backupPath, raw, 'utf-8');
-      console.error(`Database file corrupted. Backed up invalid JSON to ${backupPath}. Resetting database.`);
-      existingData = {};
-    }
-  }
-
+function mergeDefaultData(existingData) {
   const merged = { ...defaultData, ...existingData };
   Object.keys(defaultData).forEach((key) => {
     if (existingData[key] === undefined) {
       merged[key] = defaultData[key];
     }
   });
-  fs.writeFileSync(dbFile, JSON.stringify(merged, null, 2), 'utf-8');
+  return merged;
 }
 
-export function readDb() {
-  ensureDb();
+function writeDbFile(data) {
+  ensureLocalDataDir();
+  const tempFile = `${dbFile}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+  fs.renameSync(tempFile, dbFile);
+}
+
+function loadDbFile() {
+  ensureLocalDataDir();
+
+  if (!fs.existsSync(dbFile)) {
+    writeDbFile(defaultData);
+    return defaultData;
+  }
+
   const raw = fs.readFileSync(dbFile, 'utf-8');
+  if (!raw.trim()) {
+    writeDbFile(defaultData);
+    return defaultData;
+  }
+
   try {
-    return JSON.parse(raw);
+    const existingData = JSON.parse(raw);
+    const merged = mergeDefaultData(existingData);
+    writeDbFile(merged);
+    return merged;
   } catch (error) {
-    console.error('Failed to parse database JSON. Resetting database.', error);
-    fs.writeFileSync(dbFile, JSON.stringify(defaultData, null, 2), 'utf-8');
+    const backupPath = `${dbFile}.corrupt-${Date.now()}.bak`;
+    fs.writeFileSync(backupPath, raw, 'utf-8');
+    console.error(`Database file corrupted. Backed up invalid JSON to ${backupPath}. Resetting database.`);
+    writeDbFile(defaultData);
     return defaultData;
   }
 }
 
+async function ensurePostgresSchema() {
+  if (!pgClient) return;
+  await pgClient.query(`
+    CREATE TABLE IF NOT EXISTS pos_data (
+      id TEXT PRIMARY KEY,
+      payload JSONB NOT NULL
+    )
+  `);
+}
+
+async function loadDbFromPostgres() {
+  if (!pgClient) return null;
+
+  const result = await pgClient.query('SELECT payload FROM pos_data WHERE id = $1', ['db']);
+  if (result.rowCount === 0) {
+    return null;
+  }
+  return result.rows[0].payload;
+}
+
+async function saveDbToPostgres(data) {
+  if (!pgClient || !pgConnected) return;
+  try {
+    await pgClient.query(
+      `INSERT INTO pos_data(id, payload) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload`,
+      ['db', data]
+    );
+  } catch (error) {
+    console.error('Failed to save DB to Postgres:', error);
+  }
+}
+
+export async function initDatabase() {
+  if (pgClient) {
+    try {
+      await pgClient.connect();
+      pgConnected = true;
+      await ensurePostgresSchema();
+      const postgresData = await loadDbFromPostgres();
+
+      if (postgresData) {
+        dbCache = mergeDefaultData(postgresData);
+      } else {
+        dbCache = defaultData;
+        await saveDbToPostgres(dbCache);
+      }
+
+      return;
+    } catch (error) {
+      console.error('Postgres initialization failed:', error);
+      console.warn('Falling back to local JSON file storage.');
+      pgConnected = false;
+    }
+  }
+
+  dbCache = loadDbFile();
+}
+
+export function readDb() {
+  if (dbCache === null) {
+    throw new Error('Database has not been initialized. Call initDatabase() first.');
+  }
+  return dbCache;
+}
+
 export function writeDb(data) {
-  ensureDb();
-  const tempFile = `${dbFile}.tmp`;
-  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
-  fs.renameSync(tempFile, dbFile);
+  if (dbCache === null) {
+    throw new Error('Database has not been initialized. Call initDatabase() first.');
+  }
+
+  dbCache = data;
+  if (pgConnected) {
+    saveDbToPostgres(data).catch((error) => {
+      console.error('Failed to persist DB to Postgres:', error);
+    });
+  } else {
+    writeDbFile(data);
+  }
 }
 
 export function getCollection(name) {

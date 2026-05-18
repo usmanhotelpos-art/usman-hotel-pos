@@ -4,7 +4,7 @@
 import express from 'express';
 import cors from 'cors';
 import { router } from './routes.js';
-import { readDb } from './db.js';
+import { initDatabase, readDb } from './db.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { join } from 'path';
@@ -31,6 +31,7 @@ app.use((err, req, res, next) => {
 
 // Validate DB before serving requests. If the DB is invalid, it will be reset safely.
 try {
+  await initDatabase();
   readDb();
 } catch (startupError) {
   console.error('Failed to initialize database on startup:', startupError);

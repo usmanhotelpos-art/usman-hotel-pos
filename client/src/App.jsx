@@ -301,13 +301,6 @@ function App() {
   const [catalogueSearch, setCatalogueSearch] = useState('');
   const [catalogueCategory, setCatalogueCategory] = useState('All');
   const [catalogueCart, setCatalogueCart] = useState([]);
-
-  useEffect(() => {
-    const currentPath = window.location.pathname.replace(/\/$/, '');
-    if (currentPath === '/catalogue') {
-      setCataloguePage(true);
-    }
-  }, []);
   const [catalogueCustomer, setCatalogueCustomer] = useState({ name: '', phone: '', address: '' });
   const [catalogueOrderNote, setCatalogueOrderNote] = useState('');
   const [catalogueMessage, setCatalogueMessage] = useState('');
@@ -6007,10 +6000,6 @@ function App() {
         )}
       </div>
     );
-  }
-
-  if (cataloguePage) {
-    return renderCustomerCataloguePage();
   }
 
   if (!token || !user) {
