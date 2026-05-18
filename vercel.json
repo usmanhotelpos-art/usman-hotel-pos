@@ -1,0 +1,19 @@
+{
+  "build": {
+    "env": {
+      "VITE_API_BASE": "https://usman-hotel-pos-server-production.up.railway.app/api"
+    }
+  },
+  "env": {
+    "VITE_API_BASE": "https://usman-hotel-pos-server-production.up.railway.app/api"
+  },
+  "builds": [
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ]
+}
