@@ -73,6 +73,14 @@ router.get('/auth/me', authenticate, (req, res) => {
   res.send({ id: user.id, name: user.name, email: user.email, role: user.role });
 });
 
+router.get('/pos/categories', (req, res) => {
+  res.send(getCollection('pos_categories'));
+});
+
+router.get('/pos/products', (req, res) => {
+  res.send(getCollection('pos_products'));
+});
+
 router.use(authenticate);
 
 const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders'];

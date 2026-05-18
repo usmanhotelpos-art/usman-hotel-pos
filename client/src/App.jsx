@@ -321,6 +321,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (cataloguePage || !settings.cataloguePath) return;
+    const path = window.location.pathname.toLowerCase();
+    const customPath = `/${settings.cataloguePath.toLowerCase()}`;
+    if (path === customPath || path.startsWith(`${customPath}/`) || path.startsWith(`${customPath}?`)) {
+      setCataloguePage(true);
+    }
+  }, [settings.cataloguePath, cataloguePage]);
+
+  useEffect(() => {
+    if (!cataloguePage) return;
+    loadSettings();
+    loadInventoryData();
+  }, [cataloguePage]);
+
+  useEffect(() => {
     // If settings saved from server include catalogue details, initialize local state
     if (settings.catalogueLayout) {
       setCatalogueLayout((prev) => ({ ...prev, ...settings.catalogueLayout }));
@@ -663,8 +678,8 @@ function App() {
         }
       }));
 
-      // If a Google Sheet is configured, trigger a one-time server->sheet sync on load
-      if (data && data.googleSpreadsheetId) {
+      // If a Google Sheet is configured, trigger a one-time server->sheet sync on load only for authenticated admin sessions
+      if (user && data && data.googleSpreadsheetId) {
         try {
           await fetchJson(`${apiBase}/google/save-db`, {
             method: 'POST',
