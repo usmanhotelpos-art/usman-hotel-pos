@@ -299,6 +299,7 @@ function App() {
     layoutStyle: 'grid'
   });
   const [catalogueHost, setCatalogueHost] = useState('');
+  const [cataloguePath, setCataloguePath] = useState('catalogue');
   const [cataloguePage, setCataloguePage] = useState(false);
   const [catalogueSearch, setCatalogueSearch] = useState('');
   const [catalogueCategory, setCatalogueCategory] = useState('All');
@@ -310,7 +311,7 @@ function App() {
 
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
-    if (/^\/catalogue(\/|$|\?)/.test(path)) {
+    if (/^\/(catalogue|menu|qr)(\/|$|\?)/.test(path)) {
       setCataloguePage(true);
     }
   }, []);
@@ -4459,6 +4460,16 @@ function App() {
                 <div className="mt-3 text-xs text-slate-400">Use your PC network IP or domain so phone scans open correctly.</div>
               </div>
               <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
+                <div className="font-semibold text-slate-100">QR path</div>
+                <input
+                  value={cataloguePath}
+                  onChange={(e) => setCataloguePath(e.target.value)}
+                  placeholder="catalogue or menu or qr"
+                  className="mt-3 w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none"
+                />
+                <div className="mt-3 text-xs text-slate-400">Use a short alias like catalogue, menu, or qr for the scanned URL.</div>
+              </div>
+              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
                 <div className="font-semibold text-slate-100">Menu URL</div>
                 <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                   <input readOnly value={catalogueUrl} className="min-w-0 flex-1 rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
@@ -4710,7 +4721,8 @@ function App() {
   function getCatalogueUrl() {
     const host = catalogueHost?.trim() || window.location.host;
     const normalizedHost = host.startsWith('http') ? host : `${window.location.protocol}//${host}`;
-    return `${normalizedHost.replace(/\/$/, '')}/catalogue`;
+    const cleanedPath = cataloguePath.replace(/^\/+|\/+$/g, '') || 'catalogue';
+    return `${normalizedHost.replace(/\/$/, '')}/${cleanedPath}`;
   }
 
   function getCatalogueFilteredProducts() {
