@@ -267,7 +267,15 @@ function App() {
   const [showFlavorPopup, setShowFlavorPopup] = useState(false);
   const [ordersMainTab, setOrdersMainTab] = useState('delivery');
   const [deliverySubTab, setDeliverySubTab] = useState('all');
+  const [deliveryDateFilter, setDeliveryDateFilter] = useState('today');
+  const [deliveryCustomDateFrom, setDeliveryCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [deliveryCustomDateTo, setDeliveryCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [takeawaySubTab, setTakeawaySubTab] = useState('all');
+  const [takeawayDateFilter, setTakeawayDateFilter] = useState('today');
+  const [takeawayCustomDateFrom, setTakeawayCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [takeawayCustomDateTo, setTakeawayCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [takeawayPageIndex, setTakeawayPageIndex] = useState(0);
+  const [takeawayPageSize, setTakeawayPageSize] = useState(10);
   const [dineinSubTab, setDineinSubTab] = useState('tables');
   const [deliverySettingsSubTab, setDeliverySettingsSubTab] = useState('serviceTypes');
   const [deliveryViewMode, setDeliveryViewMode] = useState('table');
@@ -383,7 +391,11 @@ function App() {
 
   useEffect(() => {
     setOrderPageIndex(0);
-  }, [deliverySubTab, orderSearch, orderFilterRider, orderFilterPayment, orderPageSize]);
+  }, [deliverySubTab, orderSearch, orderFilterRider, orderFilterPayment, orderPageSize, deliveryDateFilter, deliveryCustomDateFrom, deliveryCustomDateTo]);
+
+  useEffect(() => {
+    setTakeawayPageIndex(0);
+  }, [takeawaySubTab, takeawayDateFilter, takeawayCustomDateFrom, takeawayCustomDateTo, takeawayPageSize]);
 
   useEffect(() => {
     setRecentOrderPageIndex(0);
@@ -420,6 +432,9 @@ function App() {
   const [riderBookSubTab, setRiderBookSubTab] = useState('all');
   const [deliveryPaymentStatusFilter, setDeliveryPaymentStatusFilter] = useState('all');
   const [riderBookFilterRider, setRiderBookFilterRider] = useState('');
+  const [riderBookDateFilter, setRiderBookDateFilter] = useState('today');
+  const [riderBookCustomDateFrom, setRiderBookCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [riderBookCustomDateTo, setRiderBookCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [riderBookSelectedOrders, setRiderBookSelectedOrders] = useState([]);
   const [riderBookSearch, setRiderBookSearch] = useState('');
   const [riderBookPageSize, setRiderBookPageSize] = useState(15);
@@ -549,7 +564,7 @@ function App() {
 
   useEffect(() => {
     setRiderBookPageIndex(0);
-  }, [riderBookFilterRider, riderBookSubTab, riderBookSearch, riderBookPageSize]);
+  }, [riderBookFilterRider, riderBookSubTab, riderBookSearch, riderBookPageSize, riderBookDateFilter, riderBookCustomDateFrom, riderBookCustomDateTo]);
 
   const header = useMemo(() => {
     switch (activeTab) {
@@ -2533,6 +2548,48 @@ function App() {
     }
   };
 
+  async function markSelectedTakeawayOrdersDue() {
+    if (selectedTakeawayOrders.length === 0) return;
+    
+    setLoading(true);
+    setMessage('');
+    try {
+      await Promise.all(selectedTakeawayOrders.map(orderId => 
+        updateOrderStatus(orderId, 'Due')
+      ));
+      setMessage(`${selectedTakeawayOrders.length} order${selectedTakeawayOrders.length > 1 ? 's' : ''} marked as Due.`);
+      setSelectedTakeawayOrders([]);
+      setTakeawaySubTab('due');
+      setTakeawayPageIndex(0);
+      await loadOrdersData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function markSelectedTakeawayOrdersPaid() {
+    if (selectedTakeawayOrders.length === 0) return;
+    
+    setLoading(true);
+    setMessage('');
+    try {
+      await Promise.all(selectedTakeawayOrders.map(orderId => 
+        updateOrderStatus(orderId, 'Completed')
+      ));
+      setMessage(`${selectedTakeawayOrders.length} order${selectedTakeawayOrders.length > 1 ? 's' : ''} marked as Paid.`);
+      setSelectedTakeawayOrders([]);
+      setTakeawaySubTab('paid');
+      setTakeawayPageIndex(0);
+      await loadOrdersData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openViewOrderModal = (order) => {
     setOrderDetailsModal(order);
   };
@@ -2586,7 +2643,44 @@ function App() {
     }
     return true;
   });
-  const riderBookSearchFiltered = riderBookFilteredBySubTab.filter((order) => {
+  const riderBookDateFiltered = riderBookFilteredBySubTab.filter((order) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const getDateRange = () => {
+      const from = new Date(today);
+      const to = new Date(today);
+
+      if (riderBookDateFilter === 'today') {
+        return { from: new Date(today), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+      }
+      if (riderBookDateFilter === 'yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { from: new Date(yesterday), to: new Date(today) };
+      }
+      if (riderBookDateFilter === 'previous-5-days') {
+        const fiveDaysAgo = new Date(today);
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        return { from: new Date(fiveDaysAgo), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+      }
+      if (riderBookDateFilter === 'custom') {
+        return {
+          from: new Date(riderBookCustomDateFrom + 'T00:00:00'),
+          to: new Date(riderBookCustomDateTo + 'T23:59:59')
+        };
+      }
+      return { from: null, to: null };
+    };
+
+    const { from, to } = getDateRange();
+    if (!from || !to) return true;
+
+    const orderDate = order.createdAt ? new Date(order.createdAt) : order.date ? new Date(order.date) : null;
+    return orderDate ? orderDate >= from && orderDate <= to : false;
+  });
+
+  const riderBookSearchFiltered = riderBookDateFiltered.filter((order) => {
     const search = riderBookSearch.trim().toLowerCase();
     if (!search) return true;
     return [order.orderNumber, order.customerName, order.phone, order.address, order.deliveryAgent, order.serviceType]
@@ -2689,6 +2783,9 @@ function App() {
 
   const renderRiderBook = () => {
     const displayTotals = riderBookSelectedOrdersList.length ? selectedTotals : riderBookTotals;
+    const isCashTab = riderBookSubTab === 'cash';
+    const riderBookExtrasServiceTotal = displayTotals.extras + displayTotals.serviceType;
+    const riderBookCashOrderCount = riderBookVisibleOrders.length;
     const pageStart = riderBookPageIndex * riderBookPageSize + 1;
     const pageEnd = Math.min((riderBookPageIndex + 1) * riderBookPageSize, riderBookVisibleOrders.length);
 
@@ -2719,40 +2816,65 @@ function App() {
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-4 text-sm text-slate-200 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
+                <div className="aspect-square rounded-full border border-slate-800 bg-slate-950/85 p-4 text-sm text-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.22)] flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Total amount</p>
-                  <p className="mt-2 text-2xl font-semibold text-white glow-text">{displayTotals.total} Rs</p>
+                  <p className="mt-3 text-4xl font-semibold text-white glow-text">{isCashTab ? `${displayTotals.total} Rs` : displayTotals.total}</p>
                 </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-4 text-sm text-slate-200 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Extras total</p>
-                  <p className="mt-2 text-2xl font-semibold text-white glow-text">{displayTotals.extras} Rs</p>
+                <div className="aspect-square rounded-full border border-slate-800 bg-slate-950/85 p-4 text-sm text-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.22)] flex flex-col items-center justify-center text-center">
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">{isCashTab ? 'Extras + Service charges' : 'Our sales'}</p>
+                  <div className="mt-3 space-y-2 text-sm text-slate-300">
+                    {isCashTab ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span>Extras</span>
+                          <span>{displayTotals.extras} Rs</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Service</span>
+                          <span>{displayTotals.serviceType} Rs</span>
+                        </div>
+                        <div className="border-t border-slate-800 pt-2 text-white font-semibold flex items-center justify-between">
+                          <span>Sum</span>
+                          <span>{displayTotals.extras} + {displayTotals.serviceType} = {riderBookExtrasServiceTotal} Rs</span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-3xl font-semibold text-white">{displayTotals.total - riderBookExtrasServiceTotal}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-4 text-sm text-slate-200 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Service charges</p>
-                  <p className="mt-2 text-2xl font-semibold text-white glow-text">{displayTotals.serviceType} Rs</p>
+                <div className={`aspect-square rounded-full border p-4 text-sm text-white shadow-[0_0_90px_rgba(16,255,207,0.28)] ${isCashTab ? 'rider-due-card border-cyan-500/30 bg-slate-950/95' : 'border border-slate-800 bg-slate-950/85'} flex flex-col justify-center items-center text-center`}>
+                  <div className="flex flex-col gap-3 items-center justify-center">
+                    <p className={`text-[10px] uppercase tracking-[0.3em] ${isCashTab ? 'text-cyan-300' : 'text-slate-500'}`}>{isCashTab ? 'Rider Due' : 'Rider Collection'}</p>
+                    {isCashTab ? (
+                      <>
+                        <h3 className="text-2xl font-semibold text-white">With cash <span className="inline-block rider-due-icon">💵</span></h3>
+                        <p className="text-sm text-slate-400">Amount rider should hand over to Usman Hotel.</p>
+                        <p className="rider-due-amount mt-2 text-4xl font-semibold text-white">{Math.max(0, displayTotals.total - riderBookExtrasServiceTotal)} Rs</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-sm text-slate-300 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span>Extras</span>
+                            <span>{displayTotals.extras}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Service</span>
+                            <span>{displayTotals.serviceType}</span>
+                          </div>
+                          <div className="border-t border-slate-800 pt-2 flex items-center justify-between text-white font-semibold">
+                            <span>Total</span>
+                            <span>{riderBookExtrasServiceTotal}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-4 text-sm text-slate-200 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">BBQ / Tandoor</p>
-                  <p className="mt-2 text-2xl font-semibold text-white glow-text">{displayTotals.bbqTandoor} Rs</p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-xs text-slate-300">
-                  <p className="uppercase tracking-[0.3em] text-slate-500">Total excl.</p>
-                  <p className="mt-2 text-lg font-semibold text-emerald-300">{displayTotals.excluded} Rs</p>
-                </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-xs text-slate-300">
-                  <p className="uppercase tracking-[0.3em] text-slate-500">Visible orders</p>
-                  <p className="mt-2 text-lg font-semibold text-white">{riderBookVisibleOrders.length}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-xs text-slate-300">
-                  <p className="uppercase tracking-[0.3em] text-slate-500">Page size</p>
-                  <p className="mt-2 text-lg font-semibold text-white">{riderBookPageSize}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-xs text-slate-300">
-                  <p className="uppercase tracking-[0.3em] text-slate-500">Selection</p>
-                  <p className="mt-2 text-lg font-semibold text-white">{riderBookSelectedOrders.length || 0}</p>
+                <div className="aspect-square rounded-full border border-slate-800 bg-slate-950/85 p-4 text-sm text-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.22)] flex flex-col items-center justify-center text-center">
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Total orders</p>
+                  <p className="mt-3 text-4xl font-semibold text-white">{riderBookCashOrderCount}</p>
                 </div>
               </div>
             </div>
@@ -2790,6 +2912,46 @@ function App() {
                 className="w-full md:w-auto md:min-w-[240px] rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
               />
             </div>
+            <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Date</span>
+                {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => {
+                      setRiderBookDateFilter(filter);
+                      setRiderBookPageIndex(0);
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${riderBookDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
+                  </button>
+                ))}
+              </div>
+              {riderBookDateFilter === 'custom' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={riderBookCustomDateFrom}
+                    onChange={(e) => {
+                      setRiderBookCustomDateFrom(e.target.value);
+                      setRiderBookPageIndex(0);
+                    }}
+                    className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                  />
+                  <span className="text-slate-400">to</span>
+                  <input
+                    type="date"
+                    value={riderBookCustomDateTo}
+                    onChange={(e) => {
+                      setRiderBookCustomDateTo(e.target.value);
+                      setRiderBookPageIndex(0);
+                    }}
+                    className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Tabs Row */}
             <div className="flex flex-wrap gap-2">
@@ -2802,6 +2964,11 @@ function App() {
                   {tab === 'all' ? 'All' : tab === 'paid' ? 'Paid Orders' : tab === 'cash' ? 'Cash' : tab === 'online' ? 'Online' : tab === 'counter' ? 'Paid to Counter' : 'Pending'}
                 </button>
               ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-400">
+              <div>Visible orders: <span className="font-semibold text-white">{riderBookVisibleOrders.length}</span></div>
+              <div>Selected: <span className="font-semibold text-white">{riderBookSelectedOrders.length || 0}</span></div>
+              <div>Page size: <span className="font-semibold text-white">{riderBookPageSize}</span></div>
             </div>
 
             {/* Actions Row */}
@@ -3220,6 +3387,7 @@ function App() {
       'Out for delivery': 'bg-purple-600',
       Completed: 'bg-emerald-600',
       'Pay Later': 'bg-amber-600',
+      Due: 'bg-red-600',
       Cancelled: 'bg-rose-600',
       Pending: 'bg-slate-500'
     };
@@ -5282,7 +5450,37 @@ function App() {
         (o.address || '').toLowerCase().includes(orderSearch.toLowerCase());
       const matchesRider = !orderFilterRider || o.deliveryAgent === orderFilterRider;
       const matchesPayment = !orderFilterPayment || o.paymentMethod === orderFilterPayment;
-      return matchesStatus && matchesSearch && matchesRider && matchesPayment;
+      let matchesDate = true;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const getDateRange = () => {
+        const from = new Date(today);
+        const to = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        if (deliveryDateFilter === 'today') return { from, to };
+        if (deliveryDateFilter === 'yesterday') {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return { from: yesterday, to };
+        }
+        if (deliveryDateFilter === 'previous-5-days') {
+          const fiveDaysAgo = new Date(today);
+          fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+          return { from: fiveDaysAgo, to };
+        }
+        if (deliveryDateFilter === 'custom') {
+          return {
+            from: new Date(deliveryCustomDateFrom + 'T00:00:00'),
+            to: new Date(deliveryCustomDateTo + 'T23:59:59')
+          };
+        }
+        return { from: null, to: null };
+      };
+      const { from, to } = getDateRange();
+      if (from && to) {
+        const orderDate = o.createdAt ? new Date(o.createdAt) : o.date ? new Date(o.date) : null;
+        matchesDate = orderDate ? orderDate >= from && orderDate <= to : false;
+      }
+      return matchesStatus && matchesSearch && matchesRider && matchesPayment && matchesDate;
     });
     const paginatedOrders = filteredOrders.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize);
     const pageCount = Math.max(1, Math.ceil(filteredOrders.length / orderPageSize));
@@ -5296,61 +5494,91 @@ function App() {
                 onClick={() => setDeliverySubTab(status)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliverySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                {status === 'Kitchen' ? 'On Kitchen' : status}
+                {status === 'Kitchen' ? '👨‍🍳 Kitchen' : status === 'Riders Assigned' ? '🚴 Rider Assigned' : '📋 All'}
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
+          <div className="flex items-center gap-2 text-slate-300">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-500">View</span>
+            <button type="button" onClick={() => setDeliveryViewMode('tile')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'tile' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Tile view">
+              <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h7v7H4v-7zm9 5h7v2h-7v-2z" fill="currentColor"/></svg>
+            </button>
+            <button type="button" onClick={() => setDeliveryViewMode('table')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'table' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Table view">
+              <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search order number, delivery address, phone..."
+              value={orderSearch}
+              onChange={(e) => setOrderSearch(e.target.value)}
+              className="w-64 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 placeholder-slate-400 outline-none focus:border-emerald-500"
+            />
+            <svg className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+            <label className="mr-2 text-slate-400">Rider</label>
+            <select value={orderFilterRider} onChange={(e) => setOrderFilterRider(e.target.value)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500">
+              <option value="">All Riders</option>
+              {Array.from(new Set(deliveryOrders.map((order) => order.deliveryAgent).filter(Boolean))).map((rider) => (
+                <option key={rider} value={rider}>{rider}</option>
+              ))}
+            </select>
+          </div>
+          <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+            <label className="mr-2 text-slate-400">Payment</label>
+            <select value={orderFilterPayment} onChange={(e) => setOrderFilterPayment(e.target.value)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500">
+              <option value="">All</option>
+              {Array.from(new Set(deliveryOrders.map((order) => order.paymentMethod).filter(Boolean))).map((method) => (
+                <option key={method} value={method}>{method}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Filter by Date:</span>
+            {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+              <button
+                key={filter}
+                onClick={() => {
+                  setDeliveryDateFilter(filter);
+                  setOrderPageIndex(0);
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliveryDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
+              </button>
+            ))}
+          </div>
+          {deliveryDateFilter === 'custom' && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               <input
-                type="text"
-                placeholder="Search order number, delivery address, phone..."
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                className="w-64 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 placeholder-slate-400 outline-none focus:border-emerald-500"
+                type="date"
+                value={deliveryCustomDateFrom}
+                onChange={(e) => {
+                  setDeliveryCustomDateFrom(e.target.value);
+                  setOrderPageIndex(0);
+                }}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
               />
-              <svg className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              <span className="text-slate-400">to</span>
+              <input
+                type="date"
+                value={deliveryCustomDateTo}
+                onChange={(e) => {
+                  setDeliveryCustomDateTo(e.target.value);
+                  setOrderPageIndex(0);
+                }}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+              />
             </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-xs uppercase tracking-[0.2em] text-slate-500">View</span>
-              <button type="button" onClick={() => setDeliveryViewMode('tile')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'tile' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Tile view">
-                <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h7v7H4v-7zm9 5h7v2h-7v-2z" fill="currentColor"/></svg>
-              </button>
-              <button type="button" onClick={() => setDeliveryViewMode('table')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'table' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Table view">
-                <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4z" fill="currentColor"/></svg>
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-              <label className="mr-2 text-slate-400">Rider</label>
-              <select value={orderFilterRider} onChange={(e) => setOrderFilterRider(e.target.value)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500">
-                <option value="">All Riders</option>
-                {Array.from(new Set(deliveryOrders.map((order) => order.deliveryAgent).filter(Boolean))).map((rider) => (
-                  <option key={rider} value={rider}>{rider}</option>
-                ))}
-              </select>
-            </div>
-            <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-              <label className="mr-2 text-slate-400">Payment</label>
-              <select value={orderFilterPayment} onChange={(e) => setOrderFilterPayment(e.target.value)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500">
-                <option value="">All</option>
-                {Array.from(new Set(deliveryOrders.map((order) => order.paymentMethod).filter(Boolean))).map((method) => (
-                  <option key={method} value={method}>{method}</option>
-                ))}
-              </select>
-            </div>
-            <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-              <label className="mr-2 text-slate-400">Page</label>
-              <select value={orderPageSize} onChange={(e) => setOrderPageSize(Number(e.target.value))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500">
-                {[6, 12, 18].map((size) => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
         </div>
 
         {selectedOrders.length > 0 && (
@@ -5361,8 +5589,8 @@ function App() {
               <div className="flex flex-wrap gap-2">
                 <button onClick={clearOrderSelection} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Clear</button>
                 <button onClick={openBulkRiderAssignmentModal} className="rounded-3xl border border-purple-600 bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500">Assign Rider</button>
+              </div>
             </div>
-          </div>
         )}
 
         {deliveryViewMode === 'table' ? (
@@ -5543,11 +5771,27 @@ function App() {
             })}
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-300">
-          <div>{filteredOrders.length ? `Page ${orderPageIndex + 1} of ${pageCount}` : 'No orders available'}</div>
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+          <div>{filteredOrders.length ? `Showing ${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, filteredOrders.length)} of ${filteredOrders.length} orders` : 'No orders available'}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Per page:</span>
+            {[6, 12, 18].map((size) => (
+              <button
+                key={size}
+                onClick={() => {
+                  setOrderPageSize(size);
+                  setOrderPageIndex(0);
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${orderPageSize === size ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-2">
-            <button disabled={orderPageIndex === 0} onClick={() => setOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50">Prev</button>
-            <button disabled={orderPageIndex >= pageCount - 1} onClick={() => setOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50">Next</button>
+            <button disabled={orderPageIndex === 0} onClick={() => setOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700">← Prev</button>
+            <span className="text-xs text-slate-400">Page {orderPageIndex + 1} of {pageCount}</span>
+            <button disabled={orderPageIndex >= pageCount - 1} onClick={() => setOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700">Next →</button>
           </div>
         </div>
       </div>
@@ -5716,18 +5960,69 @@ function App() {
 
   function renderTakeawayOrders() {
     const takeawayOrders = posOrders.filter((o) => o.orderType === 'Takeaway');
-    const filteredTakeaway = takeawayOrders.filter((o) => takeawaySubTab === 'all' || (takeawaySubTab === 'paid' && o.status === 'Completed') || (takeawaySubTab === 'pay-later' && o.status === 'Pay Later'));
+    
+    // Filter logic for each tab
+    const filteredTakeaway = takeawayOrders.filter((o) => {
+      if (takeawaySubTab === 'all') return true;
+      if (takeawaySubTab === 'paid') return o.status === 'Completed';
+      if (takeawaySubTab === 'pay-later') return o.status === 'Pay Later';
+      if (takeawaySubTab === 'due') return o.status === 'Due';
+      return true;
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const getDateRange = () => {
+      const from = new Date(today);
+      const to = new Date(today);
+
+      if (takeawayDateFilter === 'today') {
+        return { from: new Date(today), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+      } else if (takeawayDateFilter === 'yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { from: new Date(yesterday), to: new Date(today) };
+      } else if (takeawayDateFilter === 'previous-5-days') {
+        const fiveDaysAgo = new Date(today);
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        return { from: new Date(fiveDaysAgo), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+      } else if (takeawayDateFilter === 'custom') {
+        return {
+          from: new Date(takeawayCustomDateFrom + 'T00:00:00'),
+          to: new Date(takeawayCustomDateTo + 'T23:59:59')
+        };
+      }
+      return { from: null, to: null };
+    };
+
+    const { from, to } = getDateRange();
+    const dateFilteredOrders = filteredTakeaway.filter((order) => {
+      if (!from || !to) return true;
+      const orderDate = order.createdAt ? new Date(order.createdAt) : order.date ? new Date(order.date) : null;
+      return orderDate ? orderDate >= from && orderDate <= to : false;
+    });
+
+    const duePageCount = Math.max(1, Math.ceil(dateFilteredOrders.length / takeawayPageSize));
+    const paginatedDueOrders = dateFilteredOrders.slice(takeawayPageIndex * takeawayPageSize, (takeawayPageIndex + 1) * takeawayPageSize);
+    const displayOrders = takeawaySubTab === 'due' ? paginatedDueOrders : dateFilteredOrders;
+
     return (
       <div className="space-y-6">
+        {/* Tab Navigation */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {['paid', 'pay-later', 'all'].map((status) => (
+            {['pay-later', 'all', 'paid', 'due'].map((status) => (
               <button
                 key={status}
-                onClick={() => setTakeawaySubTab(status)}
+                onClick={() => {
+                  setTakeawaySubTab(status);
+                  setTakeawayPageIndex(0);
+                  setSelectedTakeawayOrders([]);
+                }}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${takeawaySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                {status === 'paid' ? 'Paid Orders' : status === 'pay-later' ? 'Pay Later Orders' : 'All Orders Sales'}
+                {status === 'paid' ? '💳 Paid Orders' : status === 'pay-later' ? '⏳ Pay Later' : status === 'due' ? '📍 Due Payment' : '📋 All Orders'}
               </button>
             ))}
           </div>
@@ -5742,18 +6037,71 @@ function App() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Filter by Date:</span>
+            {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+              <button
+                key={filter}
+                onClick={() => {
+                  setTakeawayDateFilter(filter);
+                  setTakeawayPageIndex(0);
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${takeawayDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
+              </button>
+            ))}
+          </div>
+          {takeawayDateFilter === 'custom' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={takeawayCustomDateFrom}
+                onChange={(e) => {
+                  setTakeawayCustomDateFrom(e.target.value);
+                  setTakeawayPageIndex(0);
+                }}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+              />
+              <span className="text-slate-400">to</span>
+              <input
+                type="date"
+                value={takeawayCustomDateTo}
+                onChange={(e) => {
+                  setTakeawayCustomDateTo(e.target.value);
+                  setTakeawayPageIndex(0);
+                }}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Selection Toolbar */}
         {selectedTakeawayOrders.length > 0 && (
           <div className="flex items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 p-4">
             <div className="text-sm text-slate-300">
               {selectedTakeawayOrders.length} takeaway order{selectedTakeawayOrders.length > 1 ? 's' : ''} selected
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {takeawaySubTab === 'pay-later' && (
+                <button onClick={markSelectedTakeawayOrdersDue} className="rounded-3xl border border-red-700 bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500">
+                  Mark Due
+                </button>
+              )}
+              {takeawaySubTab === 'due' && (
+                <button onClick={markSelectedTakeawayOrdersPaid} className="rounded-3xl border border-emerald-700 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500">
+                  ✓ Mark Paid
+                </button>
+              )}
               <button onClick={clearTakeawaySelection} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Clear</button>
               <button onClick={deleteMultipleTakeawayOrders} className="rounded-3xl border border-rose-700 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">Delete Selected</button>
             </div>
           </div>
         )}
 
+        {/* Table View */}
         {takeawayViewMode === 'table' ? (
           <div className="overflow-x-auto rounded-[32px] border border-slate-800 bg-slate-900 p-4 shadow-soft">
             <table className="w-full min-w-[950px] text-left text-sm text-slate-100">
@@ -5762,8 +6110,8 @@ function App() {
                   <th className="px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={filteredTakeaway.length > 0 && selectedTakeawayOrders.length === filteredTakeaway.length}
-                      onChange={(e) => e.target.checked ? selectAllTakeawayOrders(filteredTakeaway) : clearTakeawaySelection()}
+                      checked={displayOrders.length > 0 && selectedTakeawayOrders.length === displayOrders.length && displayOrders.every(o => selectedTakeawayOrders.includes(o.id))}
+                      onChange={(e) => e.target.checked ? selectAllTakeawayOrders(displayOrders) : clearTakeawaySelection()}
                       className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
                     />
                   </th>
@@ -5778,93 +6126,146 @@ function App() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredTakeaway.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-950/80 transition">
-                    <td className="px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedTakeawayOrders.includes(order.id)}
-                        onChange={() => toggleTakeawaySelection(order.id)}
-                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                      />
-                    </td>
-                    <td className="px-4 py-4 font-semibold text-white">{order.orderNumber || order.id}</td>
-                    <td className="px-4 py-4 text-slate-300">{order.customerName || 'PICK UP'}</td>
-                    <td className="px-4 py-4 text-slate-300">{order.phone || '-'}</td>
-                    <td className="px-4 py-4 text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
-                        <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 font-semibold text-white">{order.total || order.amount || 0} Rs</td>
-                    <td className="px-4 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
-                    <td className="px-4 py-4 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {order.status === 'Pay Later' && (
-                          <button type="button" title="Mark Pay Later order as paid" onClick={() => markTakeawayOrderPaid(order.id)} className="rounded-full border border-amber-500 bg-amber-500 px-3 py-2 text-slate-950 transition hover:bg-amber-400">Pay Later</button>
-                        )}
-                        {renderOrderEditButton(order)}
-                        <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">Delete</button>
-                        <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-2 text-slate-950 transition hover:bg-emerald-500">Print</button>
-                      </div>
-                    </td>
+                {displayOrders.length > 0 ? (
+                  displayOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-slate-950/80 transition">
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedTakeawayOrders.includes(order.id)}
+                          onChange={() => toggleTakeawaySelection(order.id)}
+                          className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                        />
+                      </td>
+                      <td className="px-4 py-4 font-semibold text-white">{order.orderNumber || order.id}</td>
+                      <td className="px-4 py-4 text-slate-300">{order.customerName || 'PICK UP'}</td>
+                      <td className="px-4 py-4 text-slate-300">{order.phone || '-'}</td>
+                      <td className="px-4 py-4 text-slate-300">
+                        <div className="flex items-center gap-2">
+                          <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
+                          <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 font-semibold text-white">{order.total || order.amount || 0} Rs</td>
+                      <td className="px-4 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
+                      <td className="px-4 py-4 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {order.status === 'Pay Later' && (
+                            <button type="button" title="Mark Pay Later order as paid" onClick={() => markTakeawayOrderPaid(order.id)} className="rounded-full border border-amber-500 bg-amber-500 px-3 py-2 text-slate-950 transition hover:bg-amber-400">✓ Paid</button>
+                          )}
+                          {renderOrderEditButton(order)}
+                          <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">Delete</button>
+                          <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-2 text-slate-950 transition hover:bg-emerald-500">Print</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" className="px-4 py-6 text-center text-sm text-slate-500">No orders found for this filter.</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredTakeaway.map((order) => {
-              const isSelected = selectedTakeawayOrders.includes(order.id);
-              return (
-                <div key={order.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-soft hover:shadow-lg transition relative">
-                  <div className="absolute top-4 right-4">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleTakeawaySelection(order.id)}
-                      className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <div className="text-lg font-semibold text-white">{order.orderNumber || order.id}</div>
-                  <div className="mt-3 text-sm text-slate-300">{order.customerName || 'PICK UP'}</div>
-                  <div className="mt-2 text-sm text-slate-400">{order.phone || '-'}</div>
-                  <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-200 max-h-32 overflow-y-auto">
-                    <div className="mb-2 text-xs uppercase tracking-[0.24em] text-slate-500">Items</div>
-                    {(order.items || []).slice(0, 4).map((item, index) => (
-                      <div key={index} className="flex items-center justify-between py-1 border-b border-slate-800 last:border-b-0">
-                        <span className="truncate">{item.name || 'Unknown'}</span>
-                        <span className="ml-2 text-slate-400">x{item.quantity || 1}</span>
+            {displayOrders.length > 0 ? (
+              displayOrders.map((order) => {
+                const isSelected = selectedTakeawayOrders.includes(order.id);
+                return (
+                  <div key={order.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-soft hover:shadow-lg transition relative">
+                    <div className="absolute top-4 right-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleTakeawaySelection(order.id)}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div className="text-lg font-semibold text-white">{order.orderNumber || order.id}</div>
+                    <div className="mt-3 text-sm text-slate-300">{order.customerName || 'PICK UP'}</div>
+                    <div className="mt-2 text-sm text-slate-400">{order.phone || '-'}</div>
+                    <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-200 max-h-32 overflow-y-auto">
+                      <div className="mb-2 text-xs uppercase tracking-[0.24em] text-slate-500">Items</div>
+                      {(order.items || []).slice(0, 4).map((item, index) => (
+                        <div key={index} className="flex items-center justify-between py-1 border-b border-slate-800 last:border-b-0">
+                          <span className="truncate">{item.name || 'Unknown'}</span>
+                          <span className="ml-2 text-slate-400">x{item.quantity || 1}</span>
+                        </div>
+                      ))}
+                      {(order.items || []).length > 4 && <div className="mt-2 text-xs text-slate-500">+{(order.items || []).length - 4} more</div>}
+                    </div>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Total</p>
+                        <div className="text-xl font-semibold text-white">{order.total || order.amount || 0} Rs</div>
                       </div>
-                    ))}
-                    {(order.items || []).length > 4 && <div className="mt-2 text-xs text-slate-500">+{(order.items || []).length - 4} more</div>}
-                  </div>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Total</p>
-                      <div className="text-xl font-semibold text-white">{order.total || order.amount || 0} Rs</div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {order.status === 'Pay Later' && (
-                        <button onClick={() => markTakeawayOrderPaid(order.id)} className="rounded-3xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400">Pay Later</button>
-                      )}
-                      {renderOrderEditButton(order)}
-                      <button onClick={() => deleteOrder(order.id)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-rose-600 text-white hover:bg-rose-500" title="Delete order">
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                      </button>
-                      <button onClick={() => printReceipt(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-emerald-600 text-slate-950 hover:bg-emerald-500" title="Print order">
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {order.status === 'Pay Later' && (
+                          <button onClick={() => markTakeawayOrderPaid(order.id)} className="rounded-3xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400">✓ Paid</button>
+                        )}
+                        {renderOrderEditButton(order)}
+                        <button onClick={() => deleteOrder(order.id)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-rose-600 text-white hover:bg-rose-500" title="Delete order">
+                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                        </button>
+                        <button onClick={() => printReceipt(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-emerald-600 text-slate-950 hover:bg-emerald-500" title="Print order">
+                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="col-span-full flex items-center justify-center rounded-3xl border border-slate-800 bg-slate-900 p-12">
+                <p className="text-slate-400">No orders found for this filter.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Due Payment Tab - Pagination */}
+        {takeawaySubTab === 'due' && dateFilteredOrders.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div className="text-sm text-slate-300">
+              Showing {takeawayPageIndex * takeawayPageSize + 1}-{Math.min((takeawayPageIndex + 1) * takeawayPageSize, dateFilteredOrders.length)} of {dateFilteredOrders.length} orders
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Per page:</span>
+              {[10, 20, 100].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setTakeawayPageSize(size);
+                    setTakeawayPageIndex(0);
+                  }}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${takeawayPageSize === size ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTakeawayPageIndex(Math.max(0, takeawayPageIndex - 1))}
+                disabled={takeawayPageIndex === 0}
+                className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-slate-400">Page {takeawayPageIndex + 1} of {duePageCount}</span>
+              <button
+                onClick={() => setTakeawayPageIndex(takeawayPageIndex + 1)}
+                disabled={(takeawayPageIndex + 1) * takeawayPageSize >= dateFilteredOrders.length}
+                className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700"
+              >
+                Next →
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -5939,7 +6340,7 @@ function App() {
                 if (tab === 'due') setDineinOrderStatusFilter('pending');
               }}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${dineinSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-              {tab === 'tables' ? 'Table Management' : tab === 'paid' ? 'Paid Orders' : 'Due Orders'}
+              {tab === 'tables' ? '🍽️ Table Management' : tab === 'paid' ? '💳 Paid Orders' : '📍 Due Orders'}
             </button>
           ))}
         </div>

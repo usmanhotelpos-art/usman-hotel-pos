@@ -3,7 +3,61 @@
     "hotelName": "Usman Hotel",
     "currency": "PKR",
     "location": "Karachi",
-    "taxRate": 0.18
+    "taxRate": 0,
+    "tokenSlipNextNumber": 11,
+    "logo": "",
+    "receiptLogoWidth": "120",
+    "receiptHeader": "",
+    "receiptCounterLabel": "",
+    "receiptFooter": "",
+    "receiptFontTitle": "",
+    "posHeaderSubtitle": "POS Header",
+    "posHeaderTitle": "POS Counter",
+    "posHeaderPhoto": "",
+    "developerPhoto": "",
+    "receiptFontSize": "12",
+    "receiptFontStyle": "Arial",
+    "receiptLineStyle": "dashed",
+    "receiptDateTimeFormat": "DD/MM/YYYY HH:mm",
+    "slipPrefix": "usmanhotel",
+    "receiptTemplate": "classic",
+    "receiptLanguage": "English",
+    "receiptShowReceiptNumber": true,
+    "receiptShowDateTime": true,
+    "receiptShowCustomerName": true,
+    "receiptShowCustomerPhone": true,
+    "receiptShowDeliveryAddress": true,
+    "receiptShowRiderName": true,
+    "receiptShowWaiterName": true,
+    "receiptShowProductArea": true,
+    "receiptShowProductQuantity": true,
+    "receiptShowProductUnitPrice": true,
+    "receiptShowSubtotal": true,
+    "receiptShowDeliveryCharge": true,
+    "receiptShowServiceCharge": true,
+    "receiptShowTax": true,
+    "receiptShowDiscount": true,
+    "receiptShowTotal": true,
+    "receiptShowCustomerMessage": true,
+    "receiptShowNotes": true,
+    "receiptFontFamily": "Arial",
+    "tokenSlipEnabled": true,
+    "tokenSlipPrefix": "TS",
+    "receiptFontSizes": {
+      "title": 16,
+      "section": 14,
+      "product": 12,
+      "customer": 12,
+      "notes": 11
+    },
+    "printDeliveryAddress": true,
+    "printCustomerMobile": true,
+    "printSubtotal": true,
+    "printTotal": true,
+    "printTax": true,
+    "holdAutoRefreshSeconds": 24,
+    "holdDefaultViewMode": "table",
+    "holdShowAutoRefresh": true
   },
   "rooms": [
     {
@@ -59,16 +113,38 @@
     {
       "id": "s1",
       "name": "Ayesha",
-      "role": "Receptionist",
+      "role": "Biker",
       "phone": "+923001234567",
-      "status": "active"
+      "status": "active",
+      "otherName": "",
+      "username": "trtert",
+      "password": "444444",
+      "facePhoto": "",
+      "idCardNumber": "",
+      "idCardFront": "",
+      "idCardBack": "",
+      "description": "",
+      "address": "",
+      "loginEnabled": true,
+      "updatedAt": "2026-05-18T21:38:10.390Z"
     },
     {
       "id": "s2",
       "name": "Usman",
-      "role": "Manager",
+      "role": "Biker",
       "phone": "+923009876543",
-      "status": "active"
+      "status": "active",
+      "otherName": "",
+      "username": "tertert",
+      "password": "8555555555",
+      "facePhoto": "",
+      "idCardNumber": "",
+      "idCardFront": "",
+      "idCardBack": "",
+      "description": "",
+      "address": "",
+      "loginEnabled": true,
+      "updatedAt": "2026-05-18T21:38:21.353Z"
     }
   ],
   "sales": [
@@ -137,6 +213,12 @@
     {
       "id": "cat12",
       "name": "اسپیشل نان"
+    },
+    {
+      "id": "4479b0c5-1a6d-4a1f-8afc-4e28afc263ec",
+      "createdAt": "2026-05-18T22:21:40.655Z",
+      "updatedAt": "2026-05-18T22:21:40.655Z",
+      "name": "Extras"
     }
   ],
   "pos_products": [
@@ -145,18 +227,20 @@
       "name": "Chicken Karahi",
       "category": "Karahi",
       "price": 1200,
-      "availableStock": 18,
+      "availableStock": 9,
       "image": "",
-      "description": "Spicy chicken karahi with fresh spices."
+      "description": "Spicy chicken karahi with fresh spices.",
+      "updatedAt": "2026-05-18T17:28:45.086Z"
     },
     {
       "id": "p2",
       "name": "Mutton Karahi",
       "category": "Karahi",
       "price": 1500,
-      "availableStock": 12,
+      "availableStock": 2,
       "image": "",
-      "description": "Rich mutton karahi with traditional taste."
+      "description": "Rich mutton karahi with traditional taste.",
+      "updatedAt": "2026-05-18T17:28:45.088Z"
     },
     {
       "id": "p3",
@@ -172,9 +256,10 @@
       "name": "Chicken Biryani",
       "category": "Biryani",
       "price": 900,
-      "availableStock": 25,
+      "availableStock": 23,
       "image": "",
-      "description": "Aromatic chicken biryani with spices."
+      "description": "Aromatic chicken biryani with spices.",
+      "updatedAt": "2026-05-18T22:46:44.050Z"
     },
     {
       "id": "p5",
@@ -325,27 +410,30 @@
       "name": "ریڈ چکن کڑاہی — فل",
       "category": "چکن کڑاہی مینیو",
       "price": 1600,
-      "availableStock": 5,
+      "availableStock": 2,
       "image": "",
-      "description": "ریڈ چکن کڑاہی فل۔"
+      "description": "ریڈ چکن کڑاہی فل۔",
+      "updatedAt": "2026-05-18T21:27:03.778Z"
     },
     {
       "id": "p22",
       "name": "وائٹ چکن کڑاہی — ہاف",
       "category": "چکن کڑاہی مینیو",
       "price": 1000,
-      "availableStock": 8,
+      "availableStock": 1,
       "image": "",
-      "description": "وائٹ چکن کڑاہی ہاف۔"
+      "description": "وائٹ چکن کڑاہی ہاف۔",
+      "updatedAt": "2026-05-18T21:37:19.760Z"
     },
     {
       "id": "p23",
       "name": "وائٹ چکن کڑاہی — فل",
       "category": "چکن کڑاہی مینیو",
       "price": 2000,
-      "availableStock": 5,
+      "availableStock": 1,
       "image": "",
-      "description": "وائٹ چکن کڑاہی فل۔"
+      "description": "وائٹ چکن کڑاہی فل۔",
+      "updatedAt": "2026-05-18T21:37:33.460Z"
     },
     {
       "id": "p24",
@@ -370,9 +458,10 @@
       "name": "اچاری چکن کڑاہی — ہاف",
       "category": "چکن کڑاہی مینیو",
       "price": 900,
-      "availableStock": 8,
+      "availableStock": 7,
       "image": "",
-      "description": "اچاری چکن کڑاہی ہاف۔"
+      "description": "اچاری چکن کڑاہی ہاف۔",
+      "updatedAt": "2026-05-18T17:06:09.568Z"
     },
     {
       "id": "p27",
@@ -415,18 +504,20 @@
       "name": "بیف کباب",
       "category": "سیخ کباب",
       "price": 250,
-      "availableStock": 15,
+      "availableStock": 7,
       "image": "",
-      "description": "گرما گرم بیف کباب۔"
+      "description": "گرما گرم بیف کباب۔",
+      "updatedAt": "2026-05-18T23:01:37.719Z"
     },
     {
       "id": "p32",
       "name": "چکن ریشمی کباب",
       "category": "سیخ کباب",
       "price": 300,
-      "availableStock": 12,
+      "availableStock": 5,
       "image": "",
-      "description": "نرم چکن ریشمی کباب۔"
+      "description": "نرم چکن ریشمی کباب۔",
+      "updatedAt": "2026-05-18T23:01:58.825Z"
     },
     {
       "id": "p33",
@@ -451,9 +542,10 @@
       "name": "ملائی بوٹی",
       "category": "بوٹی آئٹمز",
       "price": 350,
-      "availableStock": 14,
+      "availableStock": 12,
       "image": "",
-      "description": "ملائی بوٹی خاص۔"
+      "description": "ملائی بوٹی خاص۔",
+      "updatedAt": "2026-05-18T14:12:10.078Z"
     },
     {
       "id": "p36",
@@ -523,18 +615,20 @@
       "name": "سادہ روٹی",
       "category": "نان اور روٹی",
       "price": 14,
-      "availableStock": 90,
+      "availableStock": 87,
       "image": "",
-      "description": "تازہ سادہ روٹی۔"
+      "description": "تازہ سادہ روٹی۔",
+      "updatedAt": "2026-05-18T22:46:44.052Z"
     },
     {
       "id": "p44",
       "name": "خمیری روٹی",
       "category": "نان اور روٹی",
       "price": 30,
-      "availableStock": 60,
+      "availableStock": 58,
       "image": "",
-      "description": "خمیری روٹی۔"
+      "description": "خمیری روٹی۔",
+      "updatedAt": "2026-05-18T22:46:44.249Z"
     },
     {
       "id": "p45",
@@ -577,9 +671,10 @@
       "name": "ہاف روغنی",
       "category": "اسپیشل نان",
       "price": 60,
-      "availableStock": 45,
+      "availableStock": 44,
       "image": "",
-      "description": "ہاف روغنی نان۔"
+      "description": "ہاف روغنی نان۔",
+      "updatedAt": "2026-05-18T22:22:26.264Z"
     },
     {
       "id": "p50",
@@ -679,6 +774,21 @@
       "availableStock": 30,
       "image": "",
       "description": "مسالہ دار اچاری نان۔"
+    },
+    {
+      "id": "1829caad-8eda-45b5-afc1-897d0916cd20",
+      "createdAt": "2026-05-18T22:22:05.845Z",
+      "updatedAt": "2026-05-18T23:01:58.827Z",
+      "name": "wxtra",
+      "category": "Extras",
+      "price": "300",
+      "purchasePrice": "",
+      "unit": "PKR",
+      "photo": "",
+      "code": "",
+      "stock": "4455555",
+      "flavors": [],
+      "availableStock": null
     }
   ],
   "pos_tables": [
@@ -755,7 +865,502 @@
       "description": "Extended suburb delivery zone"
     }
   ],
-  "pos_orders": [],
-  "pos_customers": [],
-  "pos_payments": []
+  "pos_orders": [
+    {
+      "id": "35b28295-90b1-425b-8e60-34a04dd9d6d9",
+      "createdAt": "2026-05-18T14:12:10.074Z",
+      "updatedAt": "2026-05-18T14:12:10.148Z",
+      "orderNumber": "ORD-530074",
+      "orderType": "Takeaway",
+      "customerName": "Pickup",
+      "phone": "",
+      "address": "",
+      "tableNumber": "",
+      "deliveryAgent": "",
+      "deliveryFee": 0,
+      "discount": 0,
+      "taxPercent": 0.18,
+      "serviceCharge": 0,
+      "paymentMethod": "Cash",
+      "paymentStatus": "",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p35",
+          "name": "ملائی بوٹی",
+          "price": 350,
+          "quantity": 2,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 700
+        }
+      ],
+      "serviceType": "",
+      "subtotal": 700,
+      "total": 701.26,
+      "status": "Completed"
+    },
+    {
+      "id": "d218617b-a3ce-42c6-aafd-13eba3394e0e",
+      "createdAt": "2026-05-18T17:06:09.563Z",
+      "updatedAt": "2026-05-18T21:26:35.744Z",
+      "orderNumber": "ORD-969563",
+      "orderType": "Takeaway",
+      "customerName": "Pickup",
+      "phone": "",
+      "address": "",
+      "tableNumber": "",
+      "deliveryAgent": "",
+      "deliveryFee": 0,
+      "discount": 0,
+      "taxPercent": 0.18,
+      "serviceCharge": 0,
+      "paymentMethod": "Cash",
+      "paymentStatus": "",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p22",
+          "name": "وائٹ چکن کڑاہی — ہاف",
+          "price": 1000,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1000
+        },
+        {
+          "productId": "p26",
+          "name": "اچاری چکن کڑاہی — ہاف",
+          "price": 900,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 900
+        }
+      ],
+      "serviceType": "",
+      "subtotal": 1900,
+      "total": 1903.42,
+      "status": "Completed"
+    },
+    {
+      "id": "8861cd79-856f-43de-ae51-84f73f0eb645",
+      "createdAt": "2026-05-18T17:26:55.452Z",
+      "updatedAt": "2026-05-18T17:27:20.330Z",
+      "orderNumber": "ORD-215452",
+      "orderType": "Takeaway",
+      "customerName": "Pickup",
+      "phone": "",
+      "address": "",
+      "tableNumber": "",
+      "deliveryAgent": "",
+      "deliveryFee": 0,
+      "discount": 0,
+      "taxPercent": 0.18,
+      "serviceCharge": 0,
+      "paymentMethod": "Cash",
+      "paymentStatus": "",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p2",
+          "name": "Mutton Karahi",
+          "price": 1500,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1500
+        },
+        {
+          "productId": "p1",
+          "name": "Chicken Karahi",
+          "price": 1200,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1200
+        }
+      ],
+      "serviceType": "",
+      "subtotal": 2700,
+      "total": 2704.86,
+      "status": "Completed"
+    },
+    {
+      "id": "6a62df4c-b736-46bc-8742-1009e4389cc3",
+      "createdAt": "2026-05-18T17:28:45.083Z",
+      "updatedAt": "2026-05-18T21:26:35.786Z",
+      "orderNumber": "ORD-325083",
+      "orderType": "Takeaway",
+      "customerName": "Pickup",
+      "phone": "",
+      "address": "",
+      "tableNumber": "",
+      "deliveryAgent": "",
+      "deliveryFee": 0,
+      "discount": 0,
+      "taxPercent": 0.18,
+      "serviceCharge": 0,
+      "paymentMethod": "Cash",
+      "paymentStatus": "",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p2",
+          "name": "Mutton Karahi",
+          "price": 1500,
+          "quantity": 9,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 13500
+        },
+        {
+          "productId": "p1",
+          "name": "Chicken Karahi",
+          "price": 1200,
+          "quantity": 8,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 9600
+        }
+      ],
+      "serviceType": "",
+      "subtotal": 23100,
+      "total": 23141.58,
+      "status": "Completed"
+    },
+    {
+      "id": "6ce25a1d-8966-4579-a0b5-e517e672353a",
+      "createdAt": "2026-05-18T21:27:03.775Z",
+      "updatedAt": "2026-05-18T21:27:03.775Z",
+      "orderNumber": "ORD-623775",
+      "orderType": "Dine-In",
+      "customerName": "Table 2",
+      "phone": "",
+      "address": "",
+      "tableNumber": "Table 2",
+      "deliveryAgent": "",
+      "deliveryFee": 0,
+      "discount": 0,
+      "taxPercent": 0.18,
+      "serviceCharge": 0,
+      "paymentMethod": "",
+      "paymentStatus": "",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p22",
+          "name": "وائٹ چکن کڑاہی — ہاف",
+          "price": 1000,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1000
+        },
+        {
+          "productId": "p21",
+          "name": "ریڈ چکن کڑاہی — فل",
+          "price": 1600,
+          "quantity": 3,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 4800
+        }
+      ],
+      "serviceType": "",
+      "subtotal": 5800,
+      "total": 5810.44,
+      "status": "Pending"
+    },
+    {
+      "id": "dab2b137-5177-4027-8bdf-99cca423ae94",
+      "createdAt": "2026-05-18T22:22:26.248Z",
+      "updatedAt": "2026-05-18T22:22:26.248Z",
+      "orderNumber": "ORD-946248",
+      "orderType": "Delivery",
+      "customerName": "",
+      "phone": "",
+      "address": "gfhfg",
+      "tableNumber": "",
+      "deliveryAgent": "Usman",
+      "deliveryFee": 50,
+      "discount": 0,
+      "taxPercent": 0,
+      "serviceCharge": 0,
+      "paymentMethod": "",
+      "paymentStatus": "Receive Cash Till",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p49",
+          "name": "ہاف روغنی",
+          "price": 60,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 60
+        },
+        {
+          "productId": "1829caad-8eda-45b5-afc1-897d0916cd20",
+          "name": "wxtra",
+          "price": 300,
+          "quantity": 4,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1200
+        }
+      ],
+      "serviceType": "Standard Delivery",
+      "subtotal": 1260,
+      "total": 1310,
+      "status": "Riders Assigned",
+      "customerId": "ac00d447-0bd6-497f-b5ec-301bdea1b65c"
+    },
+    {
+      "id": "0384ab8a-34cb-47b8-8c8d-0003ceaa6a84",
+      "createdAt": "2026-05-18T22:46:44.034Z",
+      "updatedAt": "2026-05-18T22:46:44.034Z",
+      "orderNumber": "ORD-404034",
+      "orderType": "Delivery",
+      "customerName": "",
+      "phone": "",
+      "address": "y6yt65",
+      "tableNumber": "",
+      "deliveryAgent": "Ayesha",
+      "deliveryFee": 120,
+      "discount": 0,
+      "taxPercent": 0,
+      "serviceCharge": 0,
+      "paymentMethod": "",
+      "paymentStatus": "Receive Cash Till",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p43",
+          "name": "سادہ روٹی",
+          "price": 14,
+          "quantity": 3,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 42
+        },
+        {
+          "productId": "p44",
+          "name": "خمیری روٹی",
+          "price": 30,
+          "quantity": 2,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 60
+        },
+        {
+          "productId": "p4",
+          "name": "Chicken Biryani",
+          "price": 900,
+          "quantity": 2,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1800
+        }
+      ],
+      "serviceType": "Express Delivery",
+      "subtotal": 1902,
+      "total": 2022,
+      "status": "Riders Assigned",
+      "customerId": "27c14e48-2e4c-4347-a422-b9dba4eb9166"
+    },
+    {
+      "id": "74f19f6c-62fc-45b9-97af-23280670fb0e",
+      "createdAt": "2026-05-18T23:01:37.717Z",
+      "updatedAt": "2026-05-18T23:01:37.717Z",
+      "orderNumber": "ORD-297667",
+      "orderType": "Delivery",
+      "customerName": "",
+      "phone": "",
+      "address": "oo[-p",
+      "tableNumber": "",
+      "deliveryAgent": "Ayesha",
+      "deliveryFee": 120,
+      "discount": 0,
+      "taxPercent": 0,
+      "serviceCharge": 0,
+      "paymentMethod": "",
+      "paymentStatus": "May be Online",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p31",
+          "name": "بیف کباب",
+          "price": 250,
+          "quantity": 8,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 2000
+        },
+        {
+          "productId": "p32",
+          "name": "چکن ریشمی کباب",
+          "price": 300,
+          "quantity": 3,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 900
+        },
+        {
+          "productId": "1829caad-8eda-45b5-afc1-897d0916cd20",
+          "name": "wxtra",
+          "price": 300,
+          "quantity": 1,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 300
+        }
+      ],
+      "serviceType": "Express Delivery",
+      "subtotal": 3200,
+      "total": 3320,
+      "status": "Riders Assigned",
+      "customerId": "2e3d28fe-957b-4041-bdcf-51861d2cbbb7"
+    },
+    {
+      "id": "37de073b-0467-4967-92c6-3833db68b9ab",
+      "createdAt": "2026-05-18T23:01:58.823Z",
+      "updatedAt": "2026-05-18T23:01:58.823Z",
+      "orderNumber": "ORD-318823",
+      "orderType": "Delivery",
+      "customerName": "",
+      "phone": "",
+      "address": "#]",
+      "tableNumber": "",
+      "deliveryAgent": "Usman",
+      "deliveryFee": 120,
+      "discount": 0,
+      "taxPercent": 0,
+      "serviceCharge": 0,
+      "paymentMethod": "",
+      "paymentStatus": "May be Online",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p32",
+          "name": "چکن ریشمی کباب",
+          "price": 300,
+          "quantity": 4,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 1200
+        },
+        {
+          "productId": "1829caad-8eda-45b5-afc1-897d0916cd20",
+          "name": "wxtra",
+          "price": 300,
+          "quantity": 2,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 600
+        }
+      ],
+      "serviceType": "Express Delivery",
+      "subtotal": 1800,
+      "total": 1920,
+      "status": "Riders Assigned",
+      "customerId": "372d49ef-9699-45bf-98a4-f147ac527f30"
+    }
+  ],
+  "pos_customers": [
+    {
+      "id": "104a8275-813d-41bf-a9ba-702b00d69575",
+      "createdAt": "2026-05-18T21:27:43.491Z",
+      "updatedAt": "2026-05-18T21:27:43.491Z",
+      "name": "",
+      "phone": "",
+      "address": "cv xv"
+    },
+    {
+      "id": "c9b4bb45-b1f4-41f2-84cb-3da21ca03e5f",
+      "createdAt": "2026-05-18T21:37:13.202Z",
+      "updatedAt": "2026-05-18T21:37:13.202Z",
+      "name": "",
+      "phone": "",
+      "address": "4tr5wet",
+      "lastOrderNumber": "ORD-239758"
+    },
+    {
+      "id": "7589a15a-4b82-492f-b0aa-cdd3431efd1f",
+      "createdAt": "2026-05-18T21:37:28.291Z",
+      "updatedAt": "2026-05-18T21:37:28.291Z",
+      "name": "",
+      "phone": "",
+      "address": "tertwert",
+      "lastOrderNumber": "ORD-253459"
+    },
+    {
+      "id": "ac00d447-0bd6-497f-b5ec-301bdea1b65c",
+      "createdAt": "2026-05-18T22:22:18.790Z",
+      "updatedAt": "2026-05-18T22:22:18.790Z",
+      "name": "",
+      "phone": "",
+      "address": "gfhfg",
+      "lastOrderNumber": "ORD-946248"
+    },
+    {
+      "id": "27c14e48-2e4c-4347-a422-b9dba4eb9166",
+      "createdAt": "2026-05-18T22:45:42.080Z",
+      "updatedAt": "2026-05-18T22:45:42.080Z",
+      "name": "",
+      "phone": "",
+      "address": "y6yt65",
+      "lastOrderNumber": "ORD-404034"
+    },
+    {
+      "id": "2e3d28fe-957b-4041-bdcf-51861d2cbbb7",
+      "createdAt": "2026-05-18T23:01:28.615Z",
+      "updatedAt": "2026-05-18T23:01:28.615Z",
+      "name": "",
+      "phone": "",
+      "address": "oo[-p",
+      "lastOrderNumber": "ORD-297667"
+    },
+    {
+      "id": "372d49ef-9699-45bf-98a4-f147ac527f30",
+      "createdAt": "2026-05-18T23:01:52.871Z",
+      "updatedAt": "2026-05-18T23:01:52.871Z",
+      "name": "",
+      "phone": "",
+      "address": "#]",
+      "lastOrderNumber": "ORD-318823"
+    }
+  ],
+  "pos_payments": [
+    {
+      "id": "9ac36e99-9ad5-42ea-864a-0e49ff1aed75",
+      "createdAt": "2026-05-18T14:12:10.146Z",
+      "updatedAt": "2026-05-18T14:12:10.146Z",
+      "orderId": "35b28295-90b1-425b-8e60-34a04dd9d6d9",
+      "amount": 701.26,
+      "paymentMethod": "Cash",
+      "status": "Completed",
+      "description": "Payment for order ORD-530074",
+      "date": "2026-05-18"
+    }
+  ]
 }

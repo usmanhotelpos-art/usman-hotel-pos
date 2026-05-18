@@ -224,6 +224,28 @@ function loadDbFile() {
   }
 }
 
+function loadDbFileIfExists() {
+  ensureLocalDataDir();
+  if (!fs.existsSync(dbFile)) {
+    return null;
+  }
+
+  const raw = fs.readFileSync(dbFile, 'utf-8');
+  if (!raw.trim()) {
+    return null;
+  }
+
+  try {
+    const existingData = JSON.parse(raw);
+    return mergeDefaultData(existingData);
+  } catch (error) {
+    const backupPath = `${dbFile}.corrupt-${Date.now()}.bak`;
+    fs.writeFileSync(backupPath, raw, 'utf-8');
+    console.error(`Local JSON database file corrupted. Backed up invalid data to ${backupPath}.`);
+    return null;
+  }
+}
+
 async function ensurePostgresSchema() {
   if (!pgClient) return;
   await pgClient.query(`
@@ -268,10 +290,17 @@ export async function initDatabase() {
       if (postgresData) {
         dbCache = mergeDefaultData(postgresData);
       } else {
-        dbCache = defaultData;
-        await saveDbToPostgres(dbCache);
+        const localData = loadDbFileIfExists();
+        if (localData) {
+          dbCache = localData;
+          await saveDbToPostgres(dbCache);
+        } else {
+          dbCache = defaultData;
+          await saveDbToPostgres(dbCache);
+        }
       }
 
+      console.log('Connected to Postgres. Data persistence is now using Postgres.');
       return;
     } catch (error) {
       console.error('Postgres initialization failed:', error);
@@ -297,12 +326,13 @@ export function writeDb(data) {
 
   dbCache = data;
   if (pgConnected) {
-    saveDbToPostgres(data).catch((error) => {
+    return saveDbToPostgres(data).catch((error) => {
       console.error('Failed to persist DB to Postgres:', error);
     });
-  } else {
-    writeDbFile(data);
   }
+
+  writeDbFile(data);
+  return Promise.resolve();
 }
 
 export function getCollection(name) {

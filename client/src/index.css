@@ -58,6 +58,50 @@ input {
   box-shadow: 0 0 30px rgba(16,185,129,0.16), inset 0 0 1px rgba(16,185,129,0.18);
 }
 
+@keyframes riderDuePulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(16,255,207,0.18);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 34px rgba(16,255,207,0.28);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes riderIconFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes riderAmountPulse {
+  0%, 100% {
+    transform: scale(1);
+    text-shadow: 0 0 20px rgba(16,255,207,0.18);
+  }
+  50% {
+    transform: scale(1.06);
+    text-shadow: 0 0 28px rgba(16,255,207,0.30);
+  }
+}
+
+.rider-due-card {
+  animation: riderDuePulse 4.5s ease-in-out infinite;
+}
+
+.rider-due-icon {
+  animation: riderIconFloat 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+.rider-due-amount {
+  animation: riderAmountPulse 3s ease-in-out infinite;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
 }

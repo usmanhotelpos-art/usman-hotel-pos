@@ -40,4 +40,18 @@ This builds the frontend and starts the backend server, which serves the built a
 
 - The backend listens on port `4000`.
 - The frontend uses `http://localhost:4000/api` for data operations.
+
+## Postgres on Railway
+
+- In production, do not rely on `server/data/db.json`. That file is stored on disk and will be lost when the app is redeployed.
+- Use Railway Postgres and set the `DATABASE_URL` environment variable for the `server` service.
+- When `DATABASE_URL` is present, the backend stores all app data in Postgres instead of local JSON.
+- If you already have local data in `server/data/db.json`, the next startup with `DATABASE_URL` will migrate that data into Postgres automatically.
+
+### Example environment variables
+
+```bash
+DATABASE_URL=postgres://username:password@host:port/database
+JWT_SECRET=your-jwt-secret
+```
                                                                                                                   
