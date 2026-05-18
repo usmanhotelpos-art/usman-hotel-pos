@@ -1685,7 +1685,11 @@ function App() {
     }
 
     try {
-      const saveStatus = orderType === 'Dine-In' ? 'Pending' : orderType === 'Delivery' ? 'Kitchen' : 'Completed';
+      const saveStatus = orderType === 'Dine-In'
+        ? 'Pending'
+        : orderType === 'Delivery'
+          ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
+          : 'Completed';
       const order = await savePosOrder(saveStatus);
       if (order) {
         setShowCustomerDetailsPopup(false);

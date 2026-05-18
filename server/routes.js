@@ -361,7 +361,7 @@ router.post('/pos/orders', (req, res) => {
     const price = Number(item.price || product.price) || 0;
     orderItems.push({
       productId: product.id,
-      name: product.name,
+      name: item.name || product.name,
       price,
       quantity,
       notes: item.notes || '',
