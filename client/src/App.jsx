@@ -307,6 +307,13 @@ function App() {
   const [catalogueOrderNote, setCatalogueOrderNote] = useState('');
   const [catalogueMessage, setCatalogueMessage] = useState('');
   const [receiptSettingsSubTab, setReceiptSettingsSubTab] = useState('receipt');
+
+  useEffect(() => {
+    const path = window.location.pathname.toLowerCase();
+    if (/^\/catalogue(\/|$|\?)/.test(path)) {
+      setCataloguePage(true);
+    }
+  }, []);
   const tabIcons = {
     dashboard: '🏠',
     tables: '🍽️',
