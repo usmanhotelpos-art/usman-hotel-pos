@@ -7,6 +7,7 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  EyeOff,
   Trash2,
   ShoppingBag,
   CreditCard,
@@ -29,6 +30,7 @@ export function RidersApp() {
   const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, approved, requested
   const [loading, setLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [riderToken, setRiderToken] = useState(localStorage.getItem('riderToken') || '');
   const [rider, setRider] = useState(null);
@@ -446,25 +448,33 @@ export function RidersApp() {
 
           <form onSubmit={handleRiderLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Email or username</label>
               <input
-                type="email"
+                type="text"
                 value={loginForm.email}
                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                 className="w-full bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="rider@example.com"
+                placeholder="rider@example.com or username"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+            <div className="relative">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Email or username</label>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={loginForm.password}
                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-white"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
             {loginError && <div className="bg-red-950/70 border border-red-600 text-red-300 px-4 py-3 rounded-2xl">{loginError}</div>}

@@ -82,17 +82,29 @@ router.get('/auth/me', authenticate, (req, res) => {
 // Rider Authentication Routes
 router.post('/auth/rider-login', safe(async (req, res) => {
   const { email, password } = req.body;
+  const loginValue = (email || '').toString().trim().toLowerCase();
   const riders = getCollection('riders');
-  const emailLower = (email || '').toLowerCase();
-  const candidates = riders.filter((r) => (r.email || '').toLowerCase() === emailLower);
+  const candidates = riders.filter((r) => {
+    const riderEmail = (r.email || '').toString().trim().toLowerCase();
+    const riderUsername = (r.username || '').toString().trim().toLowerCase();
+    return riderEmail === loginValue || riderUsername === loginValue;
+  });
   // Prefer a rider entry that has a passwordHash (created/updated), otherwise fallback to first match
   const rider = candidates.find((r) => r.passwordHash) || candidates[0];
 
-  if (!rider || !rider.passwordHash) {
+  if (!rider) {
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
 
-  const valid = await bcrypt.compare(password || '', rider.passwordHash);
+  let valid = false;
+  if (rider.passwordHash) {
+    valid = await bcrypt.compare(password || '', rider.passwordHash);
+  } else if (typeof rider.password === 'string') {
+    valid = password === rider.password;
+  } else if (typeof rider.rawPassword === 'string') {
+    valid = password === rider.rawPassword;
+  }
+
   if (!valid) {
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
