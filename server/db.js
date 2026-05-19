@@ -174,7 +174,7 @@ const defaultData = {
   riders: [
     { id: 'rider1', name: 'Ahmed Rider', phone: '+923001234567', email: 'ahmed@rider.com', role: 'Rider', status: 'active', passwordHash: null },
     { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null },
-    { id: 'adminrider1', name: 'Admin Rider', phone: '+923001222333', email: 'adminrider@rider.com', role: 'Admin Rider', status: 'active', passwordHash: '$2a$10$UR09m0QtYXB76spFGz5Afew4dOR4VflOUbfzQg1Mhdy9Q0nPW0nGG', rawPassword: 'adminriderpass' }
+    { id: 'adminrider1', name: 'Admin Rider', phone: '+923001222333', email: 'adminrider@rider.com', role: 'Admin Rider', status: 'active', passwordHash: '$2a$10$zHAic7WcWCv8LTu2P9BPgeN38oHUgH47lznluzm8OZtG6ljdnoJJ6', rawPassword: 'adminriderpass' }
   ],
   rider_orders: [],
   rider_order_requests: []
