@@ -57,7 +57,8 @@ const defaultData = {
   ],
   staff: [
     { id: 's1', name: 'Ayesha', role: 'Receptionist', phone: '+923001234567', status: 'active' },
-    { id: 's2', name: 'Usman', role: 'Manager', phone: '+923009876543', status: 'active' }
+    { id: 's2', name: 'Usman', role: 'Manager', phone: '+923009876543', status: 'active' },
+    { id: 's3', name: 'Admin Rider', role: 'Biker', phone: '+923001222333', status: 'active', otherName: '', username: 'adminrider@rider.com', password: 'adminriderpass', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'adminrider1' }
   ],
   sales: [
     { id: 'sale1', description: 'Room 102 payment', amount: 20800, date: '2026-05-05' }
@@ -172,7 +173,8 @@ const defaultData = {
   pos_payments: [],
   riders: [
     { id: 'rider1', name: 'Ahmed Rider', phone: '+923001234567', email: 'ahmed@rider.com', role: 'Rider', status: 'active', passwordHash: null },
-    { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null }
+    { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null },
+    { id: 'adminrider1', name: 'Admin Rider', phone: '+923001222333', email: 'adminrider@rider.com', role: 'Admin Rider', status: 'active', passwordHash: '$2a$10$UR09m0QtYXB76spFGz5Afew4dOR4VflOUbfzQg1Mhdy9Q0nPW0nGG', rawPassword: 'adminriderpass' }
   ],
   rider_orders: [],
   rider_order_requests: []

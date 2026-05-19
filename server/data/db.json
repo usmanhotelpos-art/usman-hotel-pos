@@ -209,6 +209,26 @@
       "loginEnabled": true,
       "status": "active",
       "riderId": "a6d9cfe5-64b1-46b0-afad-422f90a0eb05"
+    },
+    {
+      "id": "s3",
+      "createdAt": "2026-05-20T00:00:00.000Z",
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Admin Rider",
+      "otherName": "",
+      "phone": "+923001222333",
+      "username": "adminrider@rider.com",
+      "password": "adminriderpass",
+      "role": "Biker",
+      "facePhoto": "",
+      "idCardNumber": "",
+      "idCardFront": "",
+      "idCardBack": "",
+      "description": "",
+      "address": "",
+      "loginEnabled": true,
+      "status": "active",
+      "riderId": "adminrider1"
     }
   ],
   "sales": [
@@ -1687,6 +1707,18 @@
       "email": "autorider1@example.com",
       "passwordHash": "$2a$10$f/MJhzUumDxJbNbf45O1Qe1NbDKPIPoDFiwTzHMf7Z2G1eaSEHBB6",
       "rawPassword": "autoriderpass",
+      "role": "Admin Rider",
+      "status": "active"
+    },
+    {
+      "id": "adminrider1",
+      "createdAt": "2026-05-20T00:00:00.000Z",
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Admin Rider",
+      "phone": "+923001222333",
+      "email": "adminrider@rider.com",
+      "passwordHash": "$2a$10$UR09m0QtYXB76spFGz5Afew4dOR4VflOUbfzQg1Mhdy9Q0nPW0nGG",
+      "rawPassword": "adminriderpass",
       "role": "Admin Rider",
       "status": "active"
     },
