@@ -169,7 +169,13 @@ const defaultData = {
   ],
   pos_orders: [],
   pos_customers: [],
-  pos_payments: []
+  pos_payments: [],
+  riders: [
+    { id: 'rider1', name: 'Ahmed Rider', phone: '+923001234567', email: 'ahmed@rider.com', role: 'Rider', status: 'active', passwordHash: null },
+    { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null }
+  ],
+  rider_orders: [],
+  rider_order_requests: []
 };
 
 function ensureLocalDataDir() {

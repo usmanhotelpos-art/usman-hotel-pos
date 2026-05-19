@@ -8,6 +8,7 @@ import {
   readDb,
   removeRecord,
   updateRecord,
+  saveCollection,
   writeDb
 } from './db.js';
 import { createSpreadsheet, saveDbAsJson, loadDbFromSheet } from './google-sheets.js';
@@ -15,6 +16,11 @@ import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup
 
 const JWT_SECRET = process.env.JWT_SECRET || 'usman-hotel-secret';
 export const router = express.Router();
+
+// Basic API root for health check
+router.get('/', (req, res) => {
+  res.send({ ok: true, message: 'Usman POS API' });
+});
 
 function createToken(user) {
   return jwt.sign(
@@ -73,6 +79,48 @@ router.get('/auth/me', authenticate, (req, res) => {
   res.send({ id: user.id, name: user.name, email: user.email, role: user.role });
 });
 
+// Rider Authentication Routes
+router.post('/auth/rider-login', safe(async (req, res) => {
+  const { email, password } = req.body;
+  const riders = getCollection('riders');
+  const emailLower = (email || '').toLowerCase();
+  const candidates = riders.filter((r) => (r.email || '').toLowerCase() === emailLower);
+  // Prefer a rider entry that has a passwordHash (created/updated), otherwise fallback to first match
+  const rider = candidates.find((r) => r.passwordHash) || candidates[0];
+
+  if (!rider || !rider.passwordHash) {
+    return res.status(401).send({ error: 'Invalid rider credentials' });
+  }
+
+  const valid = await bcrypt.compare(password || '', rider.passwordHash);
+  if (!valid) {
+    return res.status(401).send({ error: 'Invalid rider credentials' });
+  }
+
+  const tokenRole = (rider.role || 'rider').toString().toLowerCase();
+  const token = jwt.sign(
+    {
+      id: rider.id,
+      email: rider.email,
+      role: tokenRole,
+      name: rider.name
+    },
+    JWT_SECRET,
+    { expiresIn: '6h' }
+  );
+
+  res.send({ token, rider: { id: rider.id, name: rider.name, email: rider.email, phone: rider.phone, role: rider.role } });
+}));
+
+router.get('/auth/rider-me', authenticate, (req, res) => {
+  const riders = getCollection('riders');
+  const rider = riders.find((r) => r.id === req.user.id);
+  if (!rider) {
+    return res.status(401).send({ error: 'Rider not found' });
+  }
+  res.send({ id: rider.id, name: rider.name, email: rider.email, phone: rider.phone, role: rider.role });
+});
+
 router.get('/pos/categories', (req, res) => {
   res.send(getCollection('pos_categories'));
 });
@@ -83,7 +131,7 @@ router.get('/pos/products', (req, res) => {
 
 router.use(authenticate);
 
-const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders'];
+const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests'];
 
 router.get('/dashboard', (req, res) => {
   const db = readDb();
@@ -139,10 +187,27 @@ collections.forEach((collection) => {
   });
 
   router.delete(`/${collection}/:id`, (req, res) => {
+    // Admin-only delete for pos_orders
+    if (collection === 'pos_orders') {
+      const userRole = (req.user.role || '').toLowerCase();
+      if (userRole !== 'admin' && userRole !== 'admin rider') {
+        return res.status(403).send({ error: 'Forbidden: Only admin riders can delete orders' });
+      }
+    }
+
     const removed = removeRecord(collection, req.params.id);
     if (!removed) {
       return res.status(404).send({ error: 'Record not found' });
     }
+
+    // Clean up related records when deleting orders
+    if (collection === 'pos_orders') {
+      const remainingRequests = getCollection('rider_order_requests').filter((r) => r.orderId !== req.params.id);
+      saveCollection('rider_order_requests', remainingRequests);
+      const remainingRiderOrders = getCollection('rider_orders').filter((r) => r.orderId !== req.params.id);
+      saveCollection('rider_orders', remainingRiderOrders);
+    }
+
     res.send({ success: true });
   });
 });
@@ -438,14 +503,6 @@ router.post('/pos/orders', (req, res) => {
   res.status(201).send(order);
 });
 
-router.delete('/pos/orders/:id', (req, res) => {
-  const removed = removeRecord('pos_orders', req.params.id);
-  if (!removed) {
-    return res.status(404).send({ error: 'Order not found' });
-  }
-  res.send({ success: true });
-});
-
 router.put('/pos/orders/:id/status', (req, res) => {
   const { status } = req.body;
   const updated = updateRecord('pos_orders', req.params.id, {
@@ -468,7 +525,64 @@ router.put('/pos/orders/:id/assign-rider', (req, res) => {
   if (!updated) {
     return res.status(404).send({ error: 'Order not found' });
   }
+
+  const riderOrders = getCollection('rider_orders') || [];
+  const matchedOrder = riderOrders.find((order) => order.orderId === req.params.id);
+  if (matchedOrder) {
+    const riders = getCollection('riders') || [];
+    const rider = riders.find((r) => (r.name || '').toLowerCase() === (deliveryAgent || '').toLowerCase());
+    updateRecord('rider_orders', matchedOrder.id, {
+      status: 'assigned',
+      riderId: rider ? rider.id : matchedOrder.riderId || null,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
   res.send(updated);
+});
+router.delete('/pos/orders/:id', (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  if (userRole !== 'admin' && userRole !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden: Only admin riders can delete orders' });
+  }
+
+  const orderId = req.params.id;
+  let deleted = removeRecord('pos_orders', orderId);
+  if (!deleted) {
+    deleted = removeRecord('rider_orders', orderId);
+  }
+
+  if (!deleted) {
+    const riderOrders = getCollection('rider_orders') || [];
+    const filtered = riderOrders.filter((r) => r.orderId !== orderId);
+    if (filtered.length !== riderOrders.length) {
+      saveCollection('rider_orders', filtered);
+      deleted = true;
+    }
+  }
+
+  if (!deleted) {
+    return res.status(404).send({ error: 'Order not found' });
+  }
+
+  const remainingRequests = getCollection('rider_order_requests').filter((r) => r.orderId !== orderId);
+  saveCollection('rider_order_requests', remainingRequests);
+
+  const remainingRiderOrders = getCollection('rider_orders').filter((r) => r.orderId !== orderId);
+  saveCollection('rider_orders', remainingRiderOrders);
+
+  res.send({ success: true, message: 'Order deleted successfully' });
+});
+
+router.post('/admin/clear-rider-app', authenticate, (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden' });
+  }
+
+  saveCollection('rider_order_requests', []);
+  saveCollection('rider_orders', []);
+
+  res.send({ success: true, message: 'Rider app data cleared for a fresh start' });
 });
 
 router.put('/pos/orders/:id/assign-waiter', (req, res) => {
@@ -580,3 +694,207 @@ router.post('/google/restore-db', safe(async (req, res) => {
   const db = await restoreDbFromSheet(spreadsheetId);
   res.send({ success: true, db });
 }));
+
+// Rider Order Management Routes
+router.get('/rider/assigned-orders/:riderId', authenticate, (req, res) => {
+  // Return assigned orders from the dedicated `rider_orders` collection
+  // and also include `pos_orders` entries where `deliveryAgent` matches
+  // the rider's name (admin assigns riders by name into pos_orders).
+  const riderOrders = getCollection('rider_orders') || [];
+  const assignedFromRiderOrders = riderOrders.filter((o) => o.riderId === req.params.riderId && o.status === 'assigned');
+
+  const posOrders = getCollection('pos_orders') || [];
+  const riders = getCollection('riders') || [];
+  const rider = riders.find((r) => r.id === req.params.riderId);
+
+  const assignedFromPosOrders = [];
+  if (rider) {
+    const riderName = (rider.name || '').toLowerCase();
+    posOrders.forEach((po) => {
+      if (((po.deliveryAgent || '').toLowerCase() === riderName) && ((po.status || '').toLowerCase() === 'riders assigned')) {
+        assignedFromPosOrders.push({
+          id: po.id,
+          riderId: req.params.riderId,
+          originalOrder: po,
+          status: po.status
+        });
+      }
+    });
+  }
+
+  res.send([...assignedFromRiderOrders, ...assignedFromPosOrders]);
+});
+
+router.get('/rider/kitchen-orders', authenticate, (req, res) => {
+  const riderOrders = getCollection('rider_orders') || [];
+  const posOrders = getCollection('pos_orders') || [];
+
+  const kitchenRiderOrders = riderOrders.filter((o) => !o.riderId && o.status === 'kitchen');
+  const kitchenPosOrders = posOrders
+    .filter((o) => o.orderType === 'Delivery' && o.status === 'Kitchen')
+    .filter((po) => !riderOrders.some((ro) => ro.orderId === po.id));
+
+  const mappedPosOrders = kitchenPosOrders.map((order) => ({
+    id: order.id,
+    orderId: order.id,
+    originalOrder: order,
+    status: 'kitchen'
+  }));
+
+  res.send([...kitchenRiderOrders, ...mappedPosOrders]);
+});
+
+router.get('/rider/approved-orders/:riderId', authenticate, (req, res) => {
+  const riderOrders = getCollection('rider_orders') || [];
+  const orders = riderOrders.filter((o) => o.riderId === req.params.riderId && o.status === 'approved');
+  res.send(orders);
+});
+
+router.get('/rider/requested-orders/:riderId', authenticate, (req, res) => {
+  const requests = getCollection('rider_order_requests') || [];
+  const posOrders = getCollection('pos_orders') || [];
+  const riderOrders = getCollection('rider_orders') || [];
+  const riderRequests = requests.filter((request) => request.riderId === req.params.riderId);
+
+  const requestedWithOrders = riderRequests.map((request) => ({
+    id: request.id,
+    riderId: request.riderId,
+    orderId: request.orderId,
+    status: request.status,
+    requestedAt: request.requestedAt,
+    originalOrder:
+      posOrders.find((order) => order.id === request.orderId) ||
+      riderOrders.find((order) => order.id === request.orderId)
+  }));
+
+  res.send(requestedWithOrders);
+});
+
+router.post('/rider/request-approval', authenticate, (req, res) => {
+  const { riderId, orderId } = req.body;
+  const posOrders = getCollection('pos_orders') || [];
+  const riderOrders = getCollection('rider_orders') || [];
+  const existingRiderOrder = riderOrders.find((order) => order.orderId === orderId);
+
+  if (!existingRiderOrder) {
+    const posOrder = posOrders.find((order) => order.id === orderId);
+    if (posOrder) {
+      createRecord('rider_orders', {
+        orderId: posOrder.id,
+        riderId: null,
+        originalOrder: posOrder,
+        status: 'kitchen',
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+
+  const request = createRecord('rider_order_requests', {
+    orderId,
+    riderId,
+    status: 'pending',
+    requestedAt: new Date().toISOString()
+  });
+  res.status(201).send(request);
+});
+
+router.get('/rider/pending-requests', authenticate, (req, res) => {
+  const requests = getCollection('rider_order_requests');
+  const pending = requests.filter((r) => r.status === 'pending');
+  res.send(pending);
+});
+
+// Admin: clear all rider order requests (useful for fresh start/testing)
+router.post('/admin/clear-requested-orders', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
+  saveCollection('rider_order_requests', []);
+  res.send({ success: true, message: 'Cleared rider order requests' });
+});
+
+router.put('/rider/approve-request/:requestId', authenticate, (req, res) => {
+  const request = updateRecord('rider_order_requests', req.params.requestId, { status: 'approved' });
+  if (!request) return res.status(404).send({ error: 'Request not found' });
+  
+  const riderOrders = getCollection('rider_orders') || [];
+  const posOrders = getCollection('pos_orders') || [];
+  let order = riderOrders.find((o) => o.orderId === request.orderId);
+
+  if (order) {
+    updateRecord('rider_orders', order.id, { status: 'approved', riderId: request.riderId });
+  } else {
+    const posOrder = posOrders.find((o) => o.id === request.orderId);
+    if (posOrder) {
+      order = createRecord('rider_orders', {
+        orderId: posOrder.id,
+        riderId: request.riderId,
+        originalOrder: posOrder,
+        status: 'approved',
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+  
+  res.send(request);
+});
+
+router.put('/rider/reject-request/:requestId', authenticate, (req, res) => {
+  const request = updateRecord('rider_order_requests', req.params.requestId, { status: 'rejected' });
+  if (!request) return res.status(404).send({ error: 'Request not found' });
+  
+  // Update the order status back to kitchen
+  const riderOrders = getCollection('rider_orders') || [];
+  const order = riderOrders.find((o) => o.orderId === request.orderId);
+  if (order) {
+    updateRecord('rider_orders', order.id, { status: 'kitchen', riderId: null });
+  }
+  
+  res.send(request);
+});
+
+router.post('/pos/order-to-delivery', (req, res) => {
+  const { orderId, riderId } = req.body;
+  const order = req.body;
+  
+  const riderOrder = createRecord('rider_orders', {
+    orderId,
+    riderId: riderId || null,
+    originalOrder: order,
+    status: riderId ? 'assigned' : 'kitchen',
+    createdAt: new Date().toISOString()
+  });
+  
+  res.status(201).send(riderOrder);
+});
+
+router.post('/rider/set-password', authenticate, safe(async (req, res) => {
+  const { riderId, password } = req.body;
+  if (!password) return res.status(400).send({ error: 'Password is required' });
+  
+  const riders = getCollection('riders');
+  const rider = riders.find((r) => r.id === riderId);
+  if (!rider) return res.status(404).send({ error: 'Rider not found' });
+  
+  const passwordHash = await bcrypt.hash(password, 10);
+  const updated = updateRecord('riders', riderId, { passwordHash });
+  
+  res.send({ success: true, rider: { id: updated.id, name: updated.name, email: updated.email } });
+}));
+
+// Create rider with password (admin only)
+router.post('/riders/create', authenticate, safe(async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
+  const { name, phone, email, password } = req.body;
+  if (!name || !email || !password) return res.status(400).send({ error: 'name, email and password are required' });
+  const passwordHash = await bcrypt.hash(password, 10);
+  const rider = createRecord('riders', { name, phone, email, passwordHash, rawPassword: password, role: 'Rider', status: 'active' });
+  res.status(201).send(rider);
+}));
+
+// Return raw password for a rider (admin only)
+router.get('/riders/raw/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
+  const riders = getCollection('riders');
+  const rider = riders.find((r) => r.id === req.params.id);
+  if (!rider) return res.status(404).send({ error: 'Rider not found' });
+  res.send({ id: rider.id, email: rider.email, rawPassword: rider.rawPassword || null });
+});

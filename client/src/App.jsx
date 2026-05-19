@@ -1,10 +1,12 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
+import { RidersApp } from './components/RidersApp';
 
 const envApiBase = import.meta.env.VITE_API_BASE || '';
 const apiBase = envApiBase
   ? envApiBase.replace(/\/$/, '')
   : '/api';
-const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'settings'];
+const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'settings'];
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -26,6 +28,11 @@ function App() {
     posHeaderTitle: 'POS Counter',
     posHeaderPhoto: '',
     developerPhoto: '',
+    riderAppTitle: 'Rider Portal',
+    riderAppSubtitle: 'Fast delivery management for riders',
+    riderAppLoginNote: 'Login to continue',
+    riderAppLogo: '',
+    riderAppAvatar: '',
     receiptFontSize: '12',
     receiptFontStyle: 'Arial',
     receiptLineStyle: 'dashed',
@@ -127,6 +134,8 @@ function App() {
   const [cart, setCart] = useState([]);
   const [orderType, setOrderType] = useState('Dine-In');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [selectedCartIndex, setSelectedCartIndex] = useState(0);
+  const posSearchInputRef = useRef(null);
   const [orderDetails, setOrderDetails] = useState({
     customerName: '',
     phone: '',
@@ -376,7 +385,8 @@ function App() {
   };
   const tabLabels = {
     'catalogue-qr': 'Catalogue QR',
-    'rider-book': 'Rider Book'
+    'rider-book': 'Rider Book',
+    settings: 'Rider App Settings'
   };
   const formatTabName = (tab) => tabLabels[tab] || tab.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   const [deliveryServiceTypes, setDeliveryServiceTypes] = useState([]);
@@ -440,6 +450,8 @@ function App() {
   const [riderBookPageSize, setRiderBookPageSize] = useState(15);
   const [riderBookPageIndex, setRiderBookPageIndex] = useState(0);
   const [riderBookActionOpen, setRiderBookActionOpen] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [ridersList, setRidersList] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [showTableModal, setShowTableModal] = useState(false);
@@ -481,6 +493,7 @@ function App() {
   });
   const [roles, setRoles] = useState([
     { name: 'Admin', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
+    { name: 'Admin Rider', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
     { name: 'Cashier', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, settings: false, login: true } },
     { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, settings: true, login: true } },
     { name: 'Biker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
@@ -580,6 +593,8 @@ function App() {
         return 'Catalogue QR';
       case 'customers':
         return 'Customer Management';
+      case 'riders-app':
+        return 'Riders App';
       case 'settings':
         return 'Hotel Settings';
       case 'rider-book':
@@ -784,6 +799,8 @@ function App() {
       } else if (tab === 'rider-book') {
         await loadOrdersData();
         await loadInventoryData();
+      } else if (tab === 'riders-app') {
+        // Riders App is a self-contained component and does not need generic tab data loading.
       } else if (tab === 'pos' || tab === 'catalogue-qr') {
         await loadPosData();
       } else if (tab === 'customers') {
@@ -842,6 +859,42 @@ function App() {
     }
   }
 
+  async function loadPendingRequests() {
+    try {
+      // Ensure we have orders and riders to augment the requests
+      if (!posOrders || posOrders.length === 0) {
+        await loadOrdersData();
+      }
+      if (!ridersList || ridersList.length === 0) {
+        try {
+          const r = await fetchJson(`${apiBase}/riders`);
+          setRidersList(Array.isArray(r) ? r : []);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      const data = await fetchJson(`${apiBase}/rider/pending-requests`);
+      const list = Array.isArray(data) ? data : [];
+
+      const augmented = list.map((req) => {
+        const rider = (ridersList || []).find((r) => r.id === req.riderId) || {};
+        const order = (posOrders || []).find((o) => o.id === req.orderId) || null;
+        return {
+          ...req,
+          riderName: rider.name || req.riderId,
+          orderNumber: order?.orderNumber || req.orderId,
+          orderTotal: order?.total || (order?.subtotal || 0)
+        };
+      });
+
+      setPendingRequests(augmented);
+    } catch (err) {
+      console.warn('Failed to load pending requests:', err.message || err);
+      setPendingRequests([]);
+    }
+  }
+
   async function loadInventoryData() {
     setLoading(true);
     setMessage('');
@@ -863,13 +916,14 @@ function App() {
     setLoading(true);
     setMessage('');
     try {
-      const [categories, products, tables, agents, staff, orders] = await Promise.all([
+      const [categories, products, tables, agents, staff, orders, riders] = await Promise.all([
         fetchJson(`${apiBase}/pos/categories`),
         fetchJson(`${apiBase}/pos/products`),
         fetchJson(`${apiBase}/pos/tables`),
         fetchJson(`${apiBase}/pos/delivery-agents`),
         fetchJson(`${apiBase}/staff`),
         fetchJson(`${apiBase}/pos/orders`)
+        , fetchJson(`${apiBase}/riders`)
       ]);
 
       setPosCategories(categories);
@@ -881,10 +935,41 @@ function App() {
       ]);
       setStaff(staff);
       setPosOrders(orders);
+      setRidersList(Array.isArray(riders) ? riders : []);
       setSelectedCategory((current) => current === 'All' ? MASHALLAH_CATEGORY : current);
       setPosSearch('');
     } catch (error) {
       setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function approveRiderRequest(requestId) {
+    if (!confirm('Approve this rider request?')) return;
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/rider/approve-request/${requestId}`, { method: 'PUT' });
+      setMessage('Request approved');
+      await loadPendingRequests();
+      await loadOrdersData();
+    } catch (err) {
+      setMessage(err.message || 'Failed to approve request');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function rejectRiderRequest(requestId) {
+    if (!confirm('Reject this rider request?')) return;
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/rider/reject-request/${requestId}`, { method: 'PUT' });
+      setMessage('Request rejected');
+      await loadPendingRequests();
+      await loadOrdersData();
+    } catch (err) {
+      setMessage(err.message || 'Failed to reject request');
     } finally {
       setLoading(false);
     }
@@ -1293,6 +1378,28 @@ function App() {
     }
   };
 
+  const handleRiderAppLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSettings((prev) => ({ ...prev, riderAppLogo: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRiderAppAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSettings((prev) => ({ ...prev, riderAppAvatar: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   async function updateSettings() {
     setLoading(true);
     setMessage('');
@@ -1382,6 +1489,184 @@ function App() {
     addToCart(exactMatch);
     setPosSearch('');
   }, [posSearch, posProducts]);
+
+  useEffect(() => {
+    if (selectedCartIndex >= cart.length) {
+      setSelectedCartIndex(Math.max(0, cart.length - 1));
+    }
+  }, [cart, selectedCartIndex]);
+
+  const focusPosSearch = () => {
+    posSearchInputRef.current?.focus();
+  };
+
+  const handlePosSearchSubmit = () => {
+    const trimmedSearch = posSearch.trim();
+    if (!trimmedSearch) return;
+    const exactMatch = posProducts.find((product) =>
+      normalizeText(product.code) === normalizeText(trimmedSearch) ||
+      normalizeText(product.sku) === normalizeText(trimmedSearch) ||
+      normalizeText(product.id) === normalizeText(trimmedSearch)
+    );
+    if (exactMatch) {
+      addToCart(exactMatch);
+      setPosSearch('');
+      return;
+    }
+    const filtered = getFilteredProducts();
+    if (filtered.length > 0) {
+      addToCart(filtered[0]);
+      setPosSearch('');
+    }
+  };
+
+  const handleCartSelectionKey = (direction) => {
+    if (!cart.length) return;
+    setSelectedCartIndex((prev) => {
+      if (direction === 'up') return Math.max(0, prev - 1);
+      if (direction === 'down') return Math.min(cart.length - 1, prev + 1);
+      return prev;
+    });
+  };
+
+  const handleSelectedCartQty = (delta) => {
+    if (!cart.length) return;
+    const selectedItem = cart[selectedCartIndex];
+    if (!selectedItem) return;
+    updateCartItem(selectedItem.itemId, delta);
+  };
+
+  const handlePosShortcuts = (event) => {
+    if (activeTab !== 'pos') return;
+    const targetTag = event.target.tagName;
+    const isFormField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag) || event.target.isContentEditable;
+
+    if (event.altKey && !event.ctrlKey && !event.metaKey) {
+      switch (event.key.toLowerCase()) {
+        case 's':
+          event.preventDefault();
+          focusPosSearch();
+          return;
+        case '1':
+          event.preventDefault();
+          handleSelectOrderType('Dine-In');
+          return;
+        case '2':
+          event.preventDefault();
+          handleSelectOrderType('Takeaway');
+          return;
+        case '3':
+          event.preventDefault();
+          handleSelectOrderType('Delivery');
+          return;
+        case 'a':
+          event.preventDefault();
+          const filtered = getFilteredProducts();
+          if (filtered.length) addToCart(filtered[0]);
+          return;
+        default:
+          break;
+      }
+    }
+
+    if (showCustomerDetailsPopup) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCustomerDetailsPopup();
+        return;
+      }
+      if (!isFormField) {
+        if (orderType === 'Delivery') {
+          if (event.key.toLowerCase() === 'c') {
+            event.preventDefault();
+            handleDeliveryPaymentStatus('Receive Cash Till');
+            return;
+          }
+          if (event.key.toLowerCase() === 'o') {
+            event.preventDefault();
+            handleDeliveryPaymentStatus('May be Online');
+            return;
+          }
+          if (event.key.toLowerCase() === 'p') {
+            event.preventDefault();
+            handleDeliveryPaymentStatus('Paid to Cash on Counter');
+            return;
+          }
+        }
+        if (orderType === 'Dine-In') {
+          if (event.key.toLowerCase() === 's') {
+            event.preventDefault();
+            handleSaveOnly();
+            return;
+          }
+          if (event.key.toLowerCase() === 'p') {
+            event.preventDefault();
+            handlePrintOnly();
+            return;
+          }
+          if (event.key.toLowerCase() === 'r') {
+            event.preventDefault();
+            handleSaveAndPrint();
+            return;
+          }
+        }
+      }
+    }
+
+    if (showPaymentPopup) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closePaymentPopup();
+        return;
+      }
+      if (!isFormField) {
+        if (event.key.toLowerCase() === 'l') {
+          event.preventDefault();
+          handleSavePayLater();
+          return;
+        }
+        if (event.key.toLowerCase() === 's') {
+          event.preventDefault();
+          handlePaymentSave();
+          return;
+        }
+      }
+    }
+
+    if (!isFormField) {
+      const key = event.key;
+      if (key === 'ArrowUp') {
+        event.preventDefault();
+        handleCartSelectionKey('up');
+        return;
+      }
+      if (key === 'ArrowDown') {
+        event.preventDefault();
+        handleCartSelectionKey('down');
+        return;
+      }
+      if (key === '+' || key === '=' ) {
+        event.preventDefault();
+        handleSelectedCartQty(1);
+        return;
+      }
+      if (key === '-') {
+        event.preventDefault();
+        handleSelectedCartQty(-1);
+        return;
+      }
+      if (key === 'Enter' && document.activeElement === posSearchInputRef.current) {
+        event.preventDefault();
+        handlePosSearchSubmit();
+        return;
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', handlePosShortcuts);
+    return () => window.removeEventListener('keydown', handlePosShortcuts);
+  }, [activeTab, cart, selectedCartIndex, showCustomerDetailsPopup, showPaymentPopup, orderType, posSearch, posProducts, orderDetails]);
 
   function getProductStartingPrice(product) {
     if (product.flavors && product.flavors.length > 0) {
@@ -2594,6 +2879,21 @@ function App() {
     setOrderDetailsModal(order);
   };
 
+  async function viewOrderById(orderId) {
+    setLoading(true);
+    try {
+      let order = (posOrders || []).find((o) => o.id === orderId);
+      if (!order) {
+        order = await fetchJson(`${apiBase}/pos/orders/${orderId}`);
+      }
+      openViewOrderModal(order);
+    } catch (err) {
+      setMessage(err.message || 'Failed to load order');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const openRiderAssignmentModal = (order) => {
     setRiderAssignmentModal(order);
     setSelectedRider(order.deliveryAgent || '');
@@ -2993,6 +3293,34 @@ function App() {
               </div>
             </div>
           </div>
+
+          {/* Pending Rider Requests (Admin) */}
+          <div className="rounded-[12px] border border-slate-800 bg-slate-900 p-4 shadow-soft mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white">Pending Rider Requests</h3>
+              <button onClick={loadPendingRequests} className="text-sm px-3 py-1 rounded bg-slate-800 text-slate-200">Refresh</button>
+            </div>
+            {pendingRequests.length === 0 ? (
+              <p className="text-sm text-slate-400">No pending requests</p>
+            ) : (
+              <div className="space-y-2">
+                {pendingRequests.map((req) => (
+                  <div key={req.id} className="flex items-center justify-between bg-slate-800 p-3 rounded">
+                    <div>
+                      <div className="text-sm text-slate-200 font-semibold">{req.orderNumber}</div>
+                      <div className="text-xs text-slate-400">Rider: {req.riderName} · Status: {req.status}</div>
+                      <div className="text-xs text-slate-400">Total: {req.orderTotal} Rs</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => viewOrderById(req.orderId)} className="px-3 py-1 rounded bg-gray-700 text-white text-sm">View</button>
+                      <button onClick={() => approveRiderRequest(req.id)} className="px-3 py-1 rounded bg-emerald-600 text-white text-sm">Approve</button>
+                      <button onClick={() => rejectRiderRequest(req.id)} className="px-3 py-1 rounded bg-rose-600 text-white text-sm">Reject</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-4 shadow-soft overflow-x-auto">
@@ -3176,8 +3504,12 @@ function App() {
   };
 
   async function saveStaff() {
-    if (!staffForm.name || !staffForm.username || !staffForm.password || !staffForm.role) {
+    if (!staffForm.name || !staffForm.username || !staffForm.role) {
       setMessage('Please fill all required fields');
+      return;
+    }
+    if (!editingStaff && !staffForm.password) {
+      setMessage('Password is required for new staff');
       return;
     }
     if (staffForm.role === 'Biker' && !staffForm.phone) {
@@ -3189,18 +3521,56 @@ function App() {
     setMessage('');
     try {
       const payload = { ...staffForm, status: 'active' };
+      if (editingStaff && !payload.password) {
+        delete payload.password;
+      }
       if (editingStaff) {
-        await fetchJson(`${apiBase}/staff/${editingStaff.id}`, {
+        // update existing staff
+        const updated = await fetchJson(`${apiBase}/staff/${editingStaff.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload)
         });
+
+        // if biker and password provided, update rider password
+        if (payload.role === 'Biker' && payload.loginEnabled && payload.password && updated.riderId) {
+          try {
+            await fetchJson(`${apiBase}/rider/set-password`, {
+              method: 'POST',
+              body: JSON.stringify({ riderId: updated.riderId, password: payload.password })
+            });
+          } catch (err) {
+            console.warn('Failed to update rider password', err.message || err);
+          }
+        }
+
         setMessage('Staff updated successfully');
       } else {
-        await fetchJson(`${apiBase}/staff`, {
+        // create staff first
+        const createdStaff = await fetchJson(`${apiBase}/staff`, {
           method: 'POST',
           body: JSON.stringify(payload)
         });
-        setMessage('Staff added successfully');
+
+        // If new staff is a Biker with login enabled, create a rider account and link
+        if (payload.role === 'Biker' && payload.loginEnabled) {
+          try {
+            const riderResp = await fetchJson(`${apiBase}/riders/create`, {
+              method: 'POST',
+              body: JSON.stringify({ name: payload.name, phone: payload.phone, email: payload.username, password: payload.password })
+            });
+            // update staff record to include riderId
+            await fetchJson(`${apiBase}/staff/${createdStaff.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ ...createdStaff, riderId: riderResp.id })
+            });
+            setMessage('Staff and Rider account created successfully');
+          } catch (err) {
+            console.warn('Failed to create rider account', err.message || err);
+            setMessage('Staff added but rider account creation failed');
+          }
+        } else {
+          setMessage('Staff added successfully');
+        }
       }
       setShowStaffModal(false);
       await loadPosData();
@@ -3902,6 +4272,9 @@ function App() {
               {member.facePhoto && <img src={member.facePhoto} alt={member.name} className="w-16 h-16 rounded-full mt-3 object-cover" />}
               <div className="flex gap-2 mt-4">
                 <button onClick={() => openStaffModal(member)} className="flex-1 rounded-full bg-blue-600 px-3 py-2 text-sm text-white transition hover:bg-blue-700">Edit</button>
+                {member.riderId && (
+                  <button onClick={() => viewRiderPassword(member)} className="rounded-full bg-yellow-500 px-3 py-2 text-sm text-slate-900 transition hover:bg-yellow-400">View PW</button>
+                )}
                 <button onClick={() => deleteRecord(member.id)} className="flex-1 rounded-full bg-rose-600 px-3 py-2 text-sm text-white transition hover:bg-rose-700">Delete</button>
               </div>
             </div>
@@ -3916,7 +4289,18 @@ function App() {
                 <input value={staffForm.otherName} onChange={(e) => setStaffForm({ ...staffForm, otherName: e.target.value })} placeholder="Other Name" className="rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
                 <input value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} placeholder={`Phone Number ${staffForm.role === 'Biker' ? '*' : ''}`} className="rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
                 <input value={staffForm.username} onChange={(e) => setStaffForm({ ...staffForm, username: e.target.value })} placeholder="Username *" className="rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" required />
-                <input type="password" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} placeholder="Password *" className="rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" required />
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="password"
+                    value={staffForm.password}
+                    onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+                    placeholder={editingStaff ? 'Password (leave blank to keep current)' : 'Password *'}
+                    className="rounded-3xl border border-slate-800 bg-slate-950 px-11 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500"
+                    required={!editingStaff}
+                  />
+                </div>
+                <p className="text-xs text-slate-500">{editingStaff ? 'Leave blank to keep the existing password.' : 'Password is required for login access.'}</p>
                 <select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })} className="rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-emerald-500">
                   <option value="">Select Role *</option>
                   {roles.map((role) => <option key={role.name} value={role.name}>{role.name}</option>)}
@@ -3952,6 +4336,20 @@ function App() {
         )}
       </div>
     );
+  }
+
+  async function viewRiderPassword(member) {
+    if (!member.riderId) return setMessage('No rider account linked');
+    try {
+      setLoading(true);
+      const data = await fetchJson(`${apiBase}/riders/raw/${member.riderId}`);
+      const pw = data.rawPassword || '(not available)';
+      alert(`Rider ${data.email} password: ${pw}`);
+    } catch (err) {
+      setMessage(err.message || 'Failed to fetch password');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function renderRoles() {
@@ -4063,7 +4461,8 @@ function App() {
                     + Add
                   </button>
                 </div>
-                <input value={posSearch} onChange={(e) => setPosSearch(e.target.value)} placeholder="Search products or SKU" className={`w-full rounded-3xl border px-4 py-3 outline-none focus:border-emerald-500 ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                <input ref={posSearchInputRef} value={posSearch} onChange={(e) => setPosSearch(e.target.value)} placeholder="Search products or SKU" className={`w-full rounded-3xl border px-4 py-3 outline-none focus:border-emerald-500 ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                <p className="mt-2 text-xs text-slate-500">Shortcuts: Alt+S focus search, Alt+1 Dine-In, Alt+2 Takeaway, Alt+3 Delivery, Alt+A add first product, ↑/↓ select cart item, + / - qty, S/P/R save/print, L pay later.</p>
               </div>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -4150,8 +4549,11 @@ function App() {
               <h3 className={`mt-2 text-xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{cart.length} items</h3>
             </div>
             <div className="space-y-3">
-              {cart.map((item) => (
-                <div key={item.itemId} className={`rounded-[24px] border ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-50'} p-3`}> 
+              {cart.map((item, index) => (
+                <div
+                  key={item.itemId}
+                  onClick={() => setSelectedCartIndex(index)}
+                  className={`rounded-[24px] border p-3 cursor-pointer transition ${darkMode ? 'bg-slate-900' : 'bg-slate-50'} ${selectedCartIndex === index ? 'border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]' : darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className={`text-sm font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{item.name}</div>
@@ -4470,6 +4872,34 @@ function App() {
             <div>
               <label className="block text-sm font-medium text-slate-400">POS Header Title</label>
               <input value={settings.posHeaderTitle} onChange={(e) => setSettings((prev) => ({ ...prev, posHeaderTitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="e.g. POS Counter" />
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-[24px] border border-slate-300/40 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-700">Rider App Branding</p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Rider App Title</label>
+                <input value={settings.riderAppTitle} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppTitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Rider Portal" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Rider App Subtitle</label>
+                <input value={settings.riderAppSubtitle} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppSubtitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Fast delivery management for riders" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Login Prompt</label>
+                <input value={settings.riderAppLoginNote} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppLoginNote: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Login to continue" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Rider App Logo</label>
+                <input type="file" accept="image/*" onChange={handleRiderAppLogoChange} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                {settings.riderAppLogo && <img src={settings.riderAppLogo} alt="Rider App Logo preview" className="mt-3 h-20 w-20 rounded-full object-cover border border-slate-700" />}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Rider App Avatar</label>
+                <input type="file" accept="image/*" onChange={handleRiderAppAvatarChange} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                {settings.riderAppAvatar && <img src={settings.riderAppAvatar} alt="Rider App Avatar preview" className="mt-3 h-20 w-20 rounded-full object-cover border border-slate-700" />}
+              </div>
             </div>
           </div>
 
@@ -6736,6 +7166,7 @@ function App() {
             {activeTab === 'pos' && renderPos()}
             {activeTab === 'catalogue-qr' && renderCatalogueQrModule()}
             {activeTab === 'customers' && renderCustomers()}
+            {activeTab === 'riders-app' && <RidersApp />}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'rider-book' && renderRiderBook()}
