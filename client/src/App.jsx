@@ -3524,6 +3524,7 @@ function App() {
       if (editingStaff && !payload.password) {
         delete payload.password;
       }
+      let successMessage = '';
       if (editingStaff) {
         // update existing staff
         const updated = await fetchJson(`${apiBase}/staff/${editingStaff.id}`, {
@@ -3531,19 +3532,42 @@ function App() {
           body: JSON.stringify(payload)
         });
 
-        // if biker or admin rider and password provided, update rider password
-        if ((payload.role === 'Biker' || payload.role === 'Admin Rider') && payload.loginEnabled && payload.password && updated.riderId) {
-          try {
-            await fetchJson(`${apiBase}/rider/set-password`, {
-              method: 'POST',
-              body: JSON.stringify({ riderId: updated.riderId, password: payload.password })
-            });
-          } catch (err) {
-            console.warn('Failed to update rider password', err.message || err);
+        successMessage = 'Staff updated successfully';
+        if ((payload.role === 'Biker' || payload.role === 'Admin Rider') && payload.loginEnabled) {
+          if (updated.riderId) {
+            if (payload.password) {
+              try {
+                await fetchJson(`${apiBase}/rider/set-password`, {
+                  method: 'POST',
+                  body: JSON.stringify({ riderId: updated.riderId, password: payload.password })
+                });
+              } catch (err) {
+                console.warn('Failed to update rider password', err.message || err);
+              }
+            }
+          } else if (payload.password) {
+            try {
+              const riderResp = await fetchJson(`${apiBase}/riders/create`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  name: payload.name,
+                  phone: payload.phone,
+                  email: payload.username,
+                  password: payload.password,
+                  role: payload.role
+                })
+              });
+              await fetchJson(`${apiBase}/staff/${updated.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ ...updated, riderId: riderResp.id })
+              });
+              successMessage = 'Staff updated and Rider account created successfully';
+            } catch (err) {
+              console.warn('Failed to create rider account', err.message || err);
+              successMessage = 'Staff updated but rider account creation failed';
+            }
           }
         }
-
-        setMessage('Staff updated successfully');
       } else {
         // create staff first
         const createdStaff = await fetchJson(`${apiBase}/staff`, {
@@ -3577,6 +3601,9 @@ function App() {
         } else {
           setMessage('Staff added successfully');
         }
+      }
+      if (successMessage) {
+        setMessage(successMessage);
       }
       setShowStaffModal(false);
       await loadPosData();

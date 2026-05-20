@@ -943,6 +943,63 @@ router.post('/riders/create', authenticate, safe(async (req, res) => {
   res.status(201).send(rider);
 }));
 
+router.post('/admin/rider-repair', authenticate, safe(async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
+
+  const staffMembers = getCollection('staff') || [];
+  const riders = getCollection('riders') || [];
+  const created = [];
+  const linked = [];
+  const skipped = [];
+
+  for (const staff of staffMembers) {
+    const role = (staff.role || '').toString();
+    const loginEnabled = staff.loginEnabled !== false;
+    if (!loginEnabled) continue;
+    if (role !== 'Biker' && role !== 'Admin Rider') continue;
+    if (!staff.username) {
+      skipped.push({ staffId: staff.id, reason: 'missing username' });
+      continue;
+    }
+
+    const loginValue = staff.username.toString().trim().toLowerCase();
+    const existingRider = riders.find((r) => {
+      const riderEmail = (r.email || '').toString().trim().toLowerCase();
+      const riderUsername = (r.username || '').toString().trim().toLowerCase();
+      return riderEmail === loginValue || riderUsername === loginValue;
+    });
+
+    if (existingRider) {
+      if (!staff.riderId || staff.riderId !== existingRider.id) {
+        updateRecord('staff', staff.id, { ...staff, riderId: existingRider.id });
+      }
+      linked.push({ staffId: staff.id, riderId: existingRider.id });
+      continue;
+    }
+
+    if (!staff.password) {
+      skipped.push({ staffId: staff.id, reason: 'missing password' });
+      continue;
+    }
+
+    const passwordHash = await bcrypt.hash(staff.password, 10);
+    const rider = createRecord('riders', {
+      name: staff.name || staff.username,
+      phone: staff.phone || '',
+      email: staff.username,
+      passwordHash,
+      rawPassword: staff.password,
+      role: role,
+      status: 'active'
+    });
+
+    updateRecord('staff', staff.id, { ...staff, riderId: rider.id });
+    created.push({ staffId: staff.id, riderId: rider.id });
+  }
+
+  res.send({ created, linked, skipped });
+}));
+
 // Return raw password for a rider (admin only)
 router.get('/riders/raw/:id', authenticate, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
