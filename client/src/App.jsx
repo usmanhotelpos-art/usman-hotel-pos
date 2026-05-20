@@ -2934,20 +2934,23 @@ function App() {
     ? riderBookAssignedOrders.filter((order) => order.deliveryAgent === riderBookFilterRider)
     : riderBookAssignedOrders;
   const riderBookFilteredBySubTab = riderBookFilteredByRider.filter((order) => {
+    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+    const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+
     if (riderBookSubTab === 'cash') {
-      return order.paymentStatus === 'Receive Cash Till';
+      return paymentStatus === 'receive cash till' || paymentStatus === 'cash' || paymentMethod === 'cash';
     }
     if (riderBookSubTab === 'online') {
-      return order.paymentStatus === 'May be Online';
+      return paymentStatus === 'may be online' || paymentStatus === 'online' || paymentMethod === 'online';
     }
     if (riderBookSubTab === 'counter') {
-      return order.paymentStatus === 'Paid to Cash on Counter';
+      return paymentStatus === 'paid to cash on counter';
     }
     if (riderBookSubTab === 'pending') {
-      return order.status === 'Payment Pending';
+      return String(order.status || '').toLowerCase() === 'payment pending';
     }
     if (riderBookSubTab === 'paid') {
-      return order.paymentStatus === 'Paid' || order.status === 'Completed';
+      return paymentStatus === 'paid' || String(order.status || '').toLowerCase() === 'completed';
     }
     return true;
   });

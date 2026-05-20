@@ -301,16 +301,18 @@ export function RidersApp() {
       });
 
       if (res.ok) {
-        setAssignedOrders(assignedOrders.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
+        setAssignedOrders((prev) => prev.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
         if (selectedOrder && (selectedOrder.originalOrder?.id || selectedOrder.id) === targetOrderId) {
           setSelectedOrder(null);
         }
         notify(`Delivered ${paymentMethod === 'Cash' ? 'with cash' : 'online payment'} successfully`, 'success');
+        await loadOrders();
       } else {
         notify('Unable to update delivered status. Try again.', 'error');
       }
     } catch (error) {
       console.error('Error marking delivered:', error);
+      notify('Unable to update delivered status. Try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -319,17 +321,18 @@ export function RidersApp() {
   const pickupOrder = async (orderId) => {
     try {
       setLoading(true);
-      const order = approvedOrders.find(o => o.id === orderId);
+      const order = approvedOrders.find((o) => o.id === orderId);
       if (!order) return;
 
-      const posOrderId = order.originalOrder?.id || order.id;
+      const targetOrderId = order.originalOrder?.id || order.id;
       const deliveryAgent = order.originalOrder?.deliveryAgent || rider?.name || '';
       if (!deliveryAgent) {
         console.error('Cannot pick up order without an assigned rider.');
+        notify('Cannot pick up order without an assigned rider.', 'error');
         return;
       }
 
-      const res = await fetch(`${apiBase}/pos/orders/${posOrderId}/assign-rider`, {
+      const res = await fetch(`${apiBase}/pos/orders/${targetOrderId}/assign-rider`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -343,14 +346,13 @@ export function RidersApp() {
         throw new Error(errorData.error || 'Failed to move order to Riders Assigned');
       }
 
-      setApprovedOrders((prev) => prev.filter((o) => (o.id !== orderId && (o.originalOrder?.id || '') !== orderId)));
-      
+      setApprovedOrders((prev) => prev.filter((o) => (o.id !== orderId && (o.originalOrder?.id || o.id) !== orderId)));
       if (selectedOrder && (selectedOrder.originalOrder?.id || selectedOrder.id) === orderId) {
         setSelectedOrder(null);
       }
-      
       notify('Order picked up. Move to assigned delivery list.', 'success');
       setRiderTab('assigned');
+      await loadOrders();
     } catch (error) {
       console.error('Error picking up order:', error);
       notify('Could not pickup order. Check connection.', 'error');
