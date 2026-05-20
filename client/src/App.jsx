@@ -3020,13 +3020,16 @@ function App() {
   }, { total: 0, extras: 0, serviceType: 0, bbqTandoor: 0 });
   riderBookTotals.excluded = Math.max(0, riderBookTotals.total - riderBookTotals.extras - riderBookTotals.serviceType);
 
-  // Build rider list for the Rider Book dropdown from two sources:
-  // - `ridersList` (rider accounts created via Staff/Biker management)
-  // - `deliveryAgent` values present on orders (in case of legacy or external assignments)
-  // Merge and dedupe so the dropdown updates when staff/riders are added or removed.
-  const riderNamesFromRidersList = (ridersList || []).map((r) => String(r.name || r.email || r.username || '').trim()).filter(Boolean);
-  const riderNamesFromOrders = Array.from(new Set(riderBookAssignedOrders.map((order) => order.deliveryAgent).filter(Boolean)));
-  const riderBookRiders = Array.from(new Set([...riderNamesFromRidersList, ...riderNamesFromOrders]));
+  // Build rider list for the Rider Book dropdown from the staff roster only.
+  // Only show staff members who are configured as bikers/riders.
+  const riderBookRiders = Array.from(
+    new Set(
+      (staff || [])
+        .filter((member) => ['Biker', 'Admin Rider'].includes(member.role) && member.loginEnabled)
+        .map((member) => String(member.name || member.username || member.email || '').trim())
+        .filter(Boolean)
+    )
+  );
 
   const toggleRiderBookOrderSelection = (orderId) => {
     setRiderBookSelectedOrders((prev) =>
