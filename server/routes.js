@@ -93,6 +93,7 @@ router.post('/auth/rider-login', safe(async (req, res) => {
   const rider = candidates.find((r) => r.passwordHash) || candidates[0];
 
   if (!rider) {
+    console.warn(`Rider login failed: no rider found for '${loginValue}' (candidates=${candidates.length})`);
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
 
@@ -106,6 +107,7 @@ router.post('/auth/rider-login', safe(async (req, res) => {
   }
 
   if (!valid) {
+    console.warn(`Rider login failed for rider id=${rider.id} email='${rider.email}' role='${rider.role}' hasHash=${Boolean(rider.passwordHash)} hasRaw=${Boolean(rider.rawPassword)}`);
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
 
@@ -122,6 +124,37 @@ router.post('/auth/rider-login', safe(async (req, res) => {
   );
 
   res.send({ token, rider: { id: rider.id, name: rider.name, email: rider.email, phone: rider.phone, role: rider.role } });
+}));
+
+router.get('/auth/rider-debug', authenticate, safe(async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send({ error: 'Forbidden' });
+  }
+
+  const email = (req.query.email || '').toString().trim().toLowerCase();
+  if (!email) {
+    return res.status(400).send({ error: 'email query parameter is required' });
+  }
+
+  const riders = getCollection('riders');
+  const candidates = riders.filter((r) => {
+    const riderEmail = (r.email || '').toString().trim().toLowerCase();
+    const riderUsername = (r.username || '').toString().trim().toLowerCase();
+    return riderEmail === email || riderUsername === email;
+  });
+
+  const debugData = candidates.map((r) => ({
+    id: r.id,
+    email: r.email,
+    username: r.username,
+    role: r.role,
+    status: r.status,
+    hasPasswordHash: Boolean(r.passwordHash),
+    hasRawPassword: Boolean(r.rawPassword),
+    loginEnabled: r.loginEnabled !== false
+  }));
+
+  res.send({ email, matches: debugData });
 }));
 
 router.get('/auth/rider-me', authenticate, (req, res) => {
@@ -887,7 +920,7 @@ router.post('/rider/set-password', authenticate, safe(async (req, res) => {
   if (!rider) return res.status(404).send({ error: 'Rider not found' });
   
   const passwordHash = await bcrypt.hash(password, 10);
-  const updated = updateRecord('riders', riderId, { passwordHash });
+  const updated = updateRecord('riders', riderId, { passwordHash, rawPassword: password });
   
   res.send({ success: true, rider: { id: updated.id, name: updated.name, email: updated.email } });
 }));
@@ -895,10 +928,18 @@ router.post('/rider/set-password', authenticate, safe(async (req, res) => {
 // Create rider with password (admin only)
 router.post('/riders/create', authenticate, safe(async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
-  const { name, phone, email, password } = req.body;
+  const { name, phone, email, password, role } = req.body;
   if (!name || !email || !password) return res.status(400).send({ error: 'name, email and password are required' });
   const passwordHash = await bcrypt.hash(password, 10);
-  const rider = createRecord('riders', { name, phone, email, passwordHash, rawPassword: password, role: 'Rider', status: 'active' });
+  const rider = createRecord('riders', {
+    name,
+    phone,
+    email,
+    passwordHash,
+    rawPassword: password,
+    role: role || 'Rider',
+    status: 'active'
+  });
   res.status(201).send(rider);
 }));
 

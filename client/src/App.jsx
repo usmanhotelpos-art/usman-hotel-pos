@@ -3531,8 +3531,8 @@ function App() {
           body: JSON.stringify(payload)
         });
 
-        // if biker and password provided, update rider password
-        if (payload.role === 'Biker' && payload.loginEnabled && payload.password && updated.riderId) {
+        // if biker or admin rider and password provided, update rider password
+        if ((payload.role === 'Biker' || payload.role === 'Admin Rider') && payload.loginEnabled && payload.password && updated.riderId) {
           try {
             await fetchJson(`${apiBase}/rider/set-password`, {
               method: 'POST',
@@ -3552,11 +3552,17 @@ function App() {
         });
 
         // If new staff is a Biker with login enabled, create a rider account and link
-        if (payload.role === 'Biker' && payload.loginEnabled) {
+        if ((payload.role === 'Biker' || payload.role === 'Admin Rider') && payload.loginEnabled) {
           try {
             const riderResp = await fetchJson(`${apiBase}/riders/create`, {
               method: 'POST',
-              body: JSON.stringify({ name: payload.name, phone: payload.phone, email: payload.username, password: payload.password })
+              body: JSON.stringify({
+                name: payload.name,
+                phone: payload.phone,
+                email: payload.username,
+                password: payload.password,
+                role: payload.role
+              })
             });
             // update staff record to include riderId
             await fetchJson(`${apiBase}/staff/${createdStaff.id}`, {
