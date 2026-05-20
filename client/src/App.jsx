@@ -1123,6 +1123,14 @@ function App() {
         await loadInventoryData();
       } else {
         await loadTab(activeTab);
+        // If staff was deleted, refresh POS-related data including riders list
+        if (activeTab === 'staff') {
+          try {
+            await loadPosData();
+          } catch (e) {
+            // ignore
+          }
+        }
       }
       setMessage('Deleted successfully');
     } catch (error) {
@@ -3012,7 +3020,13 @@ function App() {
   }, { total: 0, extras: 0, serviceType: 0, bbqTandoor: 0 });
   riderBookTotals.excluded = Math.max(0, riderBookTotals.total - riderBookTotals.extras - riderBookTotals.serviceType);
 
-  const riderBookRiders = Array.from(new Set(riderBookAssignedOrders.map((order) => order.deliveryAgent).filter(Boolean)));
+  // Build rider list for the Rider Book dropdown from two sources:
+  // - `ridersList` (rider accounts created via Staff/Biker management)
+  // - `deliveryAgent` values present on orders (in case of legacy or external assignments)
+  // Merge and dedupe so the dropdown updates when staff/riders are added or removed.
+  const riderNamesFromRidersList = (ridersList || []).map((r) => String(r.name || r.email || r.username || '').trim()).filter(Boolean);
+  const riderNamesFromOrders = Array.from(new Set(riderBookAssignedOrders.map((order) => order.deliveryAgent).filter(Boolean)));
+  const riderBookRiders = Array.from(new Set([...riderNamesFromRidersList, ...riderNamesFromOrders]));
 
   const toggleRiderBookOrderSelection = (orderId) => {
     setRiderBookSelectedOrders((prev) =>
