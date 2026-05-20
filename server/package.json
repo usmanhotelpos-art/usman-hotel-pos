@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon index.js --watch . --ext js,json",
-    "start": "node index.js"
+    "build-client": "cd ../client && npm install && npm run build",
+    "start": "node ./start.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
