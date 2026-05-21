@@ -1,0 +1,16 @@
+{
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "startCommand": "npm run serve",
+    "restartPolicyType": "on_failure",
+    "restartPolicyMaxRetries": 5
+  },
+  "variables": {
+    "VITE_API_BASE": {
+      "description": "API base URL for Vite frontend",
+      "value": "https://usman-hotel-pos-server-production.up.railway.app/api"
+    }
+  }
+}
