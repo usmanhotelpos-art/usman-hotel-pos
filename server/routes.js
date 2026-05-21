@@ -1030,12 +1030,13 @@ router.post('/riders/create', authenticate, safe(async (req, res) => {
   const { name, phone, email, password, role } = req.body;
   if (!name || !email || !password) return res.status(400).send({ error: 'name, email and password are required' });
   const normalizedEmail = (email || '').toString().trim().toLowerCase();
-  const assignedRole = normalizedEmail === 'ahmed@rider.com' ? 'Admin Rider' : 'Rider';
+  const assignedRole = normalizedEmail === 'ahmed@rider.com' ? 'Admin Rider' : (role && ['Admin Rider', 'Rider'].includes(role) ? role : 'Rider');
   const passwordHash = await bcrypt.hash(password, 10);
   const rider = createRecord('riders', {
     name,
     phone,
     email,
+    username: email,
     passwordHash,
     rawPassword: password,
     role: assignedRole,

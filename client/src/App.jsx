@@ -3603,6 +3603,30 @@ function App() {
     setShowStaffModal(true);
   };
 
+  const duplicateStaff = (staff) => {
+    if (!staff) {
+      setMessage('Cannot duplicate: No staff selected');
+      return;
+    }
+    setEditingStaff(null);
+    setStaffForm({
+      name: staff.name ? `${staff.name} (Copy)` : '',
+      otherName: staff.otherName || '',
+      phone: staff.phone || '',
+      username: staff.username ? `${staff.username}-copy` : '',
+      password: staff.password || '',
+      role: staff.role || '',
+      facePhoto: staff.facePhoto || '',
+      idCardNumber: staff.idCardNumber || '',
+      idCardFront: staff.idCardFront || '',
+      idCardBack: staff.idCardBack || '',
+      description: staff.description || '',
+      address: staff.address || '',
+      loginEnabled: staff.loginEnabled !== false
+    });
+    setShowStaffModal(true);
+  };
+
   async function saveStaff() {
     if (!staffForm.name || !staffForm.username || !staffForm.role) {
       setMessage('Please fill all required fields');
@@ -4410,6 +4434,7 @@ function App() {
                 {member.riderId && (
                   <button onClick={() => viewRiderPassword(member)} className="rounded-full bg-yellow-500 px-3 py-2 text-sm text-slate-900 transition hover:bg-yellow-400">View PW</button>
                 )}
+                <button onClick={() => duplicateStaff(member)} className="flex-1 rounded-full bg-purple-600 px-3 py-2 text-sm text-white transition hover:bg-purple-700">Duplicate</button>
                 <button onClick={() => deleteRecord(member.id)} className="flex-1 rounded-full bg-rose-600 px-3 py-2 text-sm text-white transition hover:bg-rose-700">Delete</button>
               </div>
             </div>
