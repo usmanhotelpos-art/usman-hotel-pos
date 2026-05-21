@@ -27,7 +27,7 @@ const apiBase = '/api';
 
 export function RidersApp() {
   const [view, setView] = useState('login'); // login, app
-  const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, requested
+  const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, requested, deliveredCash, deliveredOnline
   const [loading, setLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -36,8 +36,9 @@ export function RidersApp() {
   const [rider, setRider] = useState(null);
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [kitchenOrders, setKitchenOrders] = useState([]);
-  const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [requestedOrders, setRequestedOrders] = useState([]);
+  const [deliveredCashOrders, setDeliveredCashOrders] = useState([]);
+  const [deliveredOnlineOrders, setDeliveredOnlineOrders] = useState([]);
   const [requestingIds, setRequestingIds] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [hotelSettings, setHotelSettings] = useState(null);
@@ -61,18 +62,25 @@ export function RidersApp() {
       accent: 'from-sky-500 to-cyan-500'
     },
     {
-      key: 'delivered',
-      label: 'Delivered',
-      subtitle: 'Cash / Online',
-      icon: Check,
-      accent: 'from-emerald-500 to-lime-500'
-    },
-    {
       key: 'requested',
       label: 'Requests',
       subtitle: 'Approval queue',
       icon: XCircle,
       accent: 'from-violet-500 to-fuchsia-500'
+    },
+    {
+      key: 'deliveredCash',
+      label: 'Rider Book Cash',
+      subtitle: 'Cash payments',
+      icon: DollarSign,
+      accent: 'from-emerald-500 to-green-500'
+    },
+    {
+      key: 'deliveredOnline',
+      label: 'Rider Book Online',
+      subtitle: 'Online payments',
+      icon: CreditCard,
+      accent: 'from-blue-500 to-indigo-500'
     }
   ];
 
@@ -142,21 +150,6 @@ export function RidersApp() {
     }
   };
 
-  const fetchDeliveredOrders = async () => {
-    if (!rider?.id) return;
-    try {
-      const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}`, {
-        headers: { Authorization: `Bearer ${riderToken}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDeliveredOrders(deduplicateOrders(data));
-      }
-    } catch (error) {
-      console.error('Failed to fetch delivered orders:', error);
-    }
-  };
-
   const deduplicateOrders = (orders) => {
     const seen = new Set();
     return orders.filter(order => {
@@ -171,7 +164,6 @@ export function RidersApp() {
     if (view === 'app') {
       fetchHotelSettings();
       loadOrders();
-      fetchDeliveredOrders();
     }
   }, [view, riderTab]);
 
@@ -197,14 +189,6 @@ export function RidersApp() {
           const data = await res.json();
           setKitchenOrders(deduplicateOrders(data));
         }
-      } else if (riderTab === 'delivered') {
-        const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}`, {
-          headers: { Authorization: `Bearer ${riderToken}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setDeliveredOrders(deduplicateOrders(data));
-        }
       } else if (riderTab === 'requested') {
         const res = await fetch(`${apiBase}/rider/requested-orders/${rider.id}`, {
           headers: { Authorization: `Bearer ${riderToken}` }
@@ -212,6 +196,22 @@ export function RidersApp() {
         if (res.ok) {
           const data = await res.json();
           setRequestedOrders(deduplicateOrders(data));
+        }
+      } else if (riderTab === 'deliveredCash') {
+        const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}/cash`, {
+          headers: { Authorization: `Bearer ${riderToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDeliveredCashOrders(deduplicateOrders(data));
+        }
+      } else if (riderTab === 'deliveredOnline') {
+        const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}/online`, {
+          headers: { Authorization: `Bearer ${riderToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDeliveredOnlineOrders(deduplicateOrders(data));
         }
       }
     } catch (error) {
@@ -323,7 +323,6 @@ export function RidersApp() {
         }
         notify(`Delivered ${paymentMethod === 'Cash' ? 'with cash' : 'online payment'} successfully`, 'success');
         await loadOrders();
-        await fetchDeliveredOrders();
       } else {
         notify('Unable to update delivered status. Try again.', 'error');
       }
@@ -374,43 +373,6 @@ export function RidersApp() {
     }
   };
 
-  const changeDeliveredOrderStatus = async (order, targetMethod) => {
-    const targetOrderId = order.originalOrder?.id || order.orderId || order.id;
-    const updatedOrder = order.originalOrder || order;
-    const paymentMethod = targetMethod === 'cash' ? 'Cash' : 'Online';
-    const paymentStatus = targetMethod === 'cash' ? 'Receive Cash Till' : 'May be Online';
-
-    try {
-      setLoading(true);
-      const res = await fetch(`${apiBase}/pos/orders/${targetOrderId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${riderToken}`
-        },
-        body: JSON.stringify({
-          ...updatedOrder,
-          paymentMethod,
-          paymentStatus,
-          status: 'Payment Collected'
-        })
-      });
-
-      if (res.ok) {
-        notify(`Marked order as ${paymentMethod} delivered.`, 'success');
-        await fetchDeliveredOrders();
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        notify(errorData.error || 'Unable to change delivered status.', 'error');
-      }
-    } catch (error) {
-      console.error('Error changing delivered order status:', error);
-      notify('Unable to change delivered status.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePrintOrder = (order) => {
     setSelectedOrder(order);
     window.setTimeout(() => {
@@ -419,7 +381,6 @@ export function RidersApp() {
     }, 250);
   };
 
-  const [deliveredFilter, setDeliveredFilter] = useState('cash');
   const riderRole = (rider?.role || '').toString().toLowerCase();
   const isAdminRider = riderRole === 'admin' || riderRole === 'admin rider' || riderRole.includes('admin');
   const pendingRequestOrderIds = requestedOrders.filter((request) => request.status === 'pending').map((request) => request.orderId);
@@ -428,18 +389,6 @@ export function RidersApp() {
     if (requestingIds.length === 0) return;
     setRequestingIds((ids) => ids.filter((id) => pendingRequestOrderIds.includes(id)));
   }, [pendingRequestOrderIds]);
-
-  const cashDeliveredOrders = deliveredOrders.filter((order) => {
-    const method = (order.paymentMethod || '').toString().toLowerCase();
-    const status = (order.paymentStatus || '').toString().toLowerCase();
-    return method === 'cash' || status.includes('cash');
-  });
-
-  const onlineDeliveredOrders = deliveredOrders.filter((order) => {
-    const method = (order.paymentMethod || '').toString().toLowerCase();
-    const status = (order.paymentStatus || '').toString().toLowerCase();
-    return method === 'online' || status.includes('online');
-  });
 
   const viewOrderSlip = (order) => {
     setSelectedOrder(order);
@@ -560,22 +509,22 @@ export function RidersApp() {
                 </div>
               </div>
               <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Delivered</p>
-                <div className="mt-3 flex items-center gap-3">
-                  <Check size={24} className="text-emerald-400" />
-                  <div>
-                    <p className="text-2xl font-semibold text-white">{deliveredOrders.length}</p>
-                    <p className="text-sm text-slate-500">Cash / Online</p>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Requests</p>
                 <div className="mt-3 flex items-center gap-3">
                   <HelpingHand size={24} className="text-violet-400" />
                   <div>
                     <p className="text-2xl font-semibold text-white">{requestedOrders.length}</p>
                     <p className="text-sm text-slate-500">Approval queue</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Delivered</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <CheckCircle size={24} className="text-emerald-400" />
+                  <div>
+                    <p className="text-2xl font-semibold text-white">{deliveredCashOrders.length + deliveredOnlineOrders.length}</p>
+                    <p className="text-sm text-slate-500">Total completed</p>
                   </div>
                 </div>
               </div>
@@ -795,74 +744,6 @@ export function RidersApp() {
           </div>
         )}
 
-        {riderTab === 'delivered' && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-3 mb-4">
-              <button
-                onClick={() => setDeliveredFilter('cash')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${deliveredFilter === 'cash' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
-              >
-                Cash
-              </button>
-              <button
-                onClick={() => setDeliveredFilter('online')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${deliveredFilter === 'online' ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
-              >
-                Online
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(deliveredFilter === 'cash' ? cashDeliveredOrders : onlineDeliveredOrders).length === 0 ? (
-                <p className="text-gray-500 col-span-full text-center py-8">
-                  No delivered orders in the {deliveredFilter === 'cash' ? 'Cash' : 'Online'} tab.
-                </p>
-              ) : (
-                (deliveredFilter === 'cash' ? cashDeliveredOrders : onlineDeliveredOrders).map((order) => {
-                  const displayOrder = order.originalOrder || order;
-                  const targetMethod = deliveredFilter === 'cash' ? 'Online' : 'Cash';
-                  return (
-                    <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-slate-200">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <p className="text-lg font-bold text-gray-900">Order #{displayOrder.id || order.id}</p>
-                          <p className="text-sm text-gray-600">{displayOrder.customerName || 'Customer'}</p>
-                          <p className="text-xs text-gray-500 mt-1">{displayOrder.address || displayOrder.deliveryAddress || 'No address'}</p>
-                        </div>
-                        <span className="bg-slate-100 text-slate-800 text-xs px-2 py-1 rounded">
-                          {order.paymentMethod || displayOrder.paymentMethod || 'Delivered'}
-                        </span>
-                      </div>
-
-                      <div className="bg-gray-50 p-3 rounded mb-3">
-                        <p className="text-sm text-gray-700"><strong>Items:</strong> {displayOrder.items?.length || 0}</p>
-                        <p className="text-sm text-gray-700"><strong>Total:</strong> {hotelSettings?.currency} {displayOrder.total || 0}</p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => changeDeliveredOrderStatus(order, targetMethod.toLowerCase())}
-                          disabled={loading}
-                          className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
-                        >
-                          {targetMethod === 'Online' ? 'Mark Online' : 'Mark Cash'}
-                        </button>
-                        <button
-                          onClick={() => viewOrderSlip(order)}
-                          className="bg-slate-700 hover:bg-slate-600 text-white py-2 px-3 rounded-2xl transition inline-flex items-center justify-center gap-2 shadow-md shadow-slate-950/20"
-                        >
-                          <Eye size={18} />
-                          Slip
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-
         {riderTab === 'requested' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {requestedOrders.length === 0 ? (
@@ -899,6 +780,142 @@ export function RidersApp() {
                     >
                       <Eye size={18} />
                       Order Slip
+                    </button>
+                    {isAdminRider && (
+                      <>
+                        <button
+                          onClick={() => handlePrintOrder(order)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
+                        >
+                          <ArrowUpRight size={18} />
+                          Print
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOrder(order)}
+                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
+                        >
+                          <Trash2 size={18} />
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {riderTab === 'deliveredCash' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {deliveredCashOrders.length === 0 ? (
+              <p className="text-gray-500 col-span-full text-center py-8">No cash delivery records</p>
+            ) : (
+              deliveredCashOrders.map((order) => (
+                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-emerald-200">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
+                      <p className="text-sm text-gray-600">
+                        {order.originalOrder?.customerName || 'Customer'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                      </p>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded flex items-center gap-1">
+                      <DollarSign size={12} />
+                      Delivered
+                    </span>
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded mb-3">
+                    <p className="text-sm text-gray-700">
+                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
+                    </p>
+                    <p className="text-sm text-emerald-700 mt-1">
+                      <strong>Payment:</strong> Cash Collected
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => viewOrderSlip(order)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
+                    >
+                      <Eye size={18} />
+                      View Slip
+                    </button>
+                    {isAdminRider && (
+                      <>
+                        <button
+                          onClick={() => handlePrintOrder(order)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
+                        >
+                          <ArrowUpRight size={18} />
+                          Print
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOrder(order)}
+                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
+                        >
+                          <Trash2 size={18} />
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {riderTab === 'deliveredOnline' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {deliveredOnlineOrders.length === 0 ? (
+              <p className="text-gray-500 col-span-full text-center py-8">No online payment delivery records</p>
+            ) : (
+              deliveredOnlineOrders.map((order) => (
+                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-blue-200">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
+                      <p className="text-sm text-gray-600">
+                        {order.originalOrder?.customerName || 'Customer'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                      </p>
+                    </div>
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center gap-1">
+                      <CreditCard size={12} />
+                      Delivered
+                    </span>
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded mb-3">
+                    <p className="text-sm text-gray-700">
+                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
+                    </p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      <strong>Payment:</strong> Online Payment
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => viewOrderSlip(order)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
+                    >
+                      <Eye size={18} />
+                      View Slip
                     </button>
                     {isAdminRider && (
                       <>

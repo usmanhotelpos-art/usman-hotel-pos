@@ -17,21 +17,6 @@ import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup
 const JWT_SECRET = process.env.JWT_SECRET || 'usman-hotel-secret';
 export const router = express.Router();
 
-// Simple SSE clients list for broadcasting order changes
-const sseClients = new Set();
-
-function sendSseEvent(eventName, data) {
-  const payload = typeof data === 'string' ? data : JSON.stringify(data);
-  for (const res of Array.from(sseClients)) {
-    try {
-      res.write(`event: ${eventName}\n`);
-      res.write(`data: ${payload}\n\n`);
-    } catch (err) {
-      // ignore individual client failures
-    }
-  }
-}
-
 // Basic API root for health check
 router.get('/', (req, res) => {
   res.send({ ok: true, message: 'Usman POS API' });
@@ -562,8 +547,6 @@ router.post('/pos/orders', (req, res) => {
     }
   });
 
-  // Broadcast orders change to SSE clients
-  try { sendSseEvent('orders', getCollection('pos_orders')); } catch (e) {}
   res.status(201).send(order);
 });
 
@@ -576,7 +559,6 @@ router.put('/pos/orders/:id/status', (req, res) => {
   if (!updated) {
     return res.status(404).send({ error: 'Order not found' });
   }
-  try { sendSseEvent('orders', getCollection('pos_orders')); } catch (e) {}
   res.send(updated);
 });
 
@@ -604,7 +586,6 @@ router.put('/pos/orders/:id/assign-rider', (req, res) => {
   }
 
   res.send(updated);
-  try { sendSseEvent('orders', getCollection('pos_orders')); } catch (e) {}
 });
 router.delete('/pos/orders/:id', (req, res) => {
   const userRole = (req.user.role || '').toLowerCase();
@@ -638,7 +619,6 @@ router.delete('/pos/orders/:id', (req, res) => {
   saveCollection('rider_orders', remainingRiderOrders);
 
   res.send({ success: true, message: 'Order deleted successfully' });
-  try { sendSseEvent('orders', getCollection('pos_orders')); } catch (e) {}
 });
 
 router.post('/admin/clear-rider-app', authenticate, (req, res) => {
@@ -702,21 +682,17 @@ router.put('/pos/orders/:id', (req, res) => {
     return res.status(404).send({ error: 'Order not found' });
   }
 
-  const isDelivered =
-    (paymentStatus || '').toLowerCase().includes('payment') ||
-    (status || '').toLowerCase().includes('payment') ||
-    (status || '').toLowerCase() === 'completed';
-  const riderOrders = getCollection('rider_orders') || [];
-  const matchedOrder = riderOrders.find((order) => order.orderId === req.params.id);
-  if (matchedOrder) {
-    updateRecord('rider_orders', matchedOrder.id, {
-      status: isDelivered ? 'completed' : matchedOrder.status,
-      originalOrder: updated,
-      updatedAt: new Date().toISOString()
-    });
+  if ((paymentStatus || '').toLowerCase().includes('payment') || (status || '').toLowerCase().includes('payment')) {
+    const riderOrders = getCollection('rider_orders') || [];
+    const matchedOrder = riderOrders.find((order) => order.orderId === req.params.id);
+    if (matchedOrder) {
+      updateRecord('rider_orders', matchedOrder.id, {
+        status: 'completed',
+        updatedAt: new Date().toISOString()
+      });
+    }
   }
 
-  try { sendSseEvent('orders', getCollection('pos_orders')); } catch (e) {}
   res.send(updated);
 });
 
@@ -734,37 +710,7 @@ router.post('/pos/payments', (req, res) => {
     });
   }
 
-  try { sendSseEvent('orders', getCollection('pos_orders')); } catch (e) {}
   res.status(201).send(created);
-});
-
-// Server-Sent Events endpoint for realtime order updates
-router.get('/events', (req, res) => {
-  // Simple auth: allow token via query param or Authorization header
-  const token = req.query.token || (req.headers.authorization || '').startsWith('Bearer ') ? (req.headers.authorization || '').slice(7) : null;
-  if (token) {
-    try {
-      req.user = jwt.verify(token, JWT_SECRET);
-    } catch (err) {
-      // ignore invalid token and proceed as guest
-    }
-  }
-
-  res.writeHead(200, {
-    Connection: 'keep-alive',
-    'Cache-Control': 'no-cache',
-    'Content-Type': 'text/event-stream'
-  });
-
-  // send initial payload
-  res.write(`event: orders\n`);
-  res.write(`data: ${JSON.stringify(getCollection('pos_orders'))}\n\n`);
-
-  sseClients.add(res);
-
-  req.on('close', () => {
-    sseClients.delete(res);
-  });
 });
 
 router.get('/search/:collection', (req, res) => {
@@ -867,26 +813,6 @@ router.get('/rider/approved-orders/:riderId', authenticate, (req, res) => {
   res.send(orders);
 });
 
-router.get('/rider/delivered-orders/:riderId', authenticate, (req, res) => {
-  const userRole = (req.user.role || '').toLowerCase();
-  const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
-  const riders = getCollection('riders') || [];
-  const rider = riders.find((r) => r.id === req.params.riderId);
-  const riderName = (rider?.name || '').toLowerCase();
-  const posOrders = getCollection('pos_orders') || [];
-
-  const delivered = posOrders.filter((order) => {
-    const status = (order.status || '').toLowerCase();
-    const paymentMethod = (order.paymentMethod || '').toLowerCase();
-    const deliveredStatus = status.includes('payment') || status === 'completed';
-    if (!deliveredStatus) return false;
-    if (isAdminRider) return true;
-    return (order.deliveryAgent || '').toLowerCase() === riderName;
-  });
-
-  res.send(delivered);
-});
-
 router.get('/rider/requested-orders/:riderId', authenticate, (req, res) => {
   const userRole = (req.user.role || '').toLowerCase();
   const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
@@ -907,6 +833,71 @@ router.get('/rider/requested-orders/:riderId', authenticate, (req, res) => {
   }));
 
   res.send(requestedWithOrders);
+});
+
+router.get('/rider/delivered-orders/:riderId/:paymentMethod', authenticate, (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
+  const paymentMethod = req.params.paymentMethod; // 'cash' or 'online'
+  
+  const posOrders = getCollection('pos_orders') || [];
+  const riders = getCollection('riders') || [];
+  const rider = riders.find((r) => r.id === req.params.riderId);
+  
+  const deliveredOrders = [];
+  if (rider || isAdminRider) {
+    const riderName = rider ? (rider.name || '').toLowerCase() : null;
+    posOrders.forEach((po) => {
+      if ((po.status || '').toLowerCase() === 'payment collected') {
+        const matchesPayment = paymentMethod.toLowerCase() === 'cash' 
+          ? (po.paymentMethod || '').toLowerCase() === 'cash'
+          : paymentMethod.toLowerCase() === 'online'
+          ? (po.paymentMethod || '').toLowerCase() === 'online'
+          : true;
+        
+        if (matchesPayment && (isAdminRider || (riderName && (po.deliveryAgent || '').toLowerCase() === riderName))) {
+          deliveredOrders.push({
+            id: po.id,
+            riderId: req.params.riderId,
+            originalOrder: po,
+            status: po.status,
+            paymentMethod: po.paymentMethod
+          });
+        }
+      }
+    });
+  }
+  
+  res.send(deliveredOrders);
+});
+
+router.get('/rider/delivered-orders/:riderId', authenticate, (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
+  
+  const posOrders = getCollection('pos_orders') || [];
+  const riders = getCollection('riders') || [];
+  const rider = riders.find((r) => r.id === req.params.riderId);
+  
+  const deliveredOrders = [];
+  if (rider || isAdminRider) {
+    const riderName = rider ? (rider.name || '').toLowerCase() : null;
+    posOrders.forEach((po) => {
+      if ((po.status || '').toLowerCase() === 'payment collected') {
+        if (isAdminRider || (riderName && (po.deliveryAgent || '').toLowerCase() === riderName)) {
+          deliveredOrders.push({
+            id: po.id,
+            riderId: req.params.riderId,
+            originalOrder: po,
+            status: po.status,
+            paymentMethod: po.paymentMethod
+          });
+        }
+      }
+    });
+  }
+  
+  res.send(deliveredOrders);
 });
 
 router.post('/rider/request-approval', authenticate, (req, res) => {

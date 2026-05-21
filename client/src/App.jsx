@@ -2982,28 +2982,34 @@ function App() {
     return fee;
   };
 
-  const riderBookAssignedOrders = posOrders.filter((order) => order.deliveryAgent);
+  const riderBookAssignedOrders = posOrders.filter((order) => order.deliveryAgent || (String(order.status || '').toLowerCase() === 'payment collected'));
   const riderBookFilteredByRider = riderBookFilterRider
-    ? riderBookAssignedOrders.filter((order) => order.deliveryAgent === riderBookFilterRider)
+    ? riderBookAssignedOrders.filter((order) => {
+        if (String(order.status || '').toLowerCase() === 'payment collected') {
+          return order.deliveryAgent === riderBookFilterRider;
+        }
+        return order.deliveryAgent === riderBookFilterRider;
+      })
     : riderBookAssignedOrders;
   const riderBookFilteredBySubTab = riderBookFilteredByRider.filter((order) => {
     const paymentStatus = String(order.paymentStatus || '').toLowerCase();
     const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+    const orderStatus = String(order.status || '').toLowerCase();
 
     if (riderBookSubTab === 'cash') {
-      return paymentStatus === 'receive cash till' || paymentStatus === 'cash' || paymentMethod === 'cash';
+      return paymentStatus === 'receive cash till' || paymentStatus === 'cash' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
     }
     if (riderBookSubTab === 'online') {
-      return paymentStatus === 'may be online' || paymentStatus === 'online' || paymentMethod === 'online';
+      return paymentStatus === 'may be online' || paymentStatus === 'online' || paymentMethod === 'online' || (orderStatus === 'payment collected' && paymentMethod === 'online');
     }
     if (riderBookSubTab === 'counter') {
       return paymentStatus === 'paid to cash on counter';
     }
     if (riderBookSubTab === 'pending') {
-      return String(order.status || '').toLowerCase() === 'payment pending';
+      return orderStatus === 'payment pending';
     }
     if (riderBookSubTab === 'paid') {
-      return paymentStatus === 'paid' || String(order.status || '').toLowerCase() === 'completed';
+      return paymentStatus === 'paid' || orderStatus === 'completed';
     }
     return true;
   });
