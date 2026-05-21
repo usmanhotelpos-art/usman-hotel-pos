@@ -58,7 +58,7 @@ const defaultData = {
   staff: [
     { id: 's1', name: 'Ayesha', role: 'Receptionist', phone: '+923001234567', status: 'active' },
     { id: 's2', name: 'Usman', role: 'Manager', phone: '+923009876543', status: 'active' },
-    { id: 's3', name: 'Admin Rider', role: 'Biker', phone: '+923001222333', status: 'active', otherName: '', username: 'adminrider@rider.com', password: 'adminriderpass', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'adminrider1' }
+    { id: 's4', name: 'Ahmed Rider', role: 'Admin Rider', phone: '+923001234567', status: 'active', otherName: '', username: 'ahmed@rider.com', password: 'riderpass1', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'rider1' }
   ],
   sales: [
     { id: 'sale1', description: 'Room 102 payment', amount: 20800, date: '2026-05-05' }
@@ -172,9 +172,8 @@ const defaultData = {
   pos_customers: [],
   pos_payments: [],
   riders: [
-    { id: 'rider1', name: 'Ahmed Rider', phone: '+923001234567', email: 'ahmed@rider.com', role: 'Rider', status: 'active', passwordHash: null },
-    { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null },
-    { id: 'adminrider1', name: 'Admin Rider', phone: '+923001222333', email: 'adminrider@rider.com', role: 'Admin Rider', status: 'active', passwordHash: '$2a$10$zHAic7WcWCv8LTu2P9BPgeN38oHUgH47lznluzm8OZtG6ljdnoJJ6', rawPassword: 'adminriderpass' }
+    { id: 'rider1', name: 'Ahmed Rider', phone: '+923001234567', email: 'ahmed@rider.com', username: 'ahmed@rider.com', role: 'Admin Rider', status: 'active', passwordHash: bcrypt.hashSync('riderpass1', 10), rawPassword: 'riderpass1' },
+    { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null }
   ],
   rider_orders: [],
   rider_order_requests: []

@@ -3567,6 +3567,7 @@ function App() {
             }
           } else if (payload.password) {
             try {
+              const riderRole = payload.username?.toLowerCase() === 'ahmed@rider.com' ? payload.role : 'Rider';
               const riderResp = await fetchJson(`${apiBase}/riders/create`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -3574,7 +3575,7 @@ function App() {
                   phone: payload.phone,
                   email: payload.username,
                   password: payload.password,
-                  role: payload.role
+                  role: riderRole
                 })
               });
               await fetchJson(`${apiBase}/staff/${updated.id}`, {
@@ -3598,6 +3599,7 @@ function App() {
         // If new staff is a Biker with login enabled, create a rider account and link
         if ((payload.role === 'Biker' || payload.role === 'Admin Rider') && payload.loginEnabled) {
           try {
+            const riderRole = payload.username?.toLowerCase() === 'ahmed@rider.com' ? payload.role : 'Rider';
             const riderResp = await fetchJson(`${apiBase}/riders/create`, {
               method: 'POST',
               body: JSON.stringify({
@@ -3605,7 +3607,7 @@ function App() {
                 phone: payload.phone,
                 email: payload.username,
                 password: payload.password,
-                role: payload.role
+                role: riderRole
               })
             });
             // update staff record to include riderId

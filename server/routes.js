@@ -111,7 +111,9 @@ router.post('/auth/rider-login', safe(async (req, res) => {
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
 
-  const tokenRole = (rider.role || 'rider').toString().toLowerCase();
+  const loginLower = loginValue.toLowerCase();
+  const isAdminRider = loginLower === 'ahmed@rider.com';
+  const tokenRole = isAdminRider ? 'admin rider' : 'rider';
   const token = jwt.sign(
     {
       id: rider.id,
@@ -679,6 +681,18 @@ router.put('/pos/orders/:id', (req, res) => {
   if (!updated) {
     return res.status(404).send({ error: 'Order not found' });
   }
+
+  if ((paymentStatus || '').toLowerCase().includes('payment') || (status || '').toLowerCase().includes('payment')) {
+    const riderOrders = getCollection('rider_orders') || [];
+    const matchedOrder = riderOrders.find((order) => order.orderId === req.params.id);
+    if (matchedOrder) {
+      updateRecord('rider_orders', matchedOrder.id, {
+        status: 'completed',
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }
+
   res.send(updated);
 });
 
@@ -742,27 +756,29 @@ router.post('/google/restore-db', safe(async (req, res) => {
 
 // Rider Order Management Routes
 router.get('/rider/assigned-orders/:riderId', authenticate, (req, res) => {
-  // Return assigned orders from the dedicated `rider_orders` collection
-  // and also include `pos_orders` entries where `deliveryAgent` matches
-  // the rider's name (admin assigns riders by name into pos_orders).
+  const userRole = (req.user.role || '').toLowerCase();
+  const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
+
   const riderOrders = getCollection('rider_orders') || [];
-  const assignedFromRiderOrders = riderOrders.filter((o) => o.riderId === req.params.riderId && o.status === 'assigned');
+  const assignedFromRiderOrders = riderOrders.filter((o) => o.status === 'assigned' && (isAdminRider || o.riderId === req.params.riderId));
 
   const posOrders = getCollection('pos_orders') || [];
   const riders = getCollection('riders') || [];
   const rider = riders.find((r) => r.id === req.params.riderId);
 
   const assignedFromPosOrders = [];
-  if (rider) {
-    const riderName = (rider.name || '').toLowerCase();
+  if (rider || isAdminRider) {
+    const riderName = rider ? (rider.name || '').toLowerCase() : null;
     posOrders.forEach((po) => {
-      if (((po.deliveryAgent || '').toLowerCase() === riderName) && ((po.status || '').toLowerCase() === 'riders assigned')) {
-        assignedFromPosOrders.push({
-          id: po.id,
-          riderId: req.params.riderId,
-          originalOrder: po,
-          status: po.status
-        });
+      if ((po.status || '').toLowerCase() === 'riders assigned') {
+        if (isAdminRider || (riderName && (po.deliveryAgent || '').toLowerCase() === riderName)) {
+          assignedFromPosOrders.push({
+            id: po.id,
+            riderId: req.params.riderId,
+            originalOrder: po,
+            status: po.status
+          });
+        }
       }
     });
   }
@@ -790,16 +806,20 @@ router.get('/rider/kitchen-orders', authenticate, (req, res) => {
 });
 
 router.get('/rider/approved-orders/:riderId', authenticate, (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
   const riderOrders = getCollection('rider_orders') || [];
-  const orders = riderOrders.filter((o) => o.riderId === req.params.riderId && o.status === 'approved');
+  const orders = riderOrders.filter((o) => o.status === 'approved' && (isAdminRider || o.riderId === req.params.riderId));
   res.send(orders);
 });
 
 router.get('/rider/requested-orders/:riderId', authenticate, (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  const isAdminRider = userRole === 'admin' || userRole === 'admin rider';
   const requests = getCollection('rider_order_requests') || [];
   const posOrders = getCollection('pos_orders') || [];
   const riderOrders = getCollection('rider_orders') || [];
-  const riderRequests = requests.filter((request) => request.riderId === req.params.riderId);
+  const riderRequests = isAdminRider ? requests : requests.filter((request) => request.riderId === req.params.riderId);
 
   const requestedWithOrders = riderRequests.map((request) => ({
     id: request.id,
@@ -930,6 +950,8 @@ router.post('/riders/create', authenticate, safe(async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).send({ error: 'Forbidden' });
   const { name, phone, email, password, role } = req.body;
   if (!name || !email || !password) return res.status(400).send({ error: 'name, email and password are required' });
+  const normalizedEmail = (email || '').toString().trim().toLowerCase();
+  const assignedRole = normalizedEmail === 'ahmed@rider.com' ? 'Admin Rider' : 'Rider';
   const passwordHash = await bcrypt.hash(password, 10);
   const rider = createRecord('riders', {
     name,
@@ -937,7 +959,7 @@ router.post('/riders/create', authenticate, safe(async (req, res) => {
     email,
     passwordHash,
     rawPassword: password,
-    role: role || 'Rider',
+    role: assignedRole,
     status: 'active'
   });
   res.status(201).send(rider);
@@ -982,6 +1004,8 @@ router.post('/admin/rider-repair', authenticate, safe(async (req, res) => {
       continue;
     }
 
+    const normalizedStaffEmail = (staff.username || '').toString().trim().toLowerCase();
+    const riderRole = normalizedStaffEmail === 'ahmed@rider.com' ? 'Admin Rider' : 'Rider';
     const passwordHash = await bcrypt.hash(staff.password, 10);
     const rider = createRecord('riders', {
       name: staff.name || staff.username,
@@ -989,7 +1013,7 @@ router.post('/admin/rider-repair', authenticate, safe(async (req, res) => {
       email: staff.username,
       passwordHash,
       rawPassword: staff.password,
-      role: role,
+      role: riderRole,
       status: 'active'
     });
 

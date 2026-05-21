@@ -7,3 +7,4 @@ yarn-error.log*
 client/dist/
 server/node_modules/
 client/node_modules/
+server/data/*.bak

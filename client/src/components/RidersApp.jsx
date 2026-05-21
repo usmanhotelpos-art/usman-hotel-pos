@@ -352,7 +352,7 @@ export function RidersApp() {
       }
       notify('Order picked up. Move to assigned delivery list.', 'success');
       setRiderTab('assigned');
-      await loadOrders();
+      // Load the assigned tab after the tab state changes via effect
     } catch (error) {
       console.error('Error picking up order:', error);
       notify('Could not pickup order. Check connection.', 'error');
