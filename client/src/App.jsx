@@ -116,6 +116,8 @@ function App() {
   const [activeMashallahSlot, setActiveMashallahSlot] = useState(null);
   const [showMashallahSelector, setShowMashallahSelector] = useState(false);
   const [mashallahSearch, setMashallahSearch] = useState('');
+  const eventSourceRef = useRef(null);
+  const pollingRef = useRef(null);
 
   const normalizeText = (value) => String(value || '').trim().toLowerCase();
   const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
@@ -944,6 +946,57 @@ function App() {
       setLoading(false);
     }
   }
+
+  // Realtime: try Server-Sent Events (SSE) and fallback to polling every 7s
+  useEffect(() => {
+    const startSse = () => {
+      if (typeof window === 'undefined' || !window.EventSource) return false;
+      const url = token ? `${apiBase}/events?token=${token}` : `${apiBase}/events`;
+      try {
+        const es = new EventSource(url);
+        eventSourceRef.current = es;
+        es.addEventListener('orders', (e) => {
+          try {
+            const data = JSON.parse(e.data || '[]');
+            setPosOrders(Array.isArray(data) ? data : data || []);
+          } catch (err) {
+            console.warn('Failed to parse SSE orders payload', err);
+          }
+        });
+        es.onopen = () => {
+          console.debug('SSE connected to', url);
+        };
+        es.onerror = (err) => {
+          console.warn('SSE error, falling back to polling', err);
+          try { es.close(); } catch (e) {}
+          eventSourceRef.current = null;
+        };
+        return true;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    // start SSE if possible
+    startSse();
+
+    // polling fallback to ensure updates even if SSE unsupported
+    const intervalMs = 7000;
+    pollingRef.current = setInterval(() => {
+      loadOrdersData();
+    }, intervalMs);
+
+    return () => {
+      if (eventSourceRef.current) {
+        try { eventSourceRef.current.close(); } catch (e) {}
+        eventSourceRef.current = null;
+      }
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [token]);
 
   async function approveRiderRequest(requestId) {
     if (!confirm('Approve this rider request?')) return;
