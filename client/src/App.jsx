@@ -10,7 +10,7 @@ const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory',
 
 function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
-  const isMobileRiderRoute = initialPath === '/rider' || initialPath === '/rider-app';
+  const isMobileRiderRoute = initialPath.startsWith('/rider');
   const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : 'dashboard');
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState(null);
