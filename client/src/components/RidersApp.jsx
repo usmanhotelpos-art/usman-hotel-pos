@@ -36,6 +36,7 @@ export function RidersApp() {
   const [rider, setRider] = useState(null);
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [kitchenOrders, setKitchenOrders] = useState([]);
+  const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [requestedOrders, setRequestedOrders] = useState([]);
   const [requestingIds, setRequestingIds] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -58,6 +59,13 @@ export function RidersApp() {
       subtitle: 'Request approval',
       icon: ShoppingBag,
       accent: 'from-sky-500 to-cyan-500'
+    },
+    {
+      key: 'delivered',
+      label: 'Delivered',
+      subtitle: 'Cash / Online',
+      icon: Check,
+      accent: 'from-emerald-500 to-lime-500'
     },
     {
       key: 'requested',
@@ -134,6 +142,21 @@ export function RidersApp() {
     }
   };
 
+  const fetchDeliveredOrders = async () => {
+    if (!rider?.id) return;
+    try {
+      const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}`, {
+        headers: { Authorization: `Bearer ${riderToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDeliveredOrders(deduplicateOrders(data));
+      }
+    } catch (error) {
+      console.error('Failed to fetch delivered orders:', error);
+    }
+  };
+
   const deduplicateOrders = (orders) => {
     const seen = new Set();
     return orders.filter(order => {
@@ -148,6 +171,7 @@ export function RidersApp() {
     if (view === 'app') {
       fetchHotelSettings();
       loadOrders();
+      fetchDeliveredOrders();
     }
   }, [view, riderTab]);
 
@@ -172,6 +196,14 @@ export function RidersApp() {
         if (res.ok) {
           const data = await res.json();
           setKitchenOrders(deduplicateOrders(data));
+        }
+      } else if (riderTab === 'delivered') {
+        const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}`, {
+          headers: { Authorization: `Bearer ${riderToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDeliveredOrders(deduplicateOrders(data));
         }
       } else if (riderTab === 'requested') {
         const res = await fetch(`${apiBase}/rider/requested-orders/${rider.id}`, {
@@ -291,6 +323,7 @@ export function RidersApp() {
         }
         notify(`Delivered ${paymentMethod === 'Cash' ? 'with cash' : 'online payment'} successfully`, 'success');
         await loadOrders();
+        await fetchDeliveredOrders();
       } else {
         notify('Unable to update delivered status. Try again.', 'error');
       }
@@ -341,6 +374,43 @@ export function RidersApp() {
     }
   };
 
+  const changeDeliveredOrderStatus = async (order, targetMethod) => {
+    const targetOrderId = order.originalOrder?.id || order.orderId || order.id;
+    const updatedOrder = order.originalOrder || order;
+    const paymentMethod = targetMethod === 'cash' ? 'Cash' : 'Online';
+    const paymentStatus = targetMethod === 'cash' ? 'Receive Cash Till' : 'May be Online';
+
+    try {
+      setLoading(true);
+      const res = await fetch(`${apiBase}/pos/orders/${targetOrderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${riderToken}`
+        },
+        body: JSON.stringify({
+          ...updatedOrder,
+          paymentMethod,
+          paymentStatus,
+          status: 'Payment Collected'
+        })
+      });
+
+      if (res.ok) {
+        notify(`Marked order as ${paymentMethod} delivered.`, 'success');
+        await fetchDeliveredOrders();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        notify(errorData.error || 'Unable to change delivered status.', 'error');
+      }
+    } catch (error) {
+      console.error('Error changing delivered order status:', error);
+      notify('Unable to change delivered status.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePrintOrder = (order) => {
     setSelectedOrder(order);
     window.setTimeout(() => {
@@ -349,6 +419,7 @@ export function RidersApp() {
     }, 250);
   };
 
+  const [deliveredFilter, setDeliveredFilter] = useState('cash');
   const riderRole = (rider?.role || '').toString().toLowerCase();
   const isAdminRider = riderRole === 'admin' || riderRole === 'admin rider' || riderRole.includes('admin');
   const pendingRequestOrderIds = requestedOrders.filter((request) => request.status === 'pending').map((request) => request.orderId);
@@ -357,6 +428,18 @@ export function RidersApp() {
     if (requestingIds.length === 0) return;
     setRequestingIds((ids) => ids.filter((id) => pendingRequestOrderIds.includes(id)));
   }, [pendingRequestOrderIds]);
+
+  const cashDeliveredOrders = deliveredOrders.filter((order) => {
+    const method = (order.paymentMethod || '').toString().toLowerCase();
+    const status = (order.paymentStatus || '').toString().toLowerCase();
+    return method === 'cash' || status.includes('cash');
+  });
+
+  const onlineDeliveredOrders = deliveredOrders.filter((order) => {
+    const method = (order.paymentMethod || '').toString().toLowerCase();
+    const status = (order.paymentStatus || '').toString().toLowerCase();
+    return method === 'online' || status.includes('online');
+  });
 
   const viewOrderSlip = (order) => {
     setSelectedOrder(order);
@@ -473,6 +556,16 @@ export function RidersApp() {
                   <div>
                     <p className="text-2xl font-semibold text-white">{assignedOrders.length}</p>
                     <p className="text-sm text-slate-500">Ready to deliver</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Delivered</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <Check size={24} className="text-emerald-400" />
+                  <div>
+                    <p className="text-2xl font-semibold text-white">{deliveredOrders.length}</p>
+                    <p className="text-sm text-slate-500">Cash / Online</p>
                   </div>
                 </div>
               </div>
@@ -699,6 +792,74 @@ export function RidersApp() {
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {riderTab === 'delivered' && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 mb-4">
+              <button
+                onClick={() => setDeliveredFilter('cash')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${deliveredFilter === 'cash' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+              >
+                Cash
+              </button>
+              <button
+                onClick={() => setDeliveredFilter('online')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${deliveredFilter === 'online' ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+              >
+                Online
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(deliveredFilter === 'cash' ? cashDeliveredOrders : onlineDeliveredOrders).length === 0 ? (
+                <p className="text-gray-500 col-span-full text-center py-8">
+                  No delivered orders in the {deliveredFilter === 'cash' ? 'Cash' : 'Online'} tab.
+                </p>
+              ) : (
+                (deliveredFilter === 'cash' ? cashDeliveredOrders : onlineDeliveredOrders).map((order) => {
+                  const displayOrder = order.originalOrder || order;
+                  const targetMethod = deliveredFilter === 'cash' ? 'Online' : 'Cash';
+                  return (
+                    <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-slate-200">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-lg font-bold text-gray-900">Order #{displayOrder.id || order.id}</p>
+                          <p className="text-sm text-gray-600">{displayOrder.customerName || 'Customer'}</p>
+                          <p className="text-xs text-gray-500 mt-1">{displayOrder.address || displayOrder.deliveryAddress || 'No address'}</p>
+                        </div>
+                        <span className="bg-slate-100 text-slate-800 text-xs px-2 py-1 rounded">
+                          {order.paymentMethod || displayOrder.paymentMethod || 'Delivered'}
+                        </span>
+                      </div>
+
+                      <div className="bg-gray-50 p-3 rounded mb-3">
+                        <p className="text-sm text-gray-700"><strong>Items:</strong> {displayOrder.items?.length || 0}</p>
+                        <p className="text-sm text-gray-700"><strong>Total:</strong> {hotelSettings?.currency} {displayOrder.total || 0}</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => changeDeliveredOrderStatus(order, targetMethod.toLowerCase())}
+                          disabled={loading}
+                          className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
+                        >
+                          {targetMethod === 'Online' ? 'Mark Online' : 'Mark Cash'}
+                        </button>
+                        <button
+                          onClick={() => viewOrderSlip(order)}
+                          className="bg-slate-700 hover:bg-slate-600 text-white py-2 px-3 rounded-2xl transition inline-flex items-center justify-center gap-2 shadow-md shadow-slate-950/20"
+                        >
+                          <Eye size={18} />
+                          Slip
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
 
