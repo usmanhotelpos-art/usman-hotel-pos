@@ -312,7 +312,8 @@ export function RidersApp() {
           ...existing,
           status: 'Payment Collected',
           paymentMethod,
-          paymentStatus
+          paymentStatus,
+          deliveryAgent: rider?.name
         })
       });
 

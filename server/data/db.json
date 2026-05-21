@@ -4,7 +4,7 @@
     "currency": "PKR",
     "location": "Karachi",
     "taxRate": 0.18,
-    "tokenSlipNextNumber": 8
+    "tokenSlipNextNumber": 9
   },
   "rooms": [
     {
@@ -584,10 +584,10 @@
       "name": "سادہ روٹی",
       "category": "نان اور روٹی",
       "price": 14,
-      "availableStock": 80,
+      "availableStock": 76,
       "image": "",
       "description": "تازہ سادہ روٹی۔",
-      "updatedAt": "2026-05-21T14:09:54.769Z"
+      "updatedAt": "2026-05-21T14:39:21.082Z"
     },
     {
       "id": "p44",
@@ -987,6 +987,42 @@
       "total": 140.162,
       "status": "Payment Collected",
       "customerId": "b442fc7f-3686-4224-93e3-254121c7acd4"
+    },
+    {
+      "id": "c4f24a36-ad90-4dfe-819f-695821d921dc",
+      "createdAt": "2026-05-21T14:39:21.080Z",
+      "updatedAt": "2026-05-21T14:39:35.903Z",
+      "orderNumber": "ORD-361080",
+      "orderType": "Delivery",
+      "customerName": "",
+      "phone": "",
+      "address": "xczzczxczxzcx",
+      "tableNumber": "",
+      "deliveryAgent": "",
+      "deliveryFee": 50,
+      "discount": 0,
+      "taxPercent": 0.18,
+      "serviceCharge": 0,
+      "paymentMethod": "Online",
+      "paymentStatus": "May be Online",
+      "notes": "",
+      "items": [
+        {
+          "productId": "p43",
+          "name": "سادہ روٹی",
+          "price": 14,
+          "quantity": 4,
+          "notes": "",
+          "weight": "",
+          "flavor": "",
+          "total": 56
+        }
+      ],
+      "serviceType": "Standard Delivery",
+      "subtotal": 56,
+      "total": 106.10079999999999,
+      "status": "Payment Collected",
+      "customerId": "26710336-25b4-412c-b702-b9fb010e6654"
     }
   ],
   "pos_customers": [
@@ -1060,6 +1096,15 @@
       "phone": "",
       "address": "test987",
       "lastOrderNumber": "ORD-277851"
+    },
+    {
+      "id": "26710336-25b4-412c-b702-b9fb010e6654",
+      "createdAt": "2026-05-21T14:39:17.884Z",
+      "updatedAt": "2026-05-21T14:39:17.884Z",
+      "name": "",
+      "phone": "",
+      "address": "xczzczxczxzcx",
+      "lastOrderNumber": "ORD-361080"
     }
   ],
   "pos_payments": [],
@@ -1309,6 +1354,50 @@
         "customerId": "b442fc7f-3686-4224-93e3-254121c7acd4"
       },
       "status": "completed"
+    },
+    {
+      "id": "06ecfa9b-273f-48b2-a94d-54d33bddbaa1",
+      "createdAt": "2026-05-21T14:39:24.704Z",
+      "updatedAt": "2026-05-21T14:39:36.072Z",
+      "orderId": "c4f24a36-ad90-4dfe-819f-695821d921dc",
+      "riderId": "rider1",
+      "originalOrder": {
+        "id": "c4f24a36-ad90-4dfe-819f-695821d921dc",
+        "createdAt": "2026-05-21T14:39:21.080Z",
+        "updatedAt": "2026-05-21T14:39:21.080Z",
+        "orderNumber": "ORD-361080",
+        "orderType": "Delivery",
+        "customerName": "",
+        "phone": "",
+        "address": "xczzczxczxzcx",
+        "tableNumber": "",
+        "deliveryAgent": "",
+        "deliveryFee": 50,
+        "discount": 0,
+        "taxPercent": 0.18,
+        "serviceCharge": 0,
+        "paymentMethod": "",
+        "paymentStatus": "Receive Cash Till",
+        "notes": "",
+        "items": [
+          {
+            "productId": "p43",
+            "name": "سادہ روٹی",
+            "price": 14,
+            "quantity": 4,
+            "notes": "",
+            "weight": "",
+            "flavor": "",
+            "total": 56
+          }
+        ],
+        "serviceType": "Standard Delivery",
+        "subtotal": 56,
+        "total": 106.10079999999999,
+        "status": "Kitchen",
+        "customerId": "26710336-25b4-412c-b702-b9fb010e6654"
+      },
+      "status": "completed"
     }
   ],
   "rider_order_requests": [
@@ -1347,6 +1436,15 @@
       "riderId": "rider1",
       "status": "approved",
       "requestedAt": "2026-05-21T14:21:22.638Z"
+    },
+    {
+      "id": "a4d11bea-dba9-4769-bd4b-ff6c6ee108bc",
+      "createdAt": "2026-05-21T14:39:24.706Z",
+      "updatedAt": "2026-05-21T14:39:29.234Z",
+      "orderId": "c4f24a36-ad90-4dfe-819f-695821d921dc",
+      "riderId": "rider1",
+      "status": "approved",
+      "requestedAt": "2026-05-21T14:39:24.706Z"
     }
   ]
 }
