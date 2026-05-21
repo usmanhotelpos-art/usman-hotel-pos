@@ -382,8 +382,20 @@ export function RidersApp() {
     }, 250);
   };
 
-  const riderRole = (rider?.role || '').toString().toLowerCase();
-  const isAdminRider = riderRole === 'admin' || riderRole === 'admin rider' || riderRole.includes('admin');
+  const decodeRiderRoleFromToken = (token) => {
+    if (!token) return '';
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return '';
+      const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+      return (decoded.role || '').toString().toLowerCase();
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const riderRole = (rider?.role || '').toString().toLowerCase() || decodeRiderRoleFromToken(riderToken);
+  const isAdminRider = riderRole.includes('admin');
   const pendingRequestOrderIds = requestedOrders.filter((request) => request.status === 'pending').map((request) => request.orderId);
 
   useEffect(() => {
