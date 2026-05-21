@@ -9,7 +9,9 @@ const apiBase = envApiBase
 const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'settings'];
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+  const isMobileRiderRoute = initialPath === '/rider' || initialPath === '/rider-app';
+  const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : 'dashboard');
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState(null);
   const [items, setItems] = useState([]);
@@ -7129,6 +7131,14 @@ function App() {
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (isMobileRiderRoute) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <RidersApp />
       </div>
     );
   }
