@@ -1104,14 +1104,14 @@ function OrderCard({ order, onViewSlip, status, actions = [], extraActions = [] 
         </div>
       )}
       {extraActions.length > 0 && (
-        <div className="mt-3 grid gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {extraActions.map((action) => {
             const ActionIcon = action.icon;
             return (
               <button
                 key={action.label}
                 onClick={action.onClick}
-                className={`w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-semibold transition ${action.variant === 'danger' ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20'}`}
+                className={`inline-flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-semibold transition ${action.variant === 'danger' ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-500/20' : 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg shadow-cyan-500/20'}`}
               >
                 {ActionIcon ? <ActionIcon size={18} /> : null}
                 {action.label}
