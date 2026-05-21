@@ -86,6 +86,25 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('posToken') || '');
   const [user, setUser] = useState(null);
   const [authForm, setAuthForm] = useState({ email: 'admin@usmanhotel.com', password: '' });
+
+  const copyRiderAppLink = async () => {
+    const link = `${window.location.origin}/rider`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setMessage(`Rider app link copied to clipboard: ${link}`);
+    } catch (error) {
+      setMessage(`Unable to copy rider link. Use: ${link}`);
+    }
+  };
   const [posCategories, setPosCategories] = useState([]);
   const [posProducts, setPosProducts] = useState([]);
   const [posTables, setPosTables] = useState([]);
@@ -7212,6 +7231,9 @@ function App() {
               </button>
               <button type="button" onClick={() => setActiveTab('pos')} className={`top-header-icon relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-indigo-500 to-emerald-400 text-white shadow-[0_12px_30px_rgba(59,130,246,0.45)] transition-transform duration-300 hover:-translate-y-1 focus:outline-none ${activeTab === 'pos' ? 'ring-4 ring-emerald-500/30' : ''}`}>
                 <span className="relative z-10 text-2xl">🛒</span>
+              </button>
+              <button onClick={copyRiderAppLink} className="rounded-full border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/20 transition">
+                Copy Rider Link
               </button>
               <button onClick={() => setDarkMode((prev) => !prev)} className={`rounded-full border px-4 py-3 text-sm font-semibold transition ${darkMode ? 'border-slate-600 bg-slate-900 text-slate-100 hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-100'}`}>
                 {darkMode ? 'Light Mode' : 'Dark Mode'}
