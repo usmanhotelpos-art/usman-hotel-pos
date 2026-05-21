@@ -946,89 +946,110 @@ export function RidersApp() {
 
       {/* Order Slip Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-96 overflow-y-auto p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Order Slip</h2>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-950 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 border border-cyan-500/50 shadow-2xl shadow-cyan-500/30 relative">
+            {/* Glowing top accent */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent blur-lg opacity-60"></div>
+            
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-extrabold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Order Slip</h2>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20 rounded-full p-2 transition text-2xl"
               >
                 ✕
               </button>
             </div>
 
-            <div className="border-t pt-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-sm text-gray-600">Order ID</p>
-                  <p className="text-lg font-bold">{selectedOrder.originalOrder?.id || selectedOrder.id}</p>
+            <div className="border-t border-cyan-500/30 pt-6">
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
+                  <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Order ID</p>
+                  <p className="text-xl font-bold text-white">{selectedOrder.originalOrder?.id || selectedOrder.id || 'N/A'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Customer</p>
-                  <p className="text-lg font-bold">{selectedOrder.originalOrder?.customerName || 'N/A'}</p>
+                <div className="bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
+                  <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Customer</p>
+                  <p className="text-xl font-bold text-white">{selectedOrder.originalOrder?.customerName || 'N/A'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Phone</p>
-                  <p className="text-lg">{selectedOrder.originalOrder?.phone || selectedOrder.originalOrder?.customerPhone || 'N/A'}</p>
+                <div className="bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
+                  <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Phone</p>
+                  <p className="text-lg text-slate-200">{selectedOrder.originalOrder?.phone || selectedOrder.originalOrder?.customerPhone || 'N/A'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Address</p>
-                  <p className="text-lg">{selectedOrder.originalOrder?.address || selectedOrder.originalOrder?.deliveryAddress || 'N/A'}</p>
+                <div className="bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
+                  <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Address</p>
+                  <p className="text-lg text-slate-200">{selectedOrder.originalOrder?.address || selectedOrder.originalOrder?.deliveryAddress || 'N/A'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Service Type</p>
-                  <p className="text-lg">{selectedOrder.originalOrder?.serviceType || 'N/A'}</p>
+                <div className="col-span-2 bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
+                  <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Service Type</p>
+                  <p className="text-lg text-slate-200">{selectedOrder.originalOrder?.serviceType || 'N/A'}</p>
                 </div>
               </div>
 
-              <div className="border-t pt-4 mt-4">
-                <h3 className="font-bold mb-2">Items</h3>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Item</th>
-                      <th className="text-center py-2">Qty</th>
-                      <th className="text-right py-2">Price</th>
-                      <th className="text-right py-2">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedOrder.originalOrder?.items?.map((item, idx) => (
-                      <tr key={idx} className="border-b">
-                        <td className="py-2">{item.name}</td>
-                        <td className="text-center py-2">{item.quantity}</td>
-                        <td className="text-right py-2">{item.price}</td>
-                        <td className="text-right py-2">{item.quantity * item.price}</td>
+              <div className="border-t border-cyan-500/30 pt-6 mt-6">
+                <h3 className="text-lg font-bold text-cyan-400 mb-4 uppercase tracking-wider">Items</h3>
+                <div className="bg-slate-900/30 border border-cyan-500/20 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-900/70 border-b border-cyan-500/20">
+                        <th className="text-left py-3 px-4 text-cyan-400 font-semibold">Item</th>
+                        <th className="text-center py-3 px-4 text-cyan-400 font-semibold">Qty</th>
+                        <th className="text-right py-3 px-4 text-cyan-400 font-semibold">Price</th>
+                        <th className="text-right py-3 px-4 text-cyan-400 font-semibold">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {selectedOrder.originalOrder?.items?.map((item, idx) => (
+                        <tr key={idx} className="border-b border-cyan-500/10 hover:bg-slate-900/50 transition">
+                          <td className="py-3 px-4 text-slate-200">{item.name}</td>
+                          <td className="text-center py-3 px-4 text-slate-300">{item.quantity}</td>
+                          <td className="text-right py-3 px-4 text-slate-300">{hotelSettings?.currency || 'PKR'} {item.price}</td>
+                          <td className="text-right py-3 px-4 font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {(item.quantity * item.price).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="border-t mt-4 pt-4 space-y-1 text-right">
-                <p className="text-gray-700">
-                  <strong>Subtotal:</strong> {selectedOrder.originalOrder?.subtotal || 0}
-                </p>
-                <p className="text-gray-700">
-                  <strong>Delivery Charge:</strong> {selectedOrder.originalOrder?.deliveryCharge || 0}
-                </p>
-                <p className="text-lg font-bold">
-                  <strong>Total:</strong> {selectedOrder.originalOrder?.total || 0}
-                </p>
+              <div className="border-t border-cyan-500/30 mt-6 pt-6 space-y-2">
+                <div className="flex justify-between items-center text-slate-300">
+                  <span>Subtotal:</span>
+                  <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.subtotal || 0}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-300">
+                  <span>Delivery Charge:</span>
+                  <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.deliveryCharge || 0}</span>
+                </div>
+                <div className="flex justify-between items-center text-xl font-bold border-t border-cyan-500/30 pt-4 mt-4">
+                  <span className="text-cyan-400">Total:</span>
+                  <span className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.total || 0}</span>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-cyan-500/30">
               <button
-                onClick={() => window.print()}
-                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium transition"
+                onClick={() => handlePrintOrder(selectedOrder)}
+                className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white py-3 px-6 rounded-lg font-semibold transition shadow-lg shadow-cyan-500/30 inline-flex items-center gap-2"
               >
+                <ArrowUpRight size={18} />
                 Print
               </button>
+              {isAdminRider && (
+                <button
+                  onClick={() => {
+                    handleDeleteOrder(selectedOrder);
+                    setSelectedOrder(null);
+                  }}
+                  className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white py-3 px-6 rounded-lg font-semibold transition shadow-lg shadow-rose-500/30 inline-flex items-center gap-2"
+                >
+                  <Trash2 size={18} />
+                  Delete
+                </button>
+              )}
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded font-medium transition"
+                className="bg-slate-800 hover:bg-slate-700 text-cyan-400 py-3 px-6 rounded-lg font-semibold transition border border-cyan-500/30"
               >
                 Close
               </button>
