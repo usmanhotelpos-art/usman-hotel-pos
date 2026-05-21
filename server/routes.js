@@ -84,35 +84,83 @@ router.post('/auth/rider-login', safe(async (req, res) => {
   const { email, password } = req.body;
   const loginValue = (email || '').toString().trim().toLowerCase();
   const riders = getCollection('riders');
+  const staffMembers = getCollection('staff') || [];
+
   const candidates = riders.filter((r) => {
     const riderEmail = (r.email || '').toString().trim().toLowerCase();
     const riderUsername = (r.username || '').toString().trim().toLowerCase();
     return riderEmail === loginValue || riderUsername === loginValue;
   });
+
   // Prefer a rider entry that has a passwordHash (created/updated), otherwise fallback to first match
-  const rider = candidates.find((r) => r.passwordHash) || candidates[0];
-
-  if (!rider) {
-    console.warn(`Rider login failed: no rider found for '${loginValue}' (candidates=${candidates.length})`);
-    return res.status(401).send({ error: 'Invalid rider credentials' });
-  }
-
+  let rider = candidates.find((r) => r.passwordHash) || candidates[0];
   let valid = false;
-  if (rider.passwordHash) {
-    valid = await bcrypt.compare(password || '', rider.passwordHash);
-  } else if (typeof rider.password === 'string') {
-    valid = password === rider.password;
-  } else if (typeof rider.rawPassword === 'string') {
-    valid = password === rider.rawPassword;
+
+  const attemptStaffFallback = async () => {
+    const staff = staffMembers.find((s) => {
+      const username = (s.username || '').toString().trim().toLowerCase();
+      const staffEmail = (s.email || '').toString().trim().toLowerCase();
+      const role = (s.role || '').toString();
+      const loginEnabled = s.loginEnabled !== false;
+      if (!loginEnabled) return false;
+      if (role !== 'Biker' && role !== 'Admin Rider') return false;
+      return username === loginValue || staffEmail === loginValue;
+    });
+
+    if (!staff) return null;
+
+    if (typeof staff.password !== 'string' || password !== staff.password) {
+      return null;
+    }
+
+    let targetRider = rider;
+    if (staff.riderId) {
+      targetRider = riders.find((r) => r.id === staff.riderId) || rider;
+    }
+
+    if (!targetRider) {
+      const passwordHash = await bcrypt.hash(password || '', 10);
+      targetRider = createRecord('riders', {
+        name: staff.name || staff.username,
+        phone: staff.phone || '',
+        email: staff.username,
+        username: staff.username,
+        passwordHash,
+        rawPassword: staff.password,
+        role: staff.role,
+        status: 'active'
+      });
+      updateRecord('staff', staff.id, { ...staff, riderId: targetRider.id });
+    }
+
+    return targetRider;
+  };
+
+  if (rider) {
+    if (rider.passwordHash) {
+      valid = await bcrypt.compare(password || '', rider.passwordHash);
+    } else if (typeof rider.password === 'string') {
+      valid = password === rider.password;
+    } else if (typeof rider.rawPassword === 'string') {
+      valid = password === rider.rawPassword;
+    }
   }
 
   if (!valid) {
-    console.warn(`Rider login failed for rider id=${rider.id} email='${rider.email}' role='${rider.role}' hasHash=${Boolean(rider.passwordHash)} hasRaw=${Boolean(rider.rawPassword)}`);
+    const staffRider = await attemptStaffFallback();
+    if (staffRider) {
+      rider = staffRider;
+      valid = true;
+    }
+  }
+
+  if (!valid || !rider) {
+    console.warn(`Rider login failed for '${loginValue}' riderId=${rider?.id || 'none'}`);
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
 
-  const loginLower = loginValue.toLowerCase();
-  const isAdminRider = loginLower === 'ahmed@rider.com';
+  const normalizedRole = (rider.role || '').toString().trim().toLowerCase();
+  const isAdminRider = normalizedRole === 'admin' || normalizedRole === 'admin rider' || normalizedRole.includes('admin');
   const tokenRole = isAdminRider ? 'admin rider' : 'rider';
   const token = jwt.sign(
     {
