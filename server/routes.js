@@ -882,10 +882,23 @@ router.put('/rider/approve-request/:requestId', authenticate, (req, res) => {
   
   const riderOrders = getCollection('rider_orders') || [];
   const posOrders = getCollection('pos_orders') || [];
+  const riders = getCollection('riders') || [];
+  const rider = riders.find((r) => r.id === request.riderId);
+  const riderName = rider?.name || '';
   let order = riderOrders.find((o) => o.orderId === request.orderId);
 
+  updateRecord('pos_orders', request.orderId, {
+    deliveryAgent: riderName,
+    status: 'Riders Assigned',
+    updatedAt: new Date().toISOString()
+  });
+
   if (order) {
-    updateRecord('rider_orders', order.id, { status: 'approved', riderId: request.riderId });
+    updateRecord('rider_orders', order.id, {
+      status: 'assigned',
+      riderId: request.riderId,
+      updatedAt: new Date().toISOString()
+    });
   } else {
     const posOrder = posOrders.find((o) => o.id === request.orderId);
     if (posOrder) {
@@ -893,8 +906,9 @@ router.put('/rider/approve-request/:requestId', authenticate, (req, res) => {
         orderId: posOrder.id,
         riderId: request.riderId,
         originalOrder: posOrder,
-        status: 'approved',
-        createdAt: new Date().toISOString()
+        status: 'assigned',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
     }
   }

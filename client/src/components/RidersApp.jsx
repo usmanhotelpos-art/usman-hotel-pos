@@ -27,7 +27,7 @@ const apiBase = '/api';
 
 export function RidersApp() {
   const [view, setView] = useState('login'); // login, app
-  const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, approved, requested
+  const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, requested
   const [loading, setLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -36,7 +36,6 @@ export function RidersApp() {
   const [rider, setRider] = useState(null);
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [kitchenOrders, setKitchenOrders] = useState([]);
-  const [approvedOrders, setApprovedOrders] = useState([]);
   const [requestedOrders, setRequestedOrders] = useState([]);
   const [requestingIds, setRequestingIds] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -59,13 +58,6 @@ export function RidersApp() {
       subtitle: 'Request approval',
       icon: ShoppingBag,
       accent: 'from-sky-500 to-cyan-500'
-    },
-    {
-      key: 'approved',
-      label: 'Pickup',
-      subtitle: 'Collect ready orders',
-      icon: CheckCircle,
-      accent: 'from-emerald-500 to-lime-500'
     },
     {
       key: 'requested',
@@ -180,14 +172,6 @@ export function RidersApp() {
         if (res.ok) {
           const data = await res.json();
           setKitchenOrders(deduplicateOrders(data));
-        }
-      } else if (riderTab === 'approved') {
-        const res = await fetch(`${apiBase}/rider/approved-orders/${rider.id}`, {
-          headers: { Authorization: `Bearer ${riderToken}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setApprovedOrders(deduplicateOrders(data));
         }
       } else if (riderTab === 'requested') {
         const res = await fetch(`${apiBase}/rider/requested-orders/${rider.id}`, {
@@ -318,48 +302,6 @@ export function RidersApp() {
     }
   };
 
-  const pickupOrder = async (orderId) => {
-    try {
-      setLoading(true);
-      const order = approvedOrders.find((o) => o.id === orderId);
-      if (!order) return;
-
-      const targetOrderId = order.originalOrder?.id || order.id;
-      const deliveryAgent = order.originalOrder?.deliveryAgent || rider?.name || '';
-      if (!deliveryAgent) {
-        console.error('Cannot pick up order without an assigned rider.');
-        notify('Cannot pick up order without an assigned rider.', 'error');
-        return;
-      }
-
-      const res = await fetch(`${apiBase}/pos/orders/${targetOrderId}/assign-rider`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${riderToken}`
-        },
-        body: JSON.stringify({ deliveryAgent, status: 'Riders Assigned' })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to move order to Riders Assigned');
-      }
-
-      setApprovedOrders((prev) => prev.filter((o) => (o.id !== orderId && (o.originalOrder?.id || o.id) !== orderId)));
-      if (selectedOrder && (selectedOrder.originalOrder?.id || selectedOrder.id) === orderId) {
-        setSelectedOrder(null);
-      }
-      notify('Order picked up. Move to assigned delivery list.', 'success');
-      setRiderTab('assigned');
-      // Load the assigned tab after the tab state changes via effect
-    } catch (error) {
-      console.error('Error picking up order:', error);
-      notify('Could not pickup order. Check connection.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDeleteOrder = async (order) => {
     const targetOrderId = order.originalOrder?.id || order.orderId || order.id;
@@ -377,7 +319,6 @@ export function RidersApp() {
       if (res.ok) {
         setAssignedOrders(assignedOrders.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
         setKitchenOrders(kitchenOrders.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
-        setApprovedOrders(approvedOrders.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
         setRequestedOrders(requestedOrders.filter((o) => (o.orderId || o.originalOrder?.id || o.id) !== targetOrderId));
         if (selectedOrder && ((selectedOrder.originalOrder?.id || selectedOrder.orderId || selectedOrder.id) === targetOrderId)) {
           setSelectedOrder(null);
@@ -532,16 +473,6 @@ export function RidersApp() {
                   <div>
                     <p className="text-2xl font-semibold text-white">{assignedOrders.length}</p>
                     <p className="text-sm text-slate-500">Ready to deliver</p>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pickup</p>
-                <div className="mt-3 flex items-center gap-3">
-                  <Truck size={24} className="text-cyan-400" />
-                  <div>
-                    <p className="text-2xl font-semibold text-white">{approvedOrders.length}</p>
-                    <p className="text-sm text-slate-500">Ready for pickup</p>
                   </div>
                 </div>
               </div>
@@ -771,74 +702,6 @@ export function RidersApp() {
           </div>
         )}
 
-        {riderTab === 'approved' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {approvedOrders.length === 0 ? (
-              <p className="text-gray-500 col-span-full text-center py-8">No approved orders ready for pickup</p>
-            ) : (
-              approvedOrders.map(order => (
-                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-green-200">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
-                      <p className="text-sm text-gray-600">
-                        {order.originalOrder?.customerName || 'Customer'}
-                      </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
-                          </p>
-                    </div>
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Approved</span>
-                  </div>
-
-                  <div className="bg-gray-50 p-3 rounded mb-3">
-                    <p className="text-sm text-gray-700">
-                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => pickupOrder(order.id)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-emerald-500/20"
-                    >
-                      <Truck size={18} />
-                      Pick Up
-                    </button>
-                    <button
-                      onClick={() => viewOrderSlip(order)}
-                      className="bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl transition inline-flex items-center justify-center gap-2 shadow-md shadow-slate-950/20"
-                    >
-                      <Eye size={18} />
-                      Slip
-                    </button>
-                    {isAdminRider && (
-                      <>
-                        <button
-                          onClick={() => handlePrintOrder(order)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
-                        >
-                          <ArrowUpRight size={18} />
-                          Print
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order)}
-                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
-                        >
-                          <Trash2 size={18} />
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
         {riderTab === 'requested' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {requestedOrders.length === 0 ? (
