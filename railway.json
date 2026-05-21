@@ -3,7 +3,8 @@
     "builder": "nixpacks"
   },
   "deploy": {
-    "startCommand": "npm run serve",
+    "buildCommand": "npm install --workspaces && npm run build:client",
+    "startCommand": "npm start",
     "restartPolicyType": "on_failure",
     "restartPolicyMaxRetries": 5
   },
@@ -11,6 +12,10 @@
     "VITE_API_BASE": {
       "description": "API base URL for Vite frontend",
       "value": "https://usman-hotel-pos-server-production.up.railway.app/api"
+    },
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
     }
   }
 }
