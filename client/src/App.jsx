@@ -5300,10 +5300,14 @@ function App() {
 
     const assignedRiderId = selectedRider.riderId || selectedRider.id;
 
-    // If a different shift is currently active, close it first to clear previous rider app state
-    if (riderShift?.active && riderShift?.riderId && riderShift?.riderId !== assignedRiderId) {
+    // If a different shift is currently active, close it first
+    const existingDifferentShiftIdx = riderShifts.findIndex(
+      (sh) => sh?.active && sh?.riderId && sh?.riderId !== assignedRiderId
+    );
+    if (existingDifferentShiftIdx >= 0) {
       try {
-        await handleCloseShift();
+        const updatedShifts = riderShifts.filter((_, i) => i !== existingDifferentShiftIdx);
+        await saveShiftSettings({ riderShifts: updatedShifts });
       } catch (err) {
         // ignore errors from close; we'll still attempt to start the new shift
       }
@@ -5323,26 +5327,20 @@ function App() {
     }
   }
 
-  async function handleCloseShift() {
-    if (!riderShift?.active) {
-      setMessage('No active shift to close.');
+  async function handleCloseShift(shiftIndex) {
+    const allShifts = settings?.riderShifts || [];
+    if (shiftIndex === undefined || shiftIndex < 0 || shiftIndex >= allShifts.length) {
+      setMessage('Invalid shift to close.');
       return;
     }
 
     setShiftActionLoading(true);
     try {
-      await fetchJson(`${apiBase}/admin/clear-rider-app`, { method: 'POST' });
-      const updated = await saveShiftSettings({
-        active: false,
-        riderId: null,
-        riderName: null,
-        riderUsername: null,
-        startedAt: null,
-        startedBy: user?.name || 'Admin'
-      });
-      setShiftRiderId('');
+      // Remove the shift at the given index
+      const updatedShifts = allShifts.filter((_, i) => i !== shiftIndex);
+      const updated = await saveShiftSettings({ riderShifts: updatedShifts });
       if (updated) {
-        setMessage('Shift closed and rider app data cleared for the next shift.');
+        setMessage('Shift closed successfully.');
       }
     } catch (error) {
       // error message handled inside saveShiftSettings or fetchJson
@@ -5443,12 +5441,9 @@ function App() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Keep single global Close Shift button for now */}
-                        {idx === 0 && (
-                          <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
-                            Close Shift
-                          </button>
-                        )}
+                        <button onClick={() => handleCloseShift(idx)} disabled={shiftActionLoading} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
+                          Close Shift
+                        </button>
                       </div>
                     </div>
                     <div className="mt-4 text-left text-sm text-slate-400 space-y-2">
