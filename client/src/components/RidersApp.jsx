@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ChevronDown,
   LogOut,
@@ -25,9 +25,18 @@ import {
 
 const apiBase = '/api';
 
+function getDisplayOrderNumber(order) {
+  const original = order?.originalOrder || order || {};
+  const orderNumber = original.orderNumber || order?.orderNumber || original.receiptNumber || original.invoiceNumber;
+  if (orderNumber) return orderNumber;
+  const id = original.id || order?.id || '';
+  return id ? String(id).slice(0, 8) : 'N/A';
+}
+
 export function RidersApp() {
   const [view, setView] = useState('login'); // login, app
   const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, requested, deliveredCash, deliveredOnline
+  const [selectedRoleTab, setSelectedRoleTab] = useState('biker'); // biker, admin-biker
   const [loading, setLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -42,9 +51,15 @@ export function RidersApp() {
   const [requestingIds, setRequestingIds] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [hotelSettings, setHotelSettings] = useState(null);
+  const [products, setProducts] = useState([]);
   const [deleteError, setDeleteError] = useState('');
   const [notification, setNotification] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryType, setSummaryType] = useState('cash');
+  const [summaryData, setSummaryData] = useState(null);
+  const [shiftTimer, setShiftTimer] = useState(0);
+  const shiftResetRef = useRef({ active: false, startedAt: '' });
 
   const tabItems = [
     {
@@ -122,6 +137,220 @@ export function RidersApp() {
     window.setTimeout(() => setShowNotification(false), 3200);
   };
 
+  const formatCurrency = (value) => {
+    const amount = Number(value || 0);
+    return `${hotelSettings?.currency || 'PKR'} ${amount.toFixed(2)}`;
+  };
+
+  const getItemCategory = (item) => {
+    if (!item) return '';
+    const categoryFromItem = item.category || item.categoryName || item.type || item.subcategory || item.group;
+    if (categoryFromItem) return categoryFromItem.toString();
+    if (item.productId) {
+      const product = products.find((product) => product.id === item.productId || product.id === String(item.productId));
+      return product?.category || product?.type || product?.group || '';
+    }
+    return '';
+  };
+
+  const isExtrasItem = (item) => {
+    const category = (getItemCategory(item) || item.name || '').toString().toLowerCase();
+    return category.includes('extras') || category.includes('extra');
+  };
+
+  const getOrderDeliveryFee = (originalOrder) => {
+    const original = originalOrder || {};
+    return Number(original.deliveryCharge || original.deliveryFee || original.serviceCharge || 0);
+  };
+
+  const calculateSummaryForOrders = (orders, type) => {
+    const totals = {
+      orderTotal: 0,
+      productTotal: 0,
+      extrasTotal: 0,
+      deliveryFeeTotal: 0,
+      riderAmount: 0,
+      count: 0
+    };
+
+    orders.forEach((order) => {
+      const original = order.originalOrder || order || {};
+      const items = Array.isArray(original.items) ? original.items : [];
+      const deliveryFee = Number(original.deliveryCharge || original.deliveryFee || original.serviceCharge || 0);
+      let itemTotal = 0;
+      let extrasTotal = 0;
+
+      items.forEach((item) => {
+        const quantity = Number(item.quantity || 1);
+        const price = Number(item.price || 0);
+        const amount = quantity * price;
+        itemTotal += amount;
+        if (isExtrasItem(item)) {
+          extrasTotal += amount;
+        }
+      });
+
+      const orderTotal = Math.max(0, itemTotal + deliveryFee);
+      const productTotal = Math.max(0, itemTotal - extrasTotal);
+      const riderAmount = type === 'cash'
+        ? productTotal
+        : Math.max(0, extrasTotal + deliveryFee);
+
+      totals.orderTotal += orderTotal;
+      totals.productTotal += productTotal;
+      totals.extrasTotal += extrasTotal;
+      totals.deliveryFeeTotal += deliveryFee;
+      totals.riderAmount += riderAmount;
+      totals.count += 1;
+    });
+
+    return totals;
+  };
+
+  const formatSignedCurrency = (value) => {
+    const amount = Number(value || 0);
+    const sign = amount > 0 ? '+' : '';
+    return `${hotelSettings?.currency || 'PKR'} ${sign}${amount.toFixed(2)}`;
+  };
+
+  const openSummaryModal = (type) => {
+    const orders = type === 'cash' ? deliveredCashOrders : deliveredOnlineOrders;
+    const data = calculateSummaryForOrders(orders, type);
+    const cashAmount = calculateSummaryForOrders(deliveredCashOrders, 'cash').riderAmount;
+    const onlineAmount = calculateSummaryForOrders(deliveredOnlineOrders, 'online').riderAmount;
+    const difference = cashAmount - onlineAmount;
+    setSummaryType(type);
+    setSummaryData({
+      ...data,
+      totalDifference: difference,
+      differenceLabel: difference < 0 ? 'RIDER HAQ' : difference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED'
+    });
+    setShowSummaryModal(true);
+  };
+
+  const closeSummaryModal = () => {
+    setShowSummaryModal(false);
+  };
+
+  const cashSummaryData = calculateSummaryForOrders(deliveredCashOrders, 'cash');
+  const onlineSummaryData = calculateSummaryForOrders(deliveredOnlineOrders, 'online');
+  const overallDifference = cashSummaryData.riderAmount - onlineSummaryData.riderAmount;
+  const overallDifferenceLabel = overallDifference < 0 ? 'RIDER HAQ' : overallDifference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED';
+
+  const riderShift = hotelSettings?.riderShift || {};
+  const shiftActive = Boolean(riderShift?.active);
+  const shiftAssignedRiderId = riderShift?.riderId;
+  const shiftAssignedRiderName = riderShift?.riderName || riderShift?.riderUsername || 'assigned rider';
+  const shiftStartedAt = riderShift?.startedAt ? new Date(riderShift.startedAt) : null;
+
+  useEffect(() => {
+    const previous = shiftResetRef.current;
+    const currentNav = {
+      active: shiftActive,
+      startedAt: riderShift?.startedAt || ''
+    };
+
+    const becameActive = !previous.active && currentNav.active;
+    const newShiftStarted = previous.active && currentNav.active && previous.startedAt !== currentNav.startedAt;
+
+    if (becameActive || newShiftStarted) {
+      setAssignedOrders([]);
+      setKitchenOrders([]);
+      setRequestedOrders([]);
+      setDeliveredCashOrders([]);
+      setDeliveredOnlineOrders([]);
+      setSelectedOrder(null);
+    }
+
+    shiftResetRef.current = currentNav;
+  }, [shiftActive, riderShift?.startedAt]);
+
+  const formatShiftElapsed = (startedAt) => {
+    if (!startedAt) return '00h 00m';
+    const startedTime = new Date(startedAt).getTime();
+    if (Number.isNaN(startedTime)) return '00h 00m';
+    const diffMs = Math.max(Date.now() - startedTime, 0);
+    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor((diffMs % 3600000) / 60000);
+    return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+  };
+
+  const shiftLoginHint = () => {
+    if (selectedRoleTab === 'admin-biker') {
+      return 'Admin Biker mode - No shift requirement';
+    }
+    if (shiftActive) {
+      const assigned = riderShift?.riderUsername || riderShift?.riderName;
+      const isAssignedUser = Boolean(inputLoginLower && canAttemptLogin && assigned);
+      if (isAssignedUser) {
+        return 'Yes, your shift started. Please enter your password.';
+      }
+      if (shiftAssignedRiderName && inputLoginLower && !canAttemptLogin) {
+        return `Shift active for ${shiftAssignedRiderName}. Please login with the assigned rider username.`;
+      }
+      return `Shift active for ${shiftAssignedRiderName}. Started at ${shiftStartedAt ? shiftStartedAt.toLocaleTimeString() : 'N/A'}`;
+    }
+    return 'Shift not started. Please ask Owner Farhan to start your shift.';
+  };
+
+  // Determine whether the current login input is allowed to attempt login.
+  const inputLoginLower = (loginForm.email || '').toString().trim().toLowerCase();
+  const shiftAssignedUsernameLower = (riderShift?.riderUsername || '').toString().trim().toLowerCase();
+  const shiftAssignedNameLower = (riderShift?.riderName || '').toString().trim().toLowerCase();
+  const shiftAssignedIdStr = riderShift?.riderId ? String(riderShift.riderId) : '';
+  const shiftAssignedUsernameLocalPart = shiftAssignedUsernameLower && shiftAssignedUsernameLower.includes('@') ? shiftAssignedUsernameLower.split('@')[0] : shiftAssignedUsernameLower;
+
+  const canAttemptLogin = (() => {
+    if (selectedRoleTab === 'admin-biker') return true; // admin bikers can login anytime via that tab
+    // for regular bikers require an active shift and ensure either no specific assignment or the login matches the assigned rider
+    if (selectedRoleTab === 'biker') {
+      // If an assigned rider exists, allow login when the input matches the assigned rider
+      if ((shiftAssignedIdStr || shiftAssignedUsernameLower || shiftAssignedNameLower)) {
+        if (!inputLoginLower) return false;
+        // Accept exact matches against assigned id, username or name.
+        if (
+          inputLoginLower === shiftAssignedUsernameLower ||
+          inputLoginLower === shiftAssignedNameLower ||
+          inputLoginLower === shiftAssignedIdStr
+        ) return true;
+        // Also accept when user enters an email like "ali@domain.com" and the local-part matches the assigned username
+        const localPart = inputLoginLower.includes('@') ? inputLoginLower.split('@')[0] : inputLoginLower;
+        if (localPart && (localPart === shiftAssignedUsernameLower || localPart === shiftAssignedUsernameLocalPart)) return true;
+        return false;
+      }
+
+      // No specific assignment - require an active shift to allow login
+      if (!shiftActive) return false;
+      return true;
+    }
+    return false;
+  })();
+
+  useEffect(() => {
+    if (!shiftActive) return undefined;
+    const interval = window.setInterval(() => setShiftTimer(Date.now()), 60000);
+    return () => window.clearInterval(interval);
+  }, [shiftActive, riderShift?.startedAt]);
+
+  useEffect(() => {
+    if (!hotelSettings || view !== 'app' || !rider) return undefined;
+    const riderRoleStr = (rider?.role || '').toString().toLowerCase();
+    const isAdminRiderUser = riderRoleStr.includes('admin');
+    
+    // Only enforce shift validation for non-admin riders
+    if (!isAdminRiderUser && !shiftActive) {
+      notify('Shift has been closed. Please login again after the next shift starts.', 'error');
+      handleLogout();
+    }
+    return undefined;
+  }, [hotelSettings, view, rider, shiftActive]);
+
+  useEffect(() => {
+    if (view !== 'login') return undefined;
+    const interval = window.setInterval(() => fetchHotelSettings(), 15000);
+    return () => window.clearInterval(interval);
+  }, [view]);
+
   const fetchRiderInfo = async () => {
     try {
       const res = await fetch(`${apiBase}/auth/rider-me`, {
@@ -144,9 +373,23 @@ export function RidersApp() {
       if (res.ok) {
         const data = await res.json();
         setHotelSettings(data);
+        return data;
       }
     } catch (error) {
       console.error('Failed to fetch hotel settings:', error);
+    }
+    return null;
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch(`${apiBase}/pos/products`);
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
     }
   };
 
@@ -161,11 +404,12 @@ export function RidersApp() {
   };
 
   useEffect(() => {
-    if (view === 'app') {
-      fetchHotelSettings();
-      loadOrders();
-    }
-  }, [view, riderTab]);
+    if (view !== 'app' || !rider?.id) return undefined;
+    fetchHotelSettings();
+    fetchProducts();
+    loadOrders();
+    return undefined;
+  }, [view, riderTab, rider?.id]);
 
   const loadOrders = async () => {
     if (!rider?.id) return;
@@ -226,6 +470,12 @@ export function RidersApp() {
     setLoading(true);
     setLoginError('');
 
+    const latestSettings = await fetchHotelSettings();
+    const latestShift = latestSettings?.riderShift || {};
+    const latestShiftActive = Boolean(latestShift?.active);
+    const latestShiftAssignedRiderId = latestShift?.riderId;
+    const latestShiftAssignedRiderName = latestShift?.riderName || latestShift?.riderUsername || 'assigned rider';
+
     try {
       const res = await fetch(`${apiBase}/auth/rider-login`, {
         method: 'POST',
@@ -235,6 +485,45 @@ export function RidersApp() {
 
       if (res.ok) {
         const data = await res.json();
+        const riderId = data.rider?.id;
+        const riderRole = (data.rider?.role || '').toString().toLowerCase();
+        const isAdminRider = riderRole.includes('admin');
+
+        // Shift validation: Skip for Admin Biker, enforce for regular Biker
+        if (selectedRoleTab === 'biker' && !isAdminRider) {
+          if (!latestShiftActive) {
+            const message = 'Shift not started. Please ask Owner Farhan to start your shift before login.';
+            setLoginError(message);
+            notify(message, 'error');
+            setLoading(false);
+            return;
+          }
+
+          if (latestShiftAssignedRiderId && riderId !== latestShiftAssignedRiderId) {
+            const message = `This shift is assigned to ${latestShiftAssignedRiderName}. Please login with the assigned rider account.`;
+            setLoginError(message);
+            notify(message, 'error');
+            setLoading(false);
+            return;
+          }
+        } else if (selectedRoleTab === 'admin-biker' && !isAdminRider) {
+          const message = 'Admin Biker tab requires an admin rider account.';
+          setLoginError(message);
+          notify(message, 'error');
+          setLoading(false);
+          return;
+        }
+
+        const clearShiftOrders = () => {
+          setAssignedOrders([]);
+          setKitchenOrders([]);
+          setRequestedOrders([]);
+          setDeliveredCashOrders([]);
+          setDeliveredOnlineOrders([]);
+          setSelectedOrder(null);
+        };
+
+        clearShiftOrders();
         setRiderToken(data.token);
         localStorage.setItem('riderToken', data.token);
         setRider(data.rider);
@@ -434,6 +723,31 @@ export function RidersApp() {
             </div>
           </div>
 
+          <div className="mb-6 flex gap-3 border-b border-slate-800 pb-4">
+            <button
+              type="button"
+              onClick={() => setSelectedRoleTab('biker')}
+              className={`flex-1 rounded-3xl py-3 px-4 text-sm font-semibold transition ${
+                selectedRoleTab === 'biker'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              Biker
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedRoleTab('admin-biker')}
+              className={`flex-1 rounded-3xl py-3 px-4 text-sm font-semibold transition ${
+                selectedRoleTab === 'admin-biker'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                  : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              Admin Biker
+            </button>
+          </div>
+
           <form onSubmit={handleRiderLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Email or username</label>
@@ -447,7 +761,7 @@ export function RidersApp() {
             </div>
 
             <div className="relative">
-              <label className="block text-sm font-medium text-slate-300 mb-2">Email or username</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={loginForm.password}
@@ -466,20 +780,30 @@ export function RidersApp() {
             </div>
 
             {loginError && <div className="bg-red-950/70 border border-red-600 text-red-300 px-4 py-3 rounded-2xl">{loginError}</div>}
+                  <div className={`rounded-3xl border px-4 py-4 text-sm ${
+                    selectedRoleTab === 'admin-biker'
+                      ? 'border-blue-700/20 bg-blue-950/60 text-blue-200'
+                      : 'border-orange-700/20 bg-orange-950/60 text-orange-200'
+                  }`}>
+              <p className="font-semibold">{shiftLoginHint()}</p>
+              {selectedRoleTab === 'biker' && shiftActive && shiftStartedAt ? (
+                <div className="mt-3 space-y-1 text-xs text-orange-300">
+                  <p>Started at {shiftStartedAt.toLocaleTimeString()}</p>
+                  <p>Elapsed: {formatShiftElapsed(riderShift.startedAt)}</p>
+                </div>
+              ) : null}
+            </div>
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-400 hover:to-pink-400 text-white font-semibold py-3 rounded-2xl transition duration-300 disabled:opacity-50"
+              disabled={loading || !canAttemptLogin}
+              className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-400 hover:to-pink-400 text-white font-semibold py-3 rounded-2xl transition duration-300 ${loading || !canAttemptLogin ? 'disabled:opacity-50 disabled:cursor-not-allowed opacity-50' : ''}`}
             >
               {loading ? 'Signing in...' : 'Login'}
               <ArrowUpRight size={18} />
             </button>
           </form>
 
-          <div className="mt-6 text-center text-slate-400 text-xs">
-            Demo credentials: ahmed@rider.com / riderpass1 (set by admin)
-          </div>
         </div>
       </div>
     );
@@ -540,6 +864,16 @@ export function RidersApp() {
                     <p className="text-sm text-slate-500">Total completed</p>
                   </div>
                 </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
+                  <div className="rounded-2xl bg-slate-950/80 p-2 text-center">
+                    <p className="font-semibold text-white">Cash</p>
+                    <p>{deliveredCashOrders.length}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-950/80 p-2 text-center">
+                    <p className="font-semibold text-white">Online</p>
+                    <p>{deliveredOnlineOrders.length}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -566,6 +900,30 @@ export function RidersApp() {
               <LogOut size={18} />
               Logout
             </button>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-4">
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-cyan-500/10 transition hover:-translate-y-1">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Cash amount</p>
+              <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(cashSummaryData.riderAmount)}</p>
+              <p className="mt-2 text-sm text-slate-400">Cash summary for collected orders.</p>
+            </div>
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-sky-500/10 transition hover:-translate-y-1">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Online amount</p>
+              <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(onlineSummaryData.riderAmount)}</p>
+              <p className="mt-2 text-sm text-slate-400">Online summary for owed rider amount.</p>
+            </div>
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-emerald-500/10 transition hover:-translate-y-1">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Shift status</p>
+              <p className={`mt-4 text-3xl font-semibold ${shiftActive ? 'text-emerald-400' : 'text-rose-400'}`}>{shiftActive ? 'Active' : 'Inactive'}</p>
+              <p className="mt-2 text-sm text-slate-400">{shiftActive ? `Rider: ${shiftAssignedRiderName}` : 'Waiting for shift start'}</p>
+              {shiftActive && riderShift.startedAt ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{formatShiftElapsed(riderShift.startedAt)} elapsed</p> : null}
+            </div>
+            <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/10 via-slate-900/70 to-cyan-500/10 p-5 shadow-xl shadow-fuchsia-500/15 animate-pulse">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-300">Difference</p>
+              <p className="mt-4 text-3xl font-semibold text-white">{formatSignedCurrency(overallDifference)}</p>
+              <p className="mt-2 text-sm font-semibold uppercase tracking-[0.2em] text-white">{overallDifferenceLabel}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -654,6 +1012,7 @@ export function RidersApp() {
                   <OrderCard
                     key={order.id}
                     order={order}
+                    currency={hotelSettings?.currency || 'PKR'}
                     onViewSlip={viewOrderSlip}
                     status="Go for Delivery"
                     actions={order.originalOrder ? [
@@ -687,7 +1046,7 @@ export function RidersApp() {
                 <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-gray-200">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
+                      <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
                       <p className="text-sm text-gray-600">
                         {order.originalOrder?.customerName || 'Customer'}
                       </p>
@@ -766,7 +1125,7 @@ export function RidersApp() {
                 <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-orange-200">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.orderId || order.id}</p>
+                      <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
                       <p className="text-sm text-gray-600">
                         {order.originalOrder?.customerName || 'Customer'}
                       </p>
@@ -820,143 +1179,232 @@ export function RidersApp() {
         )}
 
         {riderTab === 'deliveredCash' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {deliveredCashOrders.length === 0 ? (
-              <p className="text-gray-500 col-span-full text-center py-8">No cash delivery records</p>
-            ) : (
-              deliveredCashOrders.map((order) => (
-                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-emerald-200">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
-                      <p className="text-sm text-gray-600">
-                        {order.originalOrder?.customerName || 'Customer'}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Rider Book Cash</h2>
+                <p className="text-sm text-slate-400">Cash payments summary for collected amounts.</p>
+              </div>
+              <button
+                onClick={() => openSummaryModal('cash')}
+                className="rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/30 hover:from-emerald-400 hover:to-cyan-400 transition"
+              >
+                ماشاءاللہ Summary
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {deliveredCashOrders.length === 0 ? (
+                <p className="text-gray-500 col-span-full text-center py-8">No cash delivery records</p>
+              ) : (
+                deliveredCashOrders.map((order) => (
+                  <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-emerald-200">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
+                        <p className="text-sm text-gray-600">
+                          {order.originalOrder?.customerName || 'Customer'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                        </p>
+                      </div>
+                      <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded flex items-center gap-1">
+                        <DollarSign size={12} />
+                        Delivered
+                      </span>
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded mb-3">
+                      <p className="text-sm text-gray-700">
+                        <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                      <p className="text-sm text-gray-700">
+                        <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
+                      </p>
+                      <p className="text-sm text-emerald-700 mt-1">
+                        <strong>Payment:</strong> Cash Collected
                       </p>
                     </div>
-                    <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded flex items-center gap-1">
-                      <DollarSign size={12} />
-                      Delivered
-                    </span>
-                  </div>
 
-                  <div className="bg-gray-50 p-3 rounded mb-3">
-                    <p className="text-sm text-gray-700">
-                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
-                    </p>
-                    <p className="text-sm text-emerald-700 mt-1">
-                      <strong>Payment:</strong> Cash Collected
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => viewOrderSlip(order)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
+                      >
+                        <Eye size={18} />
+                        View Slip
+                      </button>
+                      {isAdminRider && (
+                        <>
+                          <button
+                            onClick={() => handlePrintOrder(order)}
+                            className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
+                          >
+                            <ArrowUpRight size={18} />
+                            Print
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOrder(order)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
+                          >
+                            <Trash2 size={18} />
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => viewOrderSlip(order)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
-                    >
-                      <Eye size={18} />
-                      View Slip
-                    </button>
-                    {isAdminRider && (
-                      <>
-                        <button
-                          onClick={() => handlePrintOrder(order)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
-                        >
-                          <ArrowUpRight size={18} />
-                          Print
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order)}
-                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
-                        >
-                          <Trash2 size={18} />
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         )}
 
         {riderTab === 'deliveredOnline' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {deliveredOnlineOrders.length === 0 ? (
-              <p className="text-gray-500 col-span-full text-center py-8">No online payment delivery records</p>
-            ) : (
-              deliveredOnlineOrders.map((order) => (
-                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-blue-200">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
-                      <p className="text-sm text-gray-600">
-                        {order.originalOrder?.customerName || 'Customer'}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Rider Book Online</h2>
+                <p className="text-sm text-slate-400">Online payments summary for extras and service charges.</p>
+              </div>
+              <button
+                onClick={() => openSummaryModal('online')}
+                className="rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/30 hover:from-sky-400 hover:to-indigo-400 transition"
+              >
+                ماشاءاللہ Summary
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {deliveredOnlineOrders.length === 0 ? (
+                <p className="text-gray-500 col-span-full text-center py-8">No online payment delivery records</p>
+              ) : (
+                deliveredOnlineOrders.map((order) => (
+                  <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-blue-200">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
+                        <p className="text-sm text-gray-600">
+                          {order.originalOrder?.customerName || 'Customer'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                        </p>
+                      </div>
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center gap-1">
+                        <CreditCard size={12} />
+                        Delivered
+                      </span>
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded mb-3">
+                      <p className="text-sm text-gray-700">
+                        <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                      <p className="text-sm text-gray-700">
+                        <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
+                      </p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        <strong>Payment:</strong> Online Payment
                       </p>
                     </div>
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center gap-1">
-                      <CreditCard size={12} />
-                      Delivered
-                    </span>
-                  </div>
 
-                  <div className="bg-gray-50 p-3 rounded mb-3">
-                    <p className="text-sm text-gray-700">
-                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
-                    </p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      <strong>Payment:</strong> Online Payment
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => viewOrderSlip(order)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
+                      >
+                        <Eye size={18} />
+                        View Slip
+                      </button>
+                      {isAdminRider && (
+                        <>
+                          <button
+                            onClick={() => handlePrintOrder(order)}
+                            className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
+                          >
+                            <ArrowUpRight size={18} />
+                            Print
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOrder(order)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
+                          >
+                            <Trash2 size={18} />
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => viewOrderSlip(order)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
-                    >
-                      <Eye size={18} />
-                      View Slip
-                    </button>
-                    {isAdminRider && (
-                      <>
-                        <button
-                          onClick={() => handlePrintOrder(order)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
-                        >
-                          <ArrowUpRight size={18} />
-                          Print
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order)}
-                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
-                        >
-                          <Trash2 size={18} />
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>
 
       {/* Order Slip Modal */}
+      {showSummaryModal && summaryData && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="relative rounded-[32px] border border-fuchsia-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 shadow-[0_0_48px_rgba(191,90,242,0.20)] max-w-3xl w-full max-h-[92vh] overflow-y-auto">
+            <button
+              onClick={closeSummaryModal}
+              className="absolute right-4 top-4 text-slate-300 hover:text-white rounded-full p-2 transition"
+            >
+              ✕
+            </button>
+            <div className="text-center">
+              <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-cyan-500 to-emerald-500 shadow-[0_0_30px_rgba(127,199,255,0.45)] text-white text-3xl font-extrabold">
+                {formatSignedCurrency(summaryData.totalDifference)}
+              </div>
+              <p className="mt-4 text-sm uppercase tracking-[0.35em] text-fuchsia-300">
+                {summaryData.totalDifference < 0 ? 'RIDER HAQ' : summaryData.totalDifference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED'}
+              </p>
+              <h3 className="mt-2 text-2xl font-extrabold text-white">
+                {summaryType === 'cash' ? 'Rider Book Cash Summary' : 'Rider Book Online Summary'}
+              </h3>
+              <p className="mt-2 max-w-2xl text-sm text-slate-400">
+                {summaryType === 'cash'
+                  ? 'Showing cash collection total excluding Extras category items and delivery fees.'
+                  : 'Showing Extras category amount plus delivery fees that should be given to riders.'}
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-4">
+              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-cyan-500/10">
+                <p className="text-sm text-slate-400">Order total</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summaryData.orderTotal)}</p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-fuchsia-500/10">
+                <p className="text-sm text-slate-400">Extras total</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summaryData.extrasTotal)}</p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-emerald-500/10">
+                <p className="text-sm text-slate-400">Delivery fee</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summaryData.deliveryFeeTotal)}</p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-slate-500/10">
+                <p className="text-sm text-slate-400">{summaryType === 'cash' ? 'Cash orders' : 'Online orders'}</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{summaryData.count}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950/90 p-6 shadow-inner shadow-slate-950/20">
+              <div className="flex items-center justify-between text-slate-400 uppercase tracking-[0.18em] text-xs font-semibold mb-4">
+                <span>Summary amount</span>
+                <span>{summaryType === 'cash' ? 'Total from rider' : 'Total for rider'}</span>
+              </div>
+              <div className="rounded-3xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 p-5 text-center text-white shadow-[0_0_18px_rgba(56,189,248,0.35)]">
+                <p className="text-sm uppercase tracking-[0.18em]">{summaryType === 'cash' ? 'Amount taken from rider' : 'Amount to give rider'}</p>
+                <p className="mt-3 text-4xl font-extrabold">{formatCurrency(summaryData.riderAmount)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-950 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 border border-cyan-500/50 shadow-2xl shadow-cyan-500/30 relative">
@@ -977,7 +1425,7 @@ export function RidersApp() {
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div className="bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
                   <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Order ID</p>
-                  <p className="text-xl font-bold text-white">{selectedOrder.originalOrder?.id || selectedOrder.id || 'N/A'}</p>
+                  <p className="text-xl font-bold text-white">{getDisplayOrderNumber(selectedOrder)}</p>
                 </div>
                 <div className="bg-slate-900/50 border border-cyan-500/20 rounded-lg p-4">
                   <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-2">Customer</p>
@@ -1028,10 +1476,18 @@ export function RidersApp() {
                   <span>Subtotal:</span>
                   <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.subtotal || 0}</span>
                 </div>
-                <div className="flex justify-between items-center text-slate-300">
-                  <span>Delivery Charge:</span>
-                  <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.deliveryCharge || 0}</span>
-                </div>
+                {Number(getOrderDeliveryFee(selectedOrder.originalOrder || selectedOrder)) > 0 && (
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>Delivery Fee:</span>
+                    <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {getOrderDeliveryFee(selectedOrder.originalOrder || selectedOrder)}</span>
+                  </div>
+                )}
+                {Number(selectedOrder.originalOrder?.serviceCharge || 0) > 0 && Number(selectedOrder.originalOrder?.deliveryCharge || selectedOrder.originalOrder?.deliveryFee || 0) > 0 && (
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>Service Charge:</span>
+                    <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.serviceCharge || 0}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-xl font-bold border-t border-cyan-500/30 pt-4 mt-4">
                   <span className="text-cyan-400">Total:</span>
                   <span className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.total || 0}</span>
@@ -1073,18 +1529,26 @@ export function RidersApp() {
   );
 }
 
-function OrderCard({ order, onViewSlip, status, actions = [], extraActions = [] }) {
+function OrderCard({ order, currency = 'PKR', onViewSlip, status, actions = [], extraActions = [] }) {
+  const original = order.originalOrder || order || {};
+  const deliveryFee = Number(original.deliveryCharge || original.deliveryFee || original.serviceCharge || 0);
+
   return (
     <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
       <div className="flex justify-between items-start mb-3">
         <div>
-          <p className="text-lg font-bold text-gray-900">Order #{order.originalOrder?.id || order.id}</p>
+          <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
           <p className="text-sm text-gray-600">
             {order.originalOrder?.customerName || 'Customer'}
           </p>
           <p className="text-xs text-gray-500 mt-1">
             {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
           </p>
+          {deliveryFee > 0 && (
+            <p className="text-xs text-gray-500 mt-1">
+              Delivery fee: {currency} {deliveryFee}
+            </p>
+          )}
         </div>
         <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">{status}</span>
       </div>
@@ -1094,7 +1558,7 @@ function OrderCard({ order, onViewSlip, status, actions = [], extraActions = [] 
           <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
         </p>
         <p className="text-sm text-gray-700">
-          <strong>Total:</strong> PKR {order.originalOrder?.total || 0}
+          <strong>Total:</strong> {currency} {order.originalOrder?.total || 0}
         </p>
       </div>
 

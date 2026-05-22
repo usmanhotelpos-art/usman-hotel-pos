@@ -6,7 +6,7 @@ const envApiBase = import.meta.env.VITE_API_BASE || '';
 const apiBase = envApiBase
   ? envApiBase.replace(/\/$/, '')
   : '/api';
-const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'settings'];
+const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'rider-root-settings', 'settings'];
 
 function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
@@ -111,6 +111,8 @@ function App() {
   const [posDeliveryAgents, setPosDeliveryAgents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [posOrders, setPosOrders] = useState([]);
+  const [shiftRiderId, setShiftRiderId] = useState('');
+  const [shiftActionLoading, setShiftActionLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '' });
@@ -404,11 +406,13 @@ function App() {
     customers: '👥',
     orders: '🧾',
     'rider-book': '🚴',
+    'rider-root-settings': '🔧',
     settings: '⚙️'
   };
   const tabLabels = {
     'catalogue-qr': 'Catalogue QR',
     'rider-book': 'Rider Book',
+    'rider-root-settings': 'Rider portal App Root settings',
     settings: 'Rider App Settings'
   };
   const formatTabName = (tab) => tabLabels[tab] || tab.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
@@ -824,6 +828,8 @@ function App() {
         await loadInventoryData();
       } else if (tab === 'riders-app') {
         // Riders App is a self-contained component and does not need generic tab data loading.
+      } else if (tab === 'rider-root-settings') {
+        await loadSettings();
       } else if (tab === 'pos' || tab === 'catalogue-qr') {
         await loadPosData();
       } else if (tab === 'customers') {
@@ -5024,7 +5030,7 @@ function App() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <div className="mt-6 grid gap-4 lg:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-400">POS Header Label</label>
               <input value={settings.posHeaderSubtitle} onChange={(e) => setSettings((prev) => ({ ...prev, posHeaderSubtitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="e.g. POS Header" />
@@ -5224,6 +5230,248 @@ function App() {
             <button onClick={restoreServerFromGoogleSheet} className="rounded-3xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500">Restore</button>
           </div>
           <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Use these controls to define receipt layout, font styling and printing behavior.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const riderShift = settings?.riderShift || {};
+  const shiftRiderOptions = useMemo(() => {
+    return (staff || []).filter((member) => {
+      const role = (member.role || '').toString().trim();
+      const isRegularBiker = role === 'Biker';
+      const isLoginEnabled = member.loginEnabled !== false;
+      return isRegularBiker && isLoginEnabled;
+    }).sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username));
+  }, [staff]);
+
+  useEffect(() => {
+    setShiftRiderId(settings?.riderShift?.riderId || '');
+  }, [settings?.riderShift?.riderId]);
+
+  const formatShiftDuration = (startedAt) => {
+    if (!startedAt) return '00h 00m';
+    const startedTime = new Date(startedAt).getTime();
+    if (Number.isNaN(startedTime)) return '00h 00m';
+    const diffMs = Math.max(Date.now() - startedTime, 0);
+    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor((diffMs % 3600000) / 60000);
+    return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+  };
+
+  const formatShiftStartedAt = (startedAt) => {
+    if (!startedAt) return 'Not started';
+    try {
+      return new Date(startedAt).toLocaleString();
+    } catch {
+      return 'Not started';
+    }
+  };
+
+  async function saveShiftSettings(shiftData) {
+    setShiftActionLoading(true);
+    try {
+      const updated = await fetchJson(`${apiBase}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify({ riderShift: shiftData })
+      });
+      setSettings((prev) => ({ ...prev, ...updated }));
+      return updated;
+    } catch (error) {
+      setMessage(error.message || 'Unable to update rider shift settings.');
+      return null;
+    } finally {
+      setShiftActionLoading(false);
+    }
+  }
+
+  async function handleStartShift() {
+    if (!shiftRiderId) {
+      setMessage('Select a biker before starting the shift.');
+      return;
+    }
+
+    const selectedRider = shiftRiderOptions.find((rider) => rider.id === shiftRiderId);
+    if (!selectedRider) {
+      setMessage('Selected biker is unavailable. Please choose another.');
+      return;
+    }
+
+    const assignedRiderId = selectedRider.riderId || selectedRider.id;
+    const shiftData = {
+      active: true,
+      riderId: assignedRiderId,
+      riderName: selectedRider.name || selectedRider.username || 'Assigned Rider',
+      riderUsername: selectedRider.username || '',
+      startedAt: new Date().toISOString(),
+      startedBy: user?.name || 'Admin'
+    };
+
+    const updated = await saveShiftSettings(shiftData);
+    if (updated) {
+      setMessage(`Shift started for ${selectedRider.name || selectedRider.username}.`);
+    }
+  }
+
+  async function handleCloseShift() {
+    if (!riderShift?.active) {
+      setMessage('No active shift to close.');
+      return;
+    }
+
+    setShiftActionLoading(true);
+    try {
+      await fetchJson(`${apiBase}/admin/clear-rider-app`, { method: 'POST' });
+      const updated = await saveShiftSettings({
+        active: false,
+        riderId: null,
+        riderName: null,
+        riderUsername: null,
+        startedAt: null,
+        startedBy: user?.name || 'Admin'
+      });
+      setShiftRiderId('');
+      if (updated) {
+        setMessage('Shift closed and rider app data cleared for the next shift.');
+      }
+    } catch (error) {
+      // error message handled inside saveShiftSettings or fetchJson
+    } finally {
+      setShiftActionLoading(false);
+    }
+  }
+
+  async function handleClearSelectedRiderOrders() {
+    if (!shiftRiderId) {
+      setMessage('Please select a rider first.');
+      return;
+    }
+
+    const selectedRider = shiftRiderOptions.find((r) => r.id === shiftRiderId);
+    if (!selectedRider) {
+      setMessage('Selected rider not found.');
+      return;
+    }
+
+    setShiftActionLoading(true);
+    try {
+      const searchName = selectedRider.name || selectedRider.username;
+      const allOrders = await fetchJson(`${apiBase}/pos/orders`);
+      
+      const riderOrders = (allOrders || []).filter(
+        (o) => (o.deliveryAgent === searchName) && o.status === 'Payment Collected'
+      );
+
+      let deletedCount = 0;
+      for (const order of riderOrders) {
+        try {
+          await fetchJson(`${apiBase}/pos/orders/${order.id}`, { method: 'DELETE' });
+          deletedCount++;
+        } catch (e) {
+          console.error('Error deleting order:', order.id, e);
+        }
+      }
+
+      setMessage(`Cleared ${deletedCount} delivered orders (cash and online) for ${searchName}.`);
+    } catch (error) {
+      setMessage(`Error clearing orders: ${error.message}`);
+    } finally {
+      setShiftActionLoading(false);
+    }
+  }
+
+
+  function renderRootSettings() {
+    return (
+      <div className="space-y-6">
+        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Rider Portal Root Settings</p>
+              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Manage Rider portal App root configuration</h3>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Rider App Title</label>
+              <input value={settings.riderAppTitle} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppTitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Rider Portal" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Rider App Subtitle</label>
+              <input value={settings.riderAppSubtitle} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppSubtitle: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Fast delivery management for riders" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Login Prompt</label>
+              <input value={settings.riderAppLoginNote} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppLoginNote: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Login to continue" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Rider App Logo URL</label>
+              <input value={settings.riderAppLogo} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppLogo: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Logo image URL" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Rider App Avatar URL</label>
+              <input value={settings.riderAppAvatar} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppAvatar: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Avatar image URL" />
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Shift Control</p>
+              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Start and close rider shifts</h3>
+              <p className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pick a biker and start the shift. Closing the shift will clear previous rider app entries so the next shift starts fresh.</p>
+            </div>
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shift status</p>
+                  <p className={`mt-2 text-lg font-semibold ${riderShift?.active ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {riderShift?.active ? 'Active' : 'Inactive'}
+                  </p>
+                </div>
+                <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  Close Shift
+                </button>
+              </div>
+              <div className="mt-4 text-left text-sm text-slate-400 space-y-2">
+                {riderShift?.active ? (
+                  <>
+                    <p>Started: {formatShiftStartedAt(riderShift.startedAt)}</p>
+                    <p>Elapsed: {formatShiftDuration(riderShift.startedAt)}</p>
+                    {riderShift.riderName ? <p>Assigned rider: {riderShift.riderName}</p> : null}
+                  </>
+                ) : (
+                  <p>No active shift yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Select Rider</label>
+              <select value={shiftRiderId} onChange={(e) => setShiftRiderId(e.target.value)} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                <option value="">Select Biker role rider</option>
+                {shiftRiderOptions.map((member) => (
+                  <option key={member.id} value={member.id}>{member.name || member.username} ({member.role})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400">Actions</label>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <button onClick={handleStartShift} disabled={shiftActionLoading || riderShift?.active || !shiftRiderId} className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">Start Shift</button>
+                <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">Close Shift</button>
+              </div>
+              <p className="mt-3 text-sm text-slate-400">{riderShift?.active ? 'Closing shift removes old rider order history and unlocks the next shift.' : 'Start a new shift when the rider is ready to take delivery.'}</p>
+            </div>
+          </div>
+          <div className="mt-6 border-t border-slate-800 pt-6">
+            <label className="block text-sm font-medium text-slate-400 mb-2">Clear Selected Rider Delivered Orders</label>
+            <p className="text-sm text-slate-500 mb-3">Remove all cash and online delivered orders for the selected rider</p>
+            <button onClick={handleClearSelectedRiderOrders} disabled={shiftActionLoading || !shiftRiderId} className="rounded-3xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-50">
+              Clear Rider Orders
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -7338,6 +7586,7 @@ function App() {
             {activeTab === 'catalogue-qr' && renderCatalogueQrModule()}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'riders-app' && <RidersApp />}
+            {activeTab === 'rider-root-settings' && renderRootSettings()}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'rider-book' && renderRiderBook()}

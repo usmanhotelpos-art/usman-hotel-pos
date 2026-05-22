@@ -34,6 +34,15 @@ const defaultData = {
     currency: 'PKR',
     location: 'Karachi',
     taxRate: 0.18
+    ,
+     riderShift: {
+       active: false,
+       riderId: null,
+       riderName: null,
+       riderUsername: null,
+       startedAt: null,
+       startedBy: null
+     }
   },
   rooms: [
     { id: 'r1', number: '101', type: 'Single', status: 'available', rate: 3800 },
@@ -58,7 +67,7 @@ const defaultData = {
   staff: [
     { id: 's1', name: 'Ayesha', role: 'Receptionist', phone: '+923001234567', status: 'active' },
     { id: 's2', name: 'Usman', role: 'Manager', phone: '+923009876543', status: 'active' },
-    { id: 's4', name: 'Ahmed Rider', role: 'Admin Rider', phone: '+923001234567', status: 'active', otherName: '', username: 'ahmed@rider.com', password: 'riderpass1', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'rider1' }
+    { id: 's4', name: 'Ahmed Rider', role: 'Admin Rider', phone: '+923001234567', email: 'ahmed@rider.com', status: 'active', otherName: '', username: 'ahmed@rider.com', password: 'riderpass1', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'rider1' }
   ],
   sales: [
     { id: 'sale1', description: 'Room 102 payment', amount: 20800, date: '2026-05-05' }

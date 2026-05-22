@@ -224,6 +224,12 @@ router.get('/pos/products', (req, res) => {
   res.send(getCollection('pos_products'));
 });
 
+// Public: return basic rider/hotel settings without requiring auth
+router.get('/settings', (req, res) => {
+  const db = readDb();
+  res.send(db.settings || {});
+});
+
 router.use(authenticate);
 
 const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests'];
