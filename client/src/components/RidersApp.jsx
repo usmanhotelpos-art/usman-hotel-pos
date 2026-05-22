@@ -237,17 +237,43 @@ export function RidersApp() {
   const overallDifference = cashSummaryData.riderAmount - onlineSummaryData.riderAmount;
   const overallDifferenceLabel = overallDifference < 0 ? 'RIDER HAQ' : overallDifference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED';
 
-  const riderShift = hotelSettings?.riderShift || {};
-  const shiftActive = Boolean(riderShift?.active);
-  const shiftAssignedRiderId = riderShift?.riderId;
-  const shiftAssignedRiderName = riderShift?.riderName || riderShift?.riderUsername || 'assigned rider';
-  const shiftStartedAt = riderShift?.startedAt ? new Date(riderShift.startedAt) : null;
+  // Support both legacy single `riderShift` and newer `riderShifts` array.
+  const allShifts = Array.isArray(hotelSettings?.riderShifts)
+    ? hotelSettings.riderShifts
+    : hotelSettings?.riderShift
+    ? [hotelSettings.riderShift]
+    : [];
+  const activeShifts = (allShifts || []).filter((s) => s && Boolean(s.active));
+  const shiftActive = activeShifts.length > 0;
+
+  // Determine if the current login input matches any active shift (used for indicator and permissive login when multiple shifts present)
+  const inputLoginLower = (loginForm.email || '').toString().trim().toLowerCase();
+  const matchedShift = inputLoginLower
+    ? activeShifts.find((s) => {
+        const username = (s.riderUsername || '').toString().trim().toLowerCase();
+        const name = (s.riderName || '').toString().trim().toLowerCase();
+        const id = s.riderId ? String(s.riderId) : '';
+        if (!inputLoginLower) return false;
+        if (inputLoginLower === username || inputLoginLower === name || inputLoginLower === id) return true;
+        const local = inputLoginLower.includes('@') ? inputLoginLower.split('@')[0] : inputLoginLower;
+        if (local && (local === username || local === (username.includes('@') ? username.split('@')[0] : username))) return true;
+        return false;
+      })
+    : null;
+
+  // Choose a primary shift to display when needed: prefer matchedShift, otherwise if only one active shift use that.
+  const primaryShift = matchedShift || (activeShifts.length === 1 ? activeShifts[0] : null);
+  const shiftAssignedRiderId = primaryShift?.riderId || '';
+  const shiftAssignedRiderName = primaryShift ? (primaryShift.riderName || primaryShift.riderUsername || 'assigned rider') : (activeShifts.length === 1 ? (activeShifts[0].riderName || activeShifts[0].riderUsername || 'assigned rider') : `${activeShifts.length} active`);
+  const shiftStartedAt = primaryShift?.startedAt ? new Date(primaryShift.startedAt) : null;
+
+  const activeShiftsStartedAtKey = activeShifts.map((s) => s?.startedAt || '').join('|');
 
   useEffect(() => {
     const previous = shiftResetRef.current;
     const currentNav = {
       active: shiftActive,
-      startedAt: riderShift?.startedAt || ''
+      startedAt: activeShiftsStartedAtKey
     };
 
     const becameActive = !previous.active && currentNav.active;
@@ -263,7 +289,7 @@ export function RidersApp() {
     }
 
     shiftResetRef.current = currentNav;
-  }, [shiftActive, riderShift?.startedAt]);
+  }, [shiftActive, activeShiftsStartedAtKey]);
 
   const formatShiftElapsed = (startedAt) => {
     if (!startedAt) return '00h 00m';
@@ -280,7 +306,7 @@ export function RidersApp() {
       return 'Admin Biker mode - No shift requirement';
     }
     if (shiftActive) {
-      const assigned = riderShift?.riderUsername || riderShift?.riderName;
+      const assigned = primaryShift?.riderUsername || primaryShift?.riderName;
       const isAssignedUser = Boolean(inputLoginLower && canAttemptLogin && assigned);
       if (isAssignedUser) {
         return 'Yes, your shift started. Please enter your password.';
@@ -292,34 +318,34 @@ export function RidersApp() {
     }
     return 'Shift not started. Please ask Owner Farhan to start your shift.';
   };
-
   // Determine whether the current login input is allowed to attempt login.
-  const inputLoginLower = (loginForm.email || '').toString().trim().toLowerCase();
-  const shiftAssignedUsernameLower = (riderShift?.riderUsername || '').toString().trim().toLowerCase();
-  const shiftAssignedNameLower = (riderShift?.riderName || '').toString().trim().toLowerCase();
-  const shiftAssignedIdStr = riderShift?.riderId ? String(riderShift.riderId) : '';
+  const shiftAssignedUsernameLower = (primaryShift?.riderUsername || '').toString().trim().toLowerCase();
+  const shiftAssignedNameLower = (primaryShift?.riderName || '').toString().trim().toLowerCase();
+  const shiftAssignedIdStr = primaryShift?.riderId ? String(primaryShift.riderId) : '';
   const shiftAssignedUsernameLocalPart = shiftAssignedUsernameLower && shiftAssignedUsernameLower.includes('@') ? shiftAssignedUsernameLower.split('@')[0] : shiftAssignedUsernameLower;
 
   const canAttemptLogin = (() => {
     if (selectedRoleTab === 'admin-biker') return true; // admin bikers can login anytime via that tab
-    // for regular bikers require an active shift and ensure either no specific assignment or the login matches the assigned rider
     if (selectedRoleTab === 'biker') {
-      // If an assigned rider exists, allow login when the input matches the assigned rider
+      // If there's a primary assigned shift (either matched by input or single active shift), require input to match that shift
       if ((shiftAssignedIdStr || shiftAssignedUsernameLower || shiftAssignedNameLower)) {
         if (!inputLoginLower) return false;
-        // Accept exact matches against assigned id, username or name.
         if (
           inputLoginLower === shiftAssignedUsernameLower ||
           inputLoginLower === shiftAssignedNameLower ||
           inputLoginLower === shiftAssignedIdStr
         ) return true;
-        // Also accept when user enters an email like "ali@domain.com" and the local-part matches the assigned username
         const localPart = inputLoginLower.includes('@') ? inputLoginLower.split('@')[0] : inputLoginLower;
         if (localPart && (localPart === shiftAssignedUsernameLower || localPart === shiftAssignedUsernameLocalPart)) return true;
         return false;
       }
 
-      // No specific assignment - require an active shift to allow login
+      // No single assigned shift: if multiple active shifts exist, allow any non-empty login input (user will still be authenticated server-side)
+      if (activeShifts.length > 1) {
+        return Boolean(inputLoginLower);
+      }
+
+      // No active shifts at all
       if (!shiftActive) return false;
       return true;
     }
@@ -330,7 +356,7 @@ export function RidersApp() {
     if (!shiftActive) return undefined;
     const interval = window.setInterval(() => setShiftTimer(Date.now()), 60000);
     return () => window.clearInterval(interval);
-  }, [shiftActive, riderShift?.startedAt]);
+  }, [shiftActive, activeShiftsStartedAtKey]);
 
   useEffect(() => {
     if (!hotelSettings || view !== 'app' || !rider) return undefined;
@@ -471,10 +497,15 @@ export function RidersApp() {
     setLoginError('');
 
     const latestSettings = await fetchHotelSettings();
-    const latestShift = latestSettings?.riderShift || {};
-    const latestShiftActive = Boolean(latestShift?.active);
-    const latestShiftAssignedRiderId = latestShift?.riderId;
-    const latestShiftAssignedRiderName = latestShift?.riderName || latestShift?.riderUsername || 'assigned rider';
+    const latestAllShifts = Array.isArray(latestSettings?.riderShifts)
+      ? latestSettings.riderShifts
+      : latestSettings?.riderShift
+      ? [latestSettings.riderShift]
+      : [];
+    const latestActiveShifts = (latestAllShifts || []).filter((s) => s && Boolean(s.active));
+    const latestShiftActive = latestActiveShifts.length > 0;
+    const anyAssignedActive = latestActiveShifts.some((s) => s.riderId || s.riderUsername);
+    const latestAssignedNames = latestActiveShifts.filter(s => s.riderName || s.riderUsername).map(s => s.riderName || s.riderUsername).join(', ');
 
     try {
       const res = await fetch(`${apiBase}/auth/rider-login`, {
@@ -485,6 +516,12 @@ export function RidersApp() {
 
       if (res.ok) {
         const data = await res.json();
+        const matchingAssigned = latestActiveShifts.some((s) => {
+          const id = s.riderId ? String(s.riderId) : '';
+          const username = (s.riderUsername || '').toString().trim().toLowerCase();
+          const riderUsernameOrEmail = (data?.rider?.username || data?.rider?.email || '').toString().trim().toLowerCase();
+          return (id && String(data?.rider?.id) === id) || (username && username === riderUsernameOrEmail);
+        });
         const riderId = data.rider?.id;
         const riderRole = (data.rider?.role || '').toString().toLowerCase();
         const isAdminRider = riderRole.includes('admin');
@@ -499,8 +536,9 @@ export function RidersApp() {
             return;
           }
 
-          if (latestShiftAssignedRiderId && riderId !== latestShiftAssignedRiderId) {
-            const message = `This shift is assigned to ${latestShiftAssignedRiderName}. Please login with the assigned rider account.`;
+          // If active shifts contain explicit assignments, require the logged-in rider to be one of those assigned.
+          if (anyAssignedActive && !matchingAssigned) {
+            const message = `This shift is assigned to ${latestAssignedNames || 'another rider'}. Please login with the assigned rider account.`;
             setLoginError(message);
             notify(message, 'error');
             setLoading(false);
@@ -789,7 +827,7 @@ export function RidersApp() {
               {selectedRoleTab === 'biker' && shiftActive && shiftStartedAt ? (
                 <div className="mt-3 space-y-1 text-xs text-orange-300">
                   <p>Started at {shiftStartedAt.toLocaleTimeString()}</p>
-                  <p>Elapsed: {formatShiftElapsed(riderShift.startedAt)}</p>
+                  <p>Elapsed: {formatShiftElapsed(primaryShift?.startedAt)}</p>
                 </div>
               ) : null}
             </div>
@@ -917,7 +955,7 @@ export function RidersApp() {
               <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Shift status</p>
               <p className={`mt-4 text-3xl font-semibold ${shiftActive ? 'text-emerald-400' : 'text-rose-400'}`}>{shiftActive ? 'Active' : 'Inactive'}</p>
               <p className="mt-2 text-sm text-slate-400">{shiftActive ? `Rider: ${shiftAssignedRiderName}` : 'Waiting for shift start'}</p>
-              {shiftActive && riderShift.startedAt ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{formatShiftElapsed(riderShift.startedAt)} elapsed</p> : null}
+              {shiftActive && primaryShift?.startedAt ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{formatShiftElapsed(primaryShift?.startedAt)} elapsed</p> : null}
             </div>
             <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/10 via-slate-900/70 to-cyan-500/10 p-5 shadow-xl shadow-fuchsia-500/15 animate-pulse">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-300">Difference</p>
