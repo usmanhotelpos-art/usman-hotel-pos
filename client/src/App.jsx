@@ -5236,6 +5236,7 @@ function App() {
   }
 
   const riderShift = settings?.riderShift || {};
+  const riderShifts = settings?.riderShifts || (settings?.riderShift ? [settings.riderShift] : []);
   const shiftRiderOptions = useMemo(() => {
     return (staff || []).filter((member) => {
       const role = (member.role || '').toString().trim();
@@ -5273,7 +5274,7 @@ function App() {
     try {
       const updated = await fetchJson(`${apiBase}/settings`, {
         method: 'PUT',
-        body: JSON.stringify({ riderShift: shiftData })
+        body: JSON.stringify(shiftData)
       });
       setSettings((prev) => ({ ...prev, ...updated }));
       return updated;
@@ -5298,6 +5299,15 @@ function App() {
     }
 
     const assignedRiderId = selectedRider.riderId || selectedRider.id;
+
+    // If a different shift is currently active, close it first to clear previous rider app state
+    if (riderShift?.active && riderShift?.riderId && riderShift?.riderId !== assignedRiderId) {
+      try {
+        await handleCloseShift();
+      } catch (err) {
+        // ignore errors from close; we'll still attempt to start the new shift
+      }
+    }
     const shiftData = {
       active: true,
       riderId: assignedRiderId,
@@ -5307,7 +5317,7 @@ function App() {
       startedBy: user?.name || 'Admin'
     };
 
-    const updated = await saveShiftSettings(shiftData);
+    const updated = await saveShiftSettings({ riderShifts: [ ...(settings.riderShifts || []), shiftData ] });
     if (updated) {
       setMessage(`Shift started for ${selectedRider.name || selectedRider.username}.`);
     }
@@ -5421,29 +5431,44 @@ function App() {
               <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Start and close rider shifts</h3>
               <p className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pick a biker and start the shift. Closing the shift will clear previous rider app entries so the next shift starts fresh.</p>
             </div>
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shift status</p>
-                  <p className={`mt-2 text-lg font-semibold ${riderShift?.active ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {riderShift?.active ? 'Active' : 'Inactive'}
-                  </p>
+            <div className="space-y-3">
+              {riderShifts && riderShifts.length > 0 ? (
+                riderShifts.map((sh, idx) => (
+                  <div key={idx} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shift status</p>
+                        <p className={`mt-2 text-lg font-semibold ${sh?.active ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {sh?.active ? 'Active' : 'Inactive'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Keep single global Close Shift button for now */}
+                        {idx === 0 && (
+                          <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
+                            Close Shift
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 text-left text-sm text-slate-400 space-y-2">
+                      {sh?.startedAt ? (
+                        <>
+                          <p>Started: {formatShiftStartedAt(sh.startedAt)}</p>
+                          <p>Elapsed: {formatShiftDuration(sh.startedAt)}</p>
+                          {sh.riderName ? <p>Assigned rider: {sh.riderName}</p> : null}
+                        </>
+                      ) : (
+                        <p>No start time</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
+                  <p className="text-sm text-slate-400">No shifts recorded</p>
                 </div>
-                <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
-                  Close Shift
-                </button>
-              </div>
-              <div className="mt-4 text-left text-sm text-slate-400 space-y-2">
-                {riderShift?.active ? (
-                  <>
-                    <p>Started: {formatShiftStartedAt(riderShift.startedAt)}</p>
-                    <p>Elapsed: {formatShiftDuration(riderShift.startedAt)}</p>
-                    {riderShift.riderName ? <p>Assigned rider: {riderShift.riderName}</p> : null}
-                  </>
-                ) : (
-                  <p>No active shift yet</p>
-                )}
-              </div>
+              )}
             </div>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -5459,7 +5484,17 @@ function App() {
             <div>
               <label className="block text-sm font-medium text-slate-400">Actions</label>
               <div className="mt-2 flex flex-wrap gap-3">
-                <button onClick={handleStartShift} disabled={shiftActionLoading || riderShift?.active || !shiftRiderId} className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">Start Shift</button>
+                <button
+                  onClick={handleStartShift}
+                  disabled={
+                    shiftActionLoading ||
+                    !shiftRiderId ||
+                    (riderShift?.active && riderShift?.riderId === shiftRiderId)
+                  }
+                  className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Start Shift
+                </button>
                 <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">Close Shift</button>
               </div>
               <p className="mt-3 text-sm text-slate-400">{riderShift?.active ? 'Closing shift removes old rider order history and unlocks the next shift.' : 'Start a new shift when the rider is ready to take delivery.'}</p>
