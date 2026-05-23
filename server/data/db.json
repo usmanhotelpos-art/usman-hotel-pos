@@ -4,7 +4,7 @@
     "currency": "PKR",
     "location": "Karachi",
     "taxRate": 0,
-    "tokenSlipNextNumber": 29,
+    "tokenSlipNextNumber": 34,
     "logo": "",
     "receiptLogoWidth": "120",
     "receiptHeader": "",
@@ -878,10 +878,10 @@
       "name": "کلونجی نان",
       "category": "نان اور روٹی",
       "price": 35,
-      "availableStock": 21,
+      "availableStock": 10,
       "image": "",
       "description": "کلونجی نان۔",
-      "updatedAt": "2026-05-22T23:21:37.761Z"
+      "updatedAt": "2026-05-23T11:02:38.684Z"
     },
     {
       "id": "p48",
@@ -969,9 +969,10 @@
       "name": "چکن چیز نان",
       "category": "اسپیشل نان",
       "price": 450,
-      "availableStock": 20,
+      "availableStock": 15,
       "image": "",
-      "description": "چکن چیز نان۔"
+      "description": "چکن چیز نان۔",
+      "updatedAt": "2026-05-23T09:53:55.363Z"
     },
     {
       "id": "p58",
@@ -1003,7 +1004,7 @@
     {
       "id": "d3c416c1-bcbc-404f-b46b-b236a57203d5",
       "createdAt": "2026-05-21T23:23:13.614Z",
-      "updatedAt": "2026-05-22T23:22:11.763Z",
+      "updatedAt": "2026-05-23T10:34:40.157Z",
       "name": "bottle",
       "category": "Extras",
       "price": "200",
@@ -1164,27 +1165,27 @@
       "customerId": "8e06b11d-55b4-45f7-814a-4198969b752d"
     },
     {
-      "id": "92a42cbe-9b34-4a62-94eb-454bd952851b",
-      "createdAt": "2026-05-22T23:22:11.759Z",
-      "updatedAt": "2026-05-22T23:22:11.759Z",
-      "orderNumber": "ORD-131759",
+      "id": "6d2c4e24-59ab-4811-9e2f-a7756b46fe6b",
+      "createdAt": "2026-05-23T10:34:19.392Z",
+      "updatedAt": "2026-05-23T10:37:44.133Z",
+      "orderNumber": "ORD-459392",
       "orderType": "Delivery",
       "customerName": "",
       "phone": "",
-      "address": "m,n,",
+      "address": "jyh",
       "tableNumber": "",
       "deliveryAgent": "farhan",
       "deliveryFee": 120,
       "discount": 0,
       "taxPercent": 0,
       "serviceCharge": 0,
-      "paymentMethod": "",
-      "paymentStatus": "May be Online",
+      "paymentMethod": "Cash",
+      "paymentStatus": "Paid",
       "notes": "",
       "items": [
         {
-          "productId": "p46",
-          "name": "کلچہ نان",
+          "productId": "p47",
+          "name": "کلونجی نان",
           "price": 35,
           "quantity": 3,
           "notes": "",
@@ -1206,80 +1207,44 @@
       "serviceType": "Express Delivery",
       "subtotal": 505,
       "total": 625,
-      "status": "Riders Assigned",
-      "customerId": "067cef26-0fdd-4bd6-aff8-192a2bef20f6"
+      "status": "Payment Collected",
+      "customerId": "7086610f-6802-447e-8dc1-a3382eebef12"
     },
     {
-      "id": "96183e40-e034-4396-9dbb-3259eb66242f",
-      "createdAt": "2026-05-23T01:46:05.748Z",
-      "updatedAt": "2026-05-23T01:46:29.466Z",
-      "orderNumber": "ORD-765702",
+      "id": "5d850991-b27b-40bc-8ac1-5ae82ff1ba31",
+      "createdAt": "2026-05-23T11:02:38.682Z",
+      "updatedAt": "2026-05-23T11:02:49.533Z",
+      "orderNumber": "ORD-158682",
       "orderType": "Delivery",
       "customerName": "",
       "phone": "",
-      "address": "yhfghj",
-      "tableNumber": "",
-      "deliveryAgent": "farhan",
-      "deliveryFee": 120,
-      "discount": 0,
-      "taxPercent": 0,
-      "serviceCharge": 0,
-      "paymentMethod": "",
-      "paymentStatus": "Receive Cash Till",
-      "notes": "",
-      "items": [
-        {
-          "productId": "p46",
-          "name": "کلچہ نان",
-          "price": 35,
-          "quantity": 4,
-          "notes": "",
-          "weight": "",
-          "flavor": "",
-          "total": 140
-        }
-      ],
-      "serviceType": "Express Delivery",
-      "subtotal": 140,
-      "total": 260,
-      "status": "Riders Assigned",
-      "customerId": "9340f870-e00a-436c-a5c1-cccb701b809d"
-    },
-    {
-      "id": "89a8d2fd-56ee-46d2-bc10-4cbfb7ed3f81",
-      "createdAt": "2026-05-23T01:47:00.358Z",
-      "updatedAt": "2026-05-23T06:03:12.690Z",
-      "orderNumber": "ORD-820358",
-      "orderType": "Delivery",
-      "customerName": "",
-      "phone": "",
-      "address": "hgh",
+      "address": "ghg",
       "tableNumber": "",
       "deliveryAgent": "farhan",
       "deliveryFee": 50,
       "discount": 0,
       "taxPercent": 0,
       "serviceCharge": 0,
-      "paymentMethod": "",
-      "paymentStatus": "Receive Cash Till",
+      "paymentMethod": "Cash",
+      "paymentStatus": "Paid",
       "notes": "",
       "items": [
         {
-          "productId": "p46",
-          "name": "کلچہ نان",
+          "productId": "p47",
+          "name": "کلونجی نان",
           "price": 35,
-          "quantity": 5,
+          "quantity": 2,
           "notes": "",
           "weight": "",
           "flavor": "",
-          "total": 175
+          "total": 70
         }
       ],
       "serviceType": "Standard Delivery",
-      "subtotal": 175,
-      "total": 225,
-      "status": "Riders Assigned",
-      "customerId": "7b51e723-624d-4f14-96f2-103c5f2cd11b"
+      "subtotal": 70,
+      "total": 120,
+      "status": "Payment Collected",
+      "customerId": "279a41a9-61b5-4e13-ac1b-7f671fef55f9"
     }
   ],
   "pos_customers": [
@@ -1524,6 +1489,51 @@
       "phone": "",
       "address": "hgh",
       "lastOrderNumber": "ORD-820358"
+    },
+    {
+      "id": "988f7c0e-6d23-445d-893b-c691155fd468",
+      "createdAt": "2026-05-23T09:47:24.452Z",
+      "updatedAt": "2026-05-23T09:47:24.452Z",
+      "name": "",
+      "phone": "",
+      "address": "vfgbf",
+      "lastOrderNumber": "ORD-656117"
+    },
+    {
+      "id": "fc94b974-708c-4988-a490-62d1ee523b49",
+      "createdAt": "2026-05-23T09:53:50.819Z",
+      "updatedAt": "2026-05-23T09:53:50.819Z",
+      "name": "",
+      "phone": "",
+      "address": "dcfc4r",
+      "lastOrderNumber": "ORD-035305"
+    },
+    {
+      "id": "7086610f-6802-447e-8dc1-a3382eebef12",
+      "createdAt": "2026-05-23T10:34:16.052Z",
+      "updatedAt": "2026-05-23T10:34:16.052Z",
+      "name": "",
+      "phone": "",
+      "address": "jyh",
+      "lastOrderNumber": "ORD-459392"
+    },
+    {
+      "id": "618c9920-b282-4d9d-8860-f8c6f89ae600",
+      "createdAt": "2026-05-23T10:34:35.315Z",
+      "updatedAt": "2026-05-23T10:34:35.315Z",
+      "name": "",
+      "phone": "",
+      "address": "jfgj",
+      "lastOrderNumber": "ORD-480149"
+    },
+    {
+      "id": "279a41a9-61b5-4e13-ac1b-7f671fef55f9",
+      "createdAt": "2026-05-23T11:02:33.003Z",
+      "updatedAt": "2026-05-23T11:02:33.003Z",
+      "name": "",
+      "phone": "",
+      "address": "ghg",
+      "lastOrderNumber": "ORD-158682"
     }
   ],
   "pos_payments": [],
@@ -1612,20 +1622,20 @@
   ],
   "rider_orders": [
     {
-      "id": "48f47cb2-4ced-4400-a83e-1ff06ad8d067",
-      "createdAt": "2026-05-23T01:46:11.986Z",
-      "updatedAt": "2026-05-23T01:46:29.523Z",
-      "orderId": "96183e40-e034-4396-9dbb-3259eb66242f",
+      "id": "b46f73dd-ccd8-484f-bbb4-807bc5dbe65b",
+      "createdAt": "2026-05-23T10:34:45.777Z",
+      "updatedAt": "2026-05-23T10:37:44.135Z",
+      "orderId": "6d2c4e24-59ab-4811-9e2f-a7756b46fe6b",
       "riderId": "4fdb0982-4863-47c4-8182-0942fce0689b",
       "originalOrder": {
-        "id": "96183e40-e034-4396-9dbb-3259eb66242f",
-        "createdAt": "2026-05-23T01:46:05.748Z",
-        "updatedAt": "2026-05-23T01:46:05.748Z",
-        "orderNumber": "ORD-765702",
+        "id": "6d2c4e24-59ab-4811-9e2f-a7756b46fe6b",
+        "createdAt": "2026-05-23T10:34:19.392Z",
+        "updatedAt": "2026-05-23T10:34:19.392Z",
+        "orderNumber": "ORD-459392",
         "orderType": "Delivery",
         "customerName": "",
         "phone": "",
-        "address": "yhfghj",
+        "address": "jyh",
         "tableNumber": "",
         "deliveryAgent": "",
         "deliveryFee": 120,
@@ -1637,87 +1647,44 @@
         "notes": "",
         "items": [
           {
-            "productId": "p46",
-            "name": "کلچہ نان",
+            "productId": "p47",
+            "name": "کلونجی نان",
             "price": 35,
-            "quantity": 4,
+            "quantity": 3,
             "notes": "",
             "weight": "",
             "flavor": "",
-            "total": 140
+            "total": 105
+          },
+          {
+            "productId": "d3c416c1-bcbc-404f-b46b-b236a57203d5",
+            "name": "bottle",
+            "price": 200,
+            "quantity": 2,
+            "notes": "",
+            "weight": "",
+            "flavor": "",
+            "total": 400
           }
         ],
         "serviceType": "Express Delivery",
-        "subtotal": 140,
-        "total": 260,
+        "subtotal": 505,
+        "total": 625,
         "status": "Kitchen",
-        "customerId": "9340f870-e00a-436c-a5c1-cccb701b809d"
+        "customerId": "7086610f-6802-447e-8dc1-a3382eebef12"
       },
-      "status": "assigned"
-    },
-    {
-      "id": "65c9a725-848f-4ad4-b376-cf8637d38d5b",
-      "createdAt": "2026-05-23T01:47:10.107Z",
-      "updatedAt": "2026-05-23T06:03:12.692Z",
-      "orderId": "89a8d2fd-56ee-46d2-bc10-4cbfb7ed3f81",
-      "riderId": "4fdb0982-4863-47c4-8182-0942fce0689b",
-      "originalOrder": {
-        "id": "89a8d2fd-56ee-46d2-bc10-4cbfb7ed3f81",
-        "createdAt": "2026-05-23T01:47:00.358Z",
-        "updatedAt": "2026-05-23T01:47:00.358Z",
-        "orderNumber": "ORD-820358",
-        "orderType": "Delivery",
-        "customerName": "",
-        "phone": "",
-        "address": "hgh",
-        "tableNumber": "",
-        "deliveryAgent": "",
-        "deliveryFee": 50,
-        "discount": 0,
-        "taxPercent": 0,
-        "serviceCharge": 0,
-        "paymentMethod": "",
-        "paymentStatus": "Receive Cash Till",
-        "notes": "",
-        "items": [
-          {
-            "productId": "p46",
-            "name": "کلچہ نان",
-            "price": 35,
-            "quantity": 5,
-            "notes": "",
-            "weight": "",
-            "flavor": "",
-            "total": 175
-          }
-        ],
-        "serviceType": "Standard Delivery",
-        "subtotal": 175,
-        "total": 225,
-        "status": "Kitchen",
-        "customerId": "7b51e723-624d-4f14-96f2-103c5f2cd11b"
-      },
-      "status": "assigned"
+      "status": "completed"
     }
   ],
   "rider_order_requests": [
     {
-      "id": "84cc30c7-fb41-4834-93e0-cc43ef910753",
-      "createdAt": "2026-05-23T01:46:11.988Z",
-      "updatedAt": "2026-05-23T01:46:29.464Z",
-      "orderId": "96183e40-e034-4396-9dbb-3259eb66242f",
+      "id": "a818af4d-79f1-431f-bb0f-dc1582ca9c6f",
+      "createdAt": "2026-05-23T10:34:45.779Z",
+      "updatedAt": "2026-05-23T10:34:55.129Z",
+      "orderId": "6d2c4e24-59ab-4811-9e2f-a7756b46fe6b",
       "riderId": "4fdb0982-4863-47c4-8182-0942fce0689b",
       "status": "approved",
-      "requestedAt": "2026-05-23T01:46:11.988Z"
-    },
-    {
-      "id": "265a011c-2d01-413d-aa32-0dbdfb4a6719",
-      "createdAt": "2026-05-23T01:47:10.110Z",
-      "updatedAt": "2026-05-23T06:03:12.676Z",
-      "orderId": "89a8d2fd-56ee-46d2-bc10-4cbfb7ed3f81",
-      "riderId": "4fdb0982-4863-47c4-8182-0942fce0689b",
-      "status": "approved",
-      "requestedAt": "2026-05-23T01:47:10.110Z"
+      "requestedAt": "2026-05-23T10:34:45.779Z"
     }
   ]
 }

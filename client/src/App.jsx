@@ -11,6 +11,7 @@ const apiBase = envApiBase
 function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
+  const isHelperRoute = initialPath.startsWith('/helper');
   const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'settings'];
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
@@ -21,7 +22,8 @@ function App() {
       return defaultTabs;
     }
   });
-  const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : 'dashboard');
+  const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : isHelperRoute ? 'pos' : 'dashboard');
+  const [isMobile, setIsMobile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState(null);
   const [items, setItems] = useState([]);
@@ -97,6 +99,44 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('posToken') || '');
   const [user, setUser] = useState(null);
   const [authForm, setAuthForm] = useState({ email: 'admin@usmanhotel.com', password: '' });
+
+  const copyAppLink = async () => {
+    const link = `${window.location.origin}`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setMessage(`App link copied to clipboard: ${link}`);
+    } catch (error) {
+      setMessage(`Unable to copy app link. Use: ${link}`);
+    }
+  };
+
+  const copyHelperLink = async () => {
+    const link = `${window.location.origin}/helper`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setMessage(`Helper app link copied to clipboard: ${link}`);
+    } catch (error) {
+      setMessage(`Unable to copy helper link. Use: ${link}`);
+    }
+  };
 
   const copyRiderAppLink = async () => {
     const link = `${window.location.origin}/rider`;
@@ -354,6 +394,14 @@ function App() {
   const [catalogueHost, setCatalogueHost] = useState('');
   const [cataloguePath, setCataloguePath] = useState('catalogue');
   const [catalogueAssignedCategories, setCatalogueAssignedCategories] = useState([]);
+
+  useEffect(() => {
+    const updateMobile = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth <= 900);
+    if (typeof window === 'undefined') return;
+    updateMobile();
+    window.addEventListener('resize', updateMobile);
+    return () => window.removeEventListener('resize', updateMobile);
+  }, []);
   const [catalogueAssignedProducts, setCatalogueAssignedProducts] = useState({});
   const [catalogueAssignCategory, setCatalogueAssignCategory] = useState('');
   const [catalogueAssignSearch, setCatalogueAssignSearch] = useState('');
@@ -623,7 +671,7 @@ function App() {
     { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, settings: true, login: true } },
     { name: 'Biker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
     { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
-    { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
+    { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'rider-book': true, 'rider-order-requests': true, settings: false, login: true } },
     { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
     { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } }
   ];
@@ -7990,7 +8038,7 @@ function App() {
     );
   }
 
-  const isSidebarOpen = sidebarExpanded || isMobileSidebar;
+  const isSidebarOpen = !isMobile && (sidebarExpanded || isMobileSidebar);
   const appStyle = {
     background: darkMode ? '#020617' : '#ffffff'
   };
@@ -8015,7 +8063,7 @@ function App() {
         .pos-header-icon::before { content: ''; position: absolute; inset: 0; border-radius: 9999px; opacity: 0.45; background: linear-gradient(135deg, rgba(249,115,22,0.65), rgba(16,185,129,0.65), rgba(59,130,246,0.65), rgba(168,85,247,0.65)); filter: blur(14px); transform: scale(0.9); transition: opacity 0.3s ease; }
         .pos-header-icon:hover::before { opacity: 0.85; }
       `}</style>
-      <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-6 px-4 py-6 pb-28 sm:px-6 lg:px-8">
         <div className={`rounded-[32px] border p-5 shadow-soft transition ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -8042,6 +8090,12 @@ function App() {
                   <span className="relative z-10 text-2xl">🛒</span>
                 </button>
               )}
+              <button onClick={copyAppLink} className="rounded-full border border-slate-500 bg-slate-500/10 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-500/20 transition">
+                Copy App Link
+              </button>
+              <button onClick={copyHelperLink} className="rounded-full border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/20 transition">
+                Copy Helper Link
+              </button>
               <button onClick={copyRiderAppLink} className="rounded-full border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/20 transition">
                 Copy Rider Link
               </button>
@@ -8055,7 +8109,7 @@ function App() {
           <aside
             onMouseEnter={() => setSidebarExpanded(true)}
             onMouseLeave={() => setSidebarExpanded(false)}
-            className={`rounded-[32px] border p-5 shadow-soft transition-all duration-300 ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'} ${isSidebarOpen ? 'w-full md:w-80' : 'w-full md:w-24'}`}>
+            className={`hidden sm:block rounded-[32px] border p-5 shadow-soft transition-all duration-300 ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'} ${isSidebarOpen ? 'w-full md:w-80' : 'w-full md:w-24'}`}>
             <div className={`mb-6 ${isSidebarOpen ? 'flex items-center justify-between gap-3' : 'flex flex-col items-center gap-3'}`}>
               <div className={`${isSidebarOpen ? 'block' : 'hidden'} text-slate-500 text-sm font-semibold uppercase tracking-[0.2em]`}>Navigation</div>
               <div className="flex items-center gap-2">
@@ -8461,6 +8515,23 @@ function App() {
           )}
         </div>
       </div>
+      {isMobile && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 px-3 py-2 backdrop-blur-xl sm:hidden">
+          <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-2">
+            {['pos', 'orders', 'rider-book', 'rider-order-requests', 'riders-app'].map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 rounded-3xl p-2 text-center text-[11px] font-semibold transition ${activeTab === tab ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+              >
+                <span className="block text-lg">{tabIcons[tab] || (tab === 'riders-app' ? '🚴' : '•')}</span>
+                <span className="mt-1 block truncate">{tabLabels[tab] || formatTabName(tab)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
