@@ -3192,11 +3192,10 @@ function App() {
     );
   };
 
-  const openRiderBookSummaryModal = (type) => {
-    // Use the same fully-filtered orders as the table so the modal matches visible data
+  const openRiderBookSummaryModal = (type, useVisibleOrders = false) => {
     const summaryOrders = type === 'cash'
-      ? riderBookSearchFiltered.filter(riderBookCashFilter)
-      : riderBookSearchFiltered.filter(riderBookOnlineFilter);
+      ? (useVisibleOrders ? riderBookCashVisibleOrders : riderBookCashSummaryOrders)
+      : (useVisibleOrders ? riderBookOnlineVisibleOrders : riderBookOnlineSummaryOrders);
     const summaryData = calculateRiderBookSummary(summaryOrders, type);
     setRiderBookSummaryType(type);
     setRiderBookSummaryData(summaryData);
@@ -3260,6 +3259,44 @@ function App() {
     }
     return true;
   });
+
+  const riderBookDateFilteredAll = riderBookFilteredByRider.filter((order) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const getDateRange = () => {
+      const from = new Date(today);
+      const to = new Date(today);
+
+      if (riderBookDateFilter === 'today') {
+        return { from: new Date(today), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+      }
+      if (riderBookDateFilter === 'yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { from: new Date(yesterday), to: new Date(today) };
+      }
+      if (riderBookDateFilter === 'previous-5-days') {
+        const fiveDaysAgo = new Date(today);
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        return { from: new Date(fiveDaysAgo), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+      }
+      if (riderBookDateFilter === 'custom') {
+        return {
+          from: new Date(riderBookCustomDateFrom + 'T00:00:00'),
+          to: new Date(riderBookCustomDateTo + 'T23:59:59')
+        };
+      }
+      return { from: null, to: null };
+    };
+
+    const { from, to } = getDateRange();
+    if (!from || !to) return true;
+
+    const orderDate = order.createdAt ? new Date(order.createdAt) : order.date ? new Date(order.date) : null;
+    return orderDate ? orderDate >= from && orderDate <= to : false;
+  });
+
   const riderBookDateFiltered = riderBookFilteredBySubTab.filter((order) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -3306,6 +3343,31 @@ function App() {
   });
 
   // Build visible cash/online lists from the same filtered set the table uses
+  const riderBookSearchFilteredAll = riderBookDateFilteredAll.filter((order) => {
+    const search = riderBookSearch.trim().toLowerCase();
+    if (!search) return true;
+    return [order.orderNumber, order.customerName, order.phone, order.address, order.deliveryAgent, order.serviceType]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(search));
+  });
+
+  const riderBookCashSummaryOrders = riderBookSearchFilteredAll.filter((order) => {
+    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+    return paymentStatus === 'receive cash till';
+  });
+  const riderBookOnlineSummaryOrders = riderBookSearchFilteredAll.filter((order) => {
+    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+    const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+    const orderStatus = String(order.status || '').toLowerCase();
+    return (
+      paymentStatus === 'may be online' ||
+      paymentStatus === 'online' ||
+      paymentMethod === 'online' ||
+      paymentStatus === 'paid to cash on counter' ||
+      (orderStatus === 'payment collected' && paymentMethod === 'online')
+    );
+  });
+
   const riderBookCashVisibleOrders = riderBookSearchFiltered.filter(riderBookCashFilter);
 
   const riderBookOnlineVisibleOrders = riderBookSearchFiltered.filter(riderBookOnlineFilter);
@@ -3400,22 +3462,34 @@ function App() {
 
   const markRiderCash = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Collected', 'Cash', 'Receive Cash Till');
-    if (success) setRiderBookSubTab('cash');
+    if (success) {
+      setRiderBookMainTab('live');
+      setRiderBookSubTab('cash');
+    }
   };
 
   const markRiderOnline = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Collected', 'Online', 'May be Online');
-    if (success) setRiderBookSubTab('online');
+    if (success) {
+      setRiderBookMainTab('live');
+      setRiderBookSubTab('online');
+    }
   };
 
   const markRiderPaid = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Collected', null, 'Paid');
-    if (success) setRiderBookSubTab('paid');
+    if (success) {
+      setRiderBookMainTab('sales');
+      setRiderBookSubTab('paid');
+    }
   };
 
   const markCustomerPending = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Pending', null, 'Due');
-    if (success) setRiderBookSubTab('due');
+    if (success) {
+      setRiderBookMainTab('sales');
+      setRiderBookSubTab('due');
+    }
   };
 
   const renderRiderBook = () => {
@@ -3423,8 +3497,8 @@ function App() {
     const isCashTab = riderBookSubTab === 'cash';
     const riderBookExtrasServiceTotal = displayTotals.extras + displayTotals.serviceType;
     const riderBookCashOrderCount = riderBookVisibleOrders.length;
-    const riderBookCashSummary = calculateRiderBookSummary(riderBookCashVisibleOrders, 'cash');
-    const riderBookOnlineSummary = calculateRiderBookSummary(riderBookOnlineVisibleOrders, 'online');
+    const riderBookCashSummary = calculateRiderBookSummary(riderBookCashSummaryOrders, 'cash');
+    const riderBookOnlineSummary = calculateRiderBookSummary(riderBookOnlineSummaryOrders, 'online');
     const riderBookDifference = riderBookCashSummary.riderAmount - riderBookOnlineSummary.riderAmount;
     const pageStart = riderBookPageIndex * riderBookPageSize + 1;
     const pageEnd = Math.min((riderBookPageIndex + 1) * riderBookPageSize, riderBookVisibleOrders.length);
@@ -3599,7 +3673,7 @@ function App() {
                     </button>
                     {(sub === 'cash' || sub === 'online') && (
                       <button
-                        onClick={() => openRiderBookSummaryModal(sub)}
+                        onClick={() => openRiderBookSummaryModal(sub, true)}
                         className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 transition hover:border-cyan-500 hover:text-white hover:bg-slate-700"
                       >
                         Summary

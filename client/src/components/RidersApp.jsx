@@ -234,8 +234,12 @@ export function RidersApp() {
 
   const cashSummaryData = calculateSummaryForOrders(deliveredCashOrders, 'cash');
   const onlineSummaryData = calculateSummaryForOrders(deliveredOnlineOrders, 'online');
-  const overallDifference = cashSummaryData.riderAmount - onlineSummaryData.riderAmount;
-  const overallDifferenceLabel = overallDifference < 0 ? 'RIDER HAQ' : overallDifference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED';
+
+  const headerCashSummaryData = cashSummaryData;
+  const headerOnlineSummaryData = onlineSummaryData;
+
+  const headerDifference = headerCashSummaryData.riderAmount - headerOnlineSummaryData.riderAmount;
+  const headerDifferenceLabel = headerDifference < 0 ? 'RIDER HAQ' : headerDifference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED';
 
   // Support both legacy single `riderShift` and newer `riderShifts` array.
   const allShifts = Array.isArray(hotelSettings?.riderShifts)
@@ -947,7 +951,7 @@ export function RidersApp() {
               className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-cyan-500/10 transition hover:-translate-y-1 hover:bg-slate-800 cursor-pointer"
             >
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Cash amount</p>
-              <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(cashSummaryData.riderAmount)}</p>
+              <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(headerCashSummaryData.riderAmount)}</p>
               <p className="mt-2 text-sm text-slate-400">Cash summary for collected orders.</p>
             </div>
             <div
@@ -956,7 +960,7 @@ export function RidersApp() {
               className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-sky-500/10 transition hover:-translate-y-1 hover:bg-slate-800 cursor-pointer"
             >
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Online amount</p>
-              <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(onlineSummaryData.riderAmount)}</p>
+              <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(headerOnlineSummaryData.riderAmount)}</p>
               <p className="mt-2 text-sm text-slate-400">Online summary for owed rider amount.</p>
             </div>
             <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-emerald-500/10 transition hover:-translate-y-1">
@@ -967,8 +971,8 @@ export function RidersApp() {
             </div>
             <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/10 via-slate-900/70 to-cyan-500/10 p-5 shadow-xl shadow-fuchsia-500/15 animate-pulse">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-300">Difference</p>
-              <p className="mt-4 text-3xl font-semibold text-white">{formatSignedCurrency(overallDifference)}</p>
-              <p className="mt-2 text-sm font-semibold uppercase tracking-[0.2em] text-white">{overallDifferenceLabel}</p>
+              <p className="mt-4 text-3xl font-semibold text-white">{formatSignedCurrency(headerDifference)}</p>
+              <p className="mt-2 text-sm font-semibold uppercase tracking-[0.2em] text-white">{headerDifferenceLabel}</p>
             </div>
           </div>
         </div>
