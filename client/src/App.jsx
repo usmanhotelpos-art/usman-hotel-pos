@@ -5228,8 +5228,26 @@ function App() {
 
     return (
       <div className="space-y-6">
+        {isMobile && (
+          <div className={`w-full rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Usman Hotel</p>
+                <h3 className="mt-1 text-lg font-semibold">Helper / POS Mobile</h3>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={logout} className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                  Logout
+                </button>
+                <button onClick={() => setDarkMode((prev) => !prev)} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${darkMode ? 'border-slate-600 bg-slate-900 text-slate-100 hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-100'}`}>
+                  {darkMode ? 'Light' : 'Dark'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <section className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] xl:grid-cols-[1.4fr_0.8fr]">
-          <div className={`min-w-0 rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <div className={`w-full min-w-0 rounded-[32px] border p-4 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>POS Catalog</p>
@@ -8529,14 +8547,14 @@ function App() {
         </div>
       </div>
       {isMobile && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 px-3 py-2 backdrop-blur-xl sm:hidden">
-          <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-2">
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 px-2 py-2 backdrop-blur-xl sm:hidden">
+          <div className="mx-auto flex max-w-[1400px] items-center gap-2 overflow-x-auto whitespace-nowrap px-2">
             {['pos', 'orders', 'rider-book', 'rider-order-requests', 'riders-app'].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 rounded-3xl p-2 text-center text-[11px] font-semibold transition ${activeTab === tab ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+                className={`inline-flex min-w-[80px] items-center justify-center rounded-3xl px-3 py-2 text-center text-[11px] font-semibold transition ${activeTab === tab ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
               >
                 <span className="block text-lg">{tabIcons[tab] || (tab === 'riders-app' ? '🚴' : '•')}</span>
                 <span className="mt-1 block truncate">{tabLabels[tab] || formatTabName(tab)}</span>
