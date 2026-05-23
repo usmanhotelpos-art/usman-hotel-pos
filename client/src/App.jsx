@@ -6,15 +6,26 @@ const envApiBase = import.meta.env.VITE_API_BASE || '';
 const apiBase = envApiBase
   ? envApiBase.replace(/\/$/, '')
   : '/api';
-const tabs = ['dashboard', 'pos', 'orders', 'rider-book', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'rider-root-settings', 'settings'];
+
 
 function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
+  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'settings'];
+  const [tabs, setTabs] = useState(() => {
+    if (typeof window === 'undefined') return defaultTabs;
+    try {
+      const saved = window.localStorage.getItem('posTabs');
+      return saved ? JSON.parse(saved) : defaultTabs;
+    } catch {
+      return defaultTabs;
+    }
+  });
   const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : 'dashboard');
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState(null);
   const [items, setItems] = useState([]);
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [settings, setSettings] = useState({
     hotelName: '',
     currency: '',
@@ -353,7 +364,13 @@ function App() {
   const [catalogueCustomer, setCatalogueCustomer] = useState({ name: '', phone: '', address: '' });
   const [catalogueOrderNote, setCatalogueOrderNote] = useState('');
   const [catalogueMessage, setCatalogueMessage] = useState('');
-  const [receiptSettingsSubTab, setReceiptSettingsSubTab] = useState('receipt');
+  const [receiptSettingsSubTab, setReceiptSettingsSubTab] = useState('app');
+
+  useEffect(() => {
+    if (activeTab === 'rider-root-settings') {
+      setActiveTab('settings');
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
@@ -395,7 +412,13 @@ function App() {
       setCatalogueAssignedProducts(settings.catalogueAssignedProducts);
     }
   }, [settings.catalogueLayout, settings.catalogueHost, settings.cataloguePath, settings.catalogueAssignedCategories, settings.catalogueAssignedProducts]);
-  const tabIcons = {
+  const defaultTabLabels = {
+    'catalogue-qr': 'Catalogue QR',
+    'rider-book': 'Rider Book',
+    'rider-order-requests': 'Rider Order Requests',
+    settings: 'Settings'
+  };
+  const defaultTabIcons = {
     dashboard: '🏠',
     tables: '🍽️',
     inventory: '📦',
@@ -406,16 +429,82 @@ function App() {
     customers: '👥',
     orders: '🧾',
     'rider-book': '🚴',
-    'rider-root-settings': '🔧',
+    'rider-order-requests': '📋',
     settings: '⚙️'
   };
-  const tabLabels = {
-    'catalogue-qr': 'Catalogue QR',
-    'rider-book': 'Rider Book',
-    'rider-root-settings': 'Rider portal App Root settings',
-    settings: 'Rider App Settings'
-  };
+  const [tabIcons, setTabIcons] = useState(() => {
+    if (typeof window === 'undefined') return defaultTabIcons;
+    try {
+      const saved = window.localStorage.getItem('posTabIcons');
+      return saved ? JSON.parse(saved) : defaultTabIcons;
+    } catch {
+      return defaultTabIcons;
+    }
+  });
+  const [tabLabels, setTabLabels] = useState(() => {
+    if (typeof window === 'undefined') return defaultTabLabels;
+    try {
+      const saved = window.localStorage.getItem('posTabLabels');
+      return saved ? JSON.parse(saved) : defaultTabLabels;
+    } catch {
+      return defaultTabLabels;
+    }
+  });
   const formatTabName = (tab) => tabLabels[tab] || tab.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  const [editingRoleTabs, setEditingRoleTabs] = useState(null);
+  const [newTabKey, setNewTabKey] = useState('');
+  const [newTabLabel, setNewTabLabel] = useState('');
+
+  function canAccessTab(tab) {
+    if (!user) return false;
+    const roleName = (user.role || '').toString().trim();
+    if (!roleName) return false;
+    if (roleName.toLowerCase().includes('admin')) return true;
+    const roleObj = roles.find((r) => (r.name || '').toString().trim().toLowerCase() === roleName.toLowerCase());
+    if (!roleObj) return false;
+    return Boolean(roleObj.permissions && roleObj.permissions[tab]);
+  }
+
+  function getDefaultTabForRole(roleName) {
+    const cleanName = (roleName || '').toString().trim().toLowerCase();
+    if (!cleanName) return 'dashboard';
+    if (cleanName.includes('admin')) return 'dashboard';
+    if (cleanName === 'cashier') return canAccessTab('pos') ? 'pos' : tabs.find((tab) => canAccessTab(tab));
+    if (canAccessTab('dashboard')) return 'dashboard';
+    if (canAccessTab('pos')) return 'pos';
+    return tabs.find((tab) => canAccessTab(tab)) || 'dashboard';
+  }
+
+  function addTab(key, label) {
+    const k = (key || '').toString().trim();
+    if (!k) return setMessage('Tab key is required');
+    if (tabs.includes(k)) return setMessage('Tab key already exists');
+    setTabs((prev) => [...prev, k]);
+    setTabLabels((prev) => ({ ...prev, [k]: label || k.replace('-', ' ') }));
+    setTabIcons((prev) => ({ ...prev, [k]: '•' }));
+    // add permission flag to all roles (default false)
+    setRoles((prev) => prev.map((r) => ({ ...r, permissions: { ...r.permissions, [k]: false } })));
+    setNewTabKey('');
+    setNewTabLabel('');
+    setMessage(`Added tab ${k}`);
+  }
+
+  function removeTab(key) {
+    if (!confirm(`Remove tab '${key}' from app? This will remove permissions for all roles.`)) return;
+    setTabs((prev) => prev.filter((t) => t !== key));
+    setTabLabels((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+    setTabIcons((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+    setRoles((prev) => prev.map((r) => ({ ...r, permissions: Object.fromEntries(Object.entries(r.permissions).filter(([p]) => p !== key)) })));
+    setMessage(`Removed tab ${key}`);
+  }
   const [deliveryServiceTypes, setDeliveryServiceTypes] = useState([]);
   const [deliveryLocations, setDeliveryLocations] = useState([]);
   const [deliveryServiceForm, setDeliveryServiceForm] = useState({ id: null, name: '', charge: 50, location: '', active: true });
@@ -466,7 +555,8 @@ function App() {
       setLoading(false);
     }
   };
-  const [riderBookSubTab, setRiderBookSubTab] = useState('all');
+  const [riderBookMainTab, setRiderBookMainTab] = useState('live');
+  const [riderBookSubTab, setRiderBookSubTab] = useState('cash');
   const [deliveryPaymentStatusFilter, setDeliveryPaymentStatusFilter] = useState('all');
   const [riderBookFilterRider, setRiderBookFilterRider] = useState('');
   const [riderBookDateFilter, setRiderBookDateFilter] = useState('today');
@@ -477,7 +567,15 @@ function App() {
   const [riderBookPageSize, setRiderBookPageSize] = useState(15);
   const [riderBookPageIndex, setRiderBookPageIndex] = useState(0);
   const [riderBookActionOpen, setRiderBookActionOpen] = useState(null);
+  const [showRiderBookSummaryModal, setShowRiderBookSummaryModal] = useState(false);
+  const [riderBookSummaryType, setRiderBookSummaryType] = useState('cash');
+  const [riderBookSummaryData, setRiderBookSummaryData] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [riderOrderRequestsMainTab, setRiderOrderRequestsMainTab] = useState('requests');
+  const [riderOrderRequestsStatus, setRiderOrderRequestsStatus] = useState('pending');
+  const [riderOrderRequestsDateFilter, setRiderOrderRequestsDateFilter] = useState('today');
+  const [riderOrderRequestsCustomDateFrom, setRiderOrderRequestsCustomDateFrom] = useState('');
+  const [riderOrderRequestsCustomDateTo, setRiderOrderRequestsCustomDateTo] = useState('');
   const [ridersList, setRidersList] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -518,7 +616,7 @@ function App() {
     address: '',
     loginEnabled: true
   });
-  const [roles, setRoles] = useState([
+  const defaultRoles = [
     { name: 'Admin', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
     { name: 'Admin Rider', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
     { name: 'Cashier', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, settings: false, login: true } },
@@ -528,7 +626,39 @@ function App() {
     { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
     { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
     { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } }
-  ]);
+  ];
+  const [roles, setRoles] = useState(() => {
+    if (typeof window === 'undefined') return defaultRoles;
+    try {
+      const saved = window.localStorage.getItem('posRoles');
+      return saved ? JSON.parse(saved) : defaultRoles;
+    } catch {
+      return defaultRoles;
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('posRoles', JSON.stringify(roles));
+      window.localStorage.setItem('posTabs', JSON.stringify(tabs));
+      window.localStorage.setItem('posTabLabels', JSON.stringify(tabLabels));
+      window.localStorage.setItem('posTabIcons', JSON.stringify(tabIcons));
+    } catch {
+      // ignore storage errors
+    }
+  }, [roles, tabs, tabLabels, tabIcons]);
+
+  // Ensure every role has a permission key for every tab (so checkboxes and canAccessTab work)
+  useEffect(() => {
+    setRoles((prev) => prev.map((role) => {
+      const perms = { ...(role.permissions || {}) };
+      tabs.forEach((t) => {
+        if (!(t in perms)) perms[t] = false;
+      });
+      return { ...role, permissions: perms };
+    }));
+  }, [tabs]);
 
   // Auto-fill delivery fee when a delivery service type is selected
   useEffect(() => {
@@ -597,6 +727,12 @@ function App() {
       loadCustomers();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && !canAccessTab(activeTab)) {
+      setActiveTab(getDefaultTabForRole(user.role));
+    }
+  }, [user, activeTab, roles, tabs]);
 
   useEffect(() => {
     setOrderDetails((prev) => ({ ...prev, taxPercent: settings.taxRate || 0 }));
@@ -685,6 +821,19 @@ function App() {
       const data = await fetchJson(`${apiBase}/auth/me`);
       setUser(data);
       setAuthMessage('');
+      // reload any persisted roles/tabs in case they were modified
+      try {
+        const savedRoles = window.localStorage.getItem('posRoles');
+        if (savedRoles) setRoles(JSON.parse(savedRoles));
+        const savedTabs = window.localStorage.getItem('posTabs');
+        if (savedTabs) setTabs(JSON.parse(savedTabs));
+        const savedTabLabels = window.localStorage.getItem('posTabLabels');
+        if (savedTabLabels) setTabLabels(JSON.parse(savedTabLabels));
+        const savedTabIcons = window.localStorage.getItem('posTabIcons');
+        if (savedTabIcons) setTabIcons(JSON.parse(savedTabIcons));
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       setAuthMessage('Session expired, please login again.');
       localStorage.removeItem('posToken');
@@ -706,7 +855,18 @@ function App() {
       localStorage.setItem('posToken', data.token);
       setToken(data.token);
       setUser(data.user);
-      setActiveTab('dashboard');
+      // reload persisted roles/tabs so permissions immediately apply
+      try {
+        const savedRoles = window.localStorage.getItem('posRoles');
+        if (savedRoles) setRoles(JSON.parse(savedRoles));
+        const savedTabs = window.localStorage.getItem('posTabs');
+        if (savedTabs) setTabs(JSON.parse(savedTabs));
+        const savedTabLabels = window.localStorage.getItem('posTabLabels');
+        if (savedTabLabels) setTabLabels(JSON.parse(savedTabLabels));
+        const savedTabIcons = window.localStorage.getItem('posTabIcons');
+        if (savedTabIcons) setTabIcons(JSON.parse(savedTabIcons));
+      } catch (e) {}
+      setActiveTab(getDefaultTabForRole(data.user.role));
       setMessage('Logged in successfully');
     } catch (error) {
       setAuthMessage(error.message);
@@ -734,78 +894,12 @@ function App() {
           ...(data.receiptFontSizes || {})
         }
       }));
-
-      // If a Google Sheet is configured, trigger a one-time server->sheet sync on load only for authenticated admin sessions
-      if (user && data && data.googleSpreadsheetId) {
-        try {
-          await fetchJson(`${apiBase}/google/save-db`, {
-            method: 'POST',
-            body: JSON.stringify({ spreadsheetId: data.googleSpreadsheetId })
-          });
-          setMessage('Synced server data to Google Sheet.');
-        } catch (err) {
-          console.warn('Auto sync to Google Sheet failed:', err.message);
-        }
-      }
     } catch (error) {
       setMessage(error.message);
     }
   }
 
-  // Create a new Google Sheet via the server and save its id to settings
-  async function createGoogleSheet() {
-    if (!user) return setMessage('Please login as admin to create sheet.');
-    setLoading(true);
-    try {
-      const res = await fetchJson(`${apiBase}/google/create-sheet`, { method: 'POST', body: JSON.stringify({ title: `${settings.hotelName || 'Usman POS'} Backup` }) });
-      const { spreadsheetId, url } = res;
-      // persist to server settings
-      const updated = await fetchJson(`${apiBase}/settings`, { method: 'PUT', body: JSON.stringify({ googleSpreadsheetId: spreadsheetId }) });
-      setSettings((prev) => ({ ...prev, ...updated }));
-      setMessage(`Created sheet: ${url}`);
-      try {
-        window.open(url, '_blank');
-      } catch (e) {
-        // ignore if popup blocked
-      }
-    } catch (err) {
-      setMessage(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Manual sync: push server DB to configured Google Sheet
-  async function syncServerToGoogleSheet() {
-    if (!settings.googleSpreadsheetId) return setMessage('No Google Sheet configured in settings.');
-    setLoading(true);
-    try {
-      await fetchJson(`${apiBase}/google/save-db`, { method: 'POST', body: JSON.stringify({ spreadsheetId: settings.googleSpreadsheetId }) });
-      setMessage('Server data pushed to Google Sheet.');
-    } catch (err) {
-      setMessage(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Restore server DB from Google Sheet (overwrites local DB) - use carefully
-  async function restoreServerFromGoogleSheet() {
-    if (!settings.googleSpreadsheetId) return setMessage('No Google Sheet configured in settings.');
-    if (!confirm('This will overwrite the server database with data from the Google Sheet. Continue?')) return;
-    setLoading(true);
-    try {
-      await fetchJson(`${apiBase}/google/restore-db`, { method: 'POST', body: JSON.stringify({ spreadsheetId: settings.googleSpreadsheetId }) });
-      setMessage('Server database restored from Google Sheet. Reloading data...');
-      // reload visible data
-      if (activeTab === 'settings') await loadSettings();
-      await loadTab(activeTab);
-    } catch (err) {
-      setMessage(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Google Sheets integration removed
 
   async function loadTab(tab) {
     setLoading(true);
@@ -826,10 +920,10 @@ function App() {
       } else if (tab === 'rider-book') {
         await loadOrdersData();
         await loadInventoryData();
+      } else if (tab === 'rider-order-requests') {
+        await loadPendingRequests();
       } else if (tab === 'riders-app') {
         // Riders App is a self-contained component and does not need generic tab data loading.
-      } else if (tab === 'rider-root-settings') {
-        await loadSettings();
       } else if (tab === 'pos' || tab === 'catalogue-qr') {
         await loadPosData();
       } else if (tab === 'customers') {
@@ -903,7 +997,7 @@ function App() {
         }
       }
 
-      const data = await fetchJson(`${apiBase}/rider/pending-requests`);
+      const data = await fetchJson(`${apiBase}/rider/requests`);
       const list = Array.isArray(data) ? data : [];
 
       const augmented = list.map((req) => {
@@ -919,7 +1013,7 @@ function App() {
 
       setPendingRequests(augmented);
     } catch (err) {
-      console.warn('Failed to load pending requests:', err.message || err);
+      console.warn('Failed to load rider requests:', err.message || err);
       setPendingRequests([]);
     }
   }
@@ -1031,6 +1125,7 @@ function App() {
     try {
       await fetchJson(`${apiBase}/rider/approve-request/${requestId}`, { method: 'PUT' });
       setMessage('Request approved');
+      setRiderOrderRequestsStatus('approved');
       await loadPendingRequests();
       await loadOrdersData();
     } catch (err) {
@@ -1046,6 +1141,7 @@ function App() {
     try {
       await fetchJson(`${apiBase}/rider/reject-request/${requestId}`, { method: 'PUT' });
       setMessage('Request rejected');
+      setRiderOrderRequestsStatus('rejected');
       await loadPendingRequests();
       await loadOrdersData();
     } catch (err) {
@@ -3009,6 +3105,58 @@ function App() {
     return fee;
   };
 
+  const calculateRiderBookSummary = (orders, type) => {
+    return orders.reduce(
+      (summary, order) => {
+        const amount = Number(order.total || order.amount || 0);
+        const extras = getOrderExtrasAmount(order);
+        const serviceCharge = getOrderServiceTypeCharge(order);
+        summary.orderValue += amount;
+        summary.extras += extras;
+        summary.serviceCharge += serviceCharge;
+        if (type === 'cash') {
+          summary.riderAmount += amount - extras - serviceCharge;
+        } else {
+          summary.riderAmount += extras + serviceCharge;
+        }
+        summary.count += 1;
+        return summary;
+      },
+      { orderValue: 0, extras: 0, serviceCharge: 0, riderAmount: 0, count: 0 }
+    );
+  };
+
+  const openRiderBookSummaryModal = (type) => {
+    const cashOrders = riderBookFilteredByRider.filter((order) => {
+      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+      const orderStatus = String(order.status || '').toLowerCase();
+      return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
+    });
+    const onlineOrders = riderBookFilteredByRider.filter((order) => {
+      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+      const orderStatus = String(order.status || '').toLowerCase();
+      return (
+        paymentStatus === 'may be online' ||
+        paymentStatus === 'online' ||
+        paymentMethod === 'online' ||
+        paymentStatus === 'paid to cash on counter' ||
+        (orderStatus === 'payment collected' && paymentMethod === 'online')
+      );
+    });
+    const summaryOrders = type === 'cash' ? cashOrders : onlineOrders;
+    const summaryData = calculateRiderBookSummary(summaryOrders, type);
+    setRiderBookSummaryType(type);
+    setRiderBookSummaryData(summaryData);
+    setShowRiderBookSummaryModal(true);
+  };
+
+  const closeRiderBookSummaryModal = () => {
+    setShowRiderBookSummaryModal(false);
+    setRiderBookSummaryData(null);
+  };
+
   const riderBookAssignedOrders = posOrders.filter((order) => order.deliveryAgent || (String(order.status || '').toLowerCase() === 'payment collected'));
   const riderBookFilteredByRider = riderBookFilterRider
     ? riderBookAssignedOrders.filter((order) => {
@@ -3023,20 +3171,41 @@ function App() {
     const paymentMethod = String(order.paymentMethod || '').toLowerCase();
     const orderStatus = String(order.status || '').toLowerCase();
 
-    if (riderBookSubTab === 'cash') {
-      return paymentStatus === 'receive cash till' || paymentStatus === 'cash' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
+    if (riderBookMainTab === 'live') {
+      if (riderBookSubTab === 'cash') {
+        return paymentStatus === 'receive cash till';
+      }
+      if (riderBookSubTab === 'online') {
+        return (
+          paymentStatus === 'may be online' ||
+          paymentStatus === 'online' ||
+          paymentMethod === 'online' ||
+          paymentStatus === 'paid to cash on counter' ||
+          (orderStatus === 'payment collected' && paymentMethod === 'online')
+        );
+      }
+      if (riderBookSubTab === 'all') {
+        return (
+          paymentStatus === 'receive cash till' ||
+          paymentStatus === 'may be online' ||
+          paymentStatus === 'online' ||
+          paymentMethod === 'online' ||
+          paymentMethod === 'cash' ||
+          paymentStatus === 'paid to cash on counter' ||
+          (orderStatus === 'payment collected' && (paymentMethod === 'online' || paymentMethod === 'cash'))
+        );
+      }
     }
-    if (riderBookSubTab === 'online') {
-      return paymentStatus === 'may be online' || paymentStatus === 'online' || paymentMethod === 'online' || (orderStatus === 'payment collected' && paymentMethod === 'online');
-    }
-    if (riderBookSubTab === 'counter') {
-      return paymentStatus === 'paid to cash on counter';
-    }
-    if (riderBookSubTab === 'pending') {
-      return orderStatus === 'payment pending';
-    }
-    if (riderBookSubTab === 'paid') {
-      return paymentStatus === 'paid' || orderStatus === 'completed';
+    if (riderBookMainTab === 'sales') {
+      if (riderBookSubTab === 'due') {
+        return orderStatus === 'payment pending';
+      }
+      if (riderBookSubTab === 'paid') {
+        return paymentStatus === 'paid' || orderStatus === 'completed';
+      }
+      if (riderBookSubTab === 'all') {
+        return orderStatus === 'payment pending' || paymentStatus === 'paid' || orderStatus === 'completed';
+      }
     }
     return true;
   });
@@ -3184,7 +3353,7 @@ function App() {
 
   const markCustomerPending = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Pending', null, 'Due');
-    if (success) setRiderBookSubTab('pending');
+    if (success) setRiderBookSubTab('due');
   };
 
   const renderRiderBook = () => {
@@ -3192,6 +3361,27 @@ function App() {
     const isCashTab = riderBookSubTab === 'cash';
     const riderBookExtrasServiceTotal = displayTotals.extras + displayTotals.serviceType;
     const riderBookCashOrderCount = riderBookVisibleOrders.length;
+    const cashSummaryOrders = riderBookFilteredByRider.filter((order) => {
+      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+      const orderStatus = String(order.status || '').toLowerCase();
+      return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
+    });
+    const onlineSummaryOrders = riderBookFilteredByRider.filter((order) => {
+      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+      const orderStatus = String(order.status || '').toLowerCase();
+      return (
+        paymentStatus === 'may be online' ||
+        paymentStatus === 'online' ||
+        paymentMethod === 'online' ||
+        paymentStatus === 'paid to cash on counter' ||
+        (orderStatus === 'payment collected' && paymentMethod === 'online')
+      );
+    });
+    const riderBookCashSummary = calculateRiderBookSummary(cashSummaryOrders, 'cash');
+    const riderBookOnlineSummary = calculateRiderBookSummary(onlineSummaryOrders, 'online');
+    const riderBookDifference = riderBookCashSummary.riderAmount - riderBookOnlineSummary.riderAmount;
     const pageStart = riderBookPageIndex * riderBookPageSize + 1;
     const pageEnd = Math.min((riderBookPageIndex + 1) * riderBookPageSize, riderBookVisibleOrders.length);
 
@@ -3207,119 +3397,85 @@ function App() {
     return (
       <div className="space-y-6">
         <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft glow-border glow-pulse">
-          {/* Top Section: Summary & Filter */}
-          <div className="grid gap-6 xl:grid-cols-[1.7fr_0.9fr] mb-6 pb-6 border-b border-slate-800">
-            <div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Rider Book</p>
-                  <h2 className="mt-2 text-3xl font-semibold leading-tight text-white">Assigned rider order summary</h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Track assigned orders, extras, service charges, and rider receipts in a compact view.</p>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200">
-                  {riderBookFilteredByRider.length} assigned order{riderBookFilteredByRider.length === 1 ? '' : 's'}
-                </div>
-              </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="aspect-square rounded-full border border-slate-800 bg-slate-950/85 p-4 text-sm text-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.22)] flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Total amount</p>
-                  <p className="mt-3 text-4xl font-semibold text-white glow-text">{isCashTab ? `${displayTotals.total} Rs` : displayTotals.total}</p>
-                </div>
-                <div className="aspect-square rounded-full border border-slate-800 bg-slate-950/85 p-4 text-sm text-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.22)] flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">{isCashTab ? 'Extras + Service charges' : 'Our sales'}</p>
-                  <div className="mt-3 space-y-2 text-sm text-slate-300">
-                    {isCashTab ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span>Extras</span>
-                          <span>{displayTotals.extras} Rs</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Service</span>
-                          <span>{displayTotals.serviceType} Rs</span>
-                        </div>
-                        <div className="border-t border-slate-800 pt-2 text-white font-semibold flex items-center justify-between">
-                          <span>Sum</span>
-                          <span>{displayTotals.extras} + {displayTotals.serviceType} = {riderBookExtrasServiceTotal} Rs</span>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="mt-4 text-3xl font-semibold text-white">{displayTotals.total - riderBookExtrasServiceTotal}</p>
-                    )}
-                  </div>
-                </div>
-                <div className={`aspect-square rounded-full border p-4 text-sm text-white shadow-[0_0_90px_rgba(16,255,207,0.28)] ${isCashTab ? 'rider-due-card border-cyan-500/30 bg-slate-950/95' : 'border border-slate-800 bg-slate-950/85'} flex flex-col justify-center items-center text-center`}>
-                  <div className="flex flex-col gap-3 items-center justify-center">
-                    <p className={`text-[10px] uppercase tracking-[0.3em] ${isCashTab ? 'text-cyan-300' : 'text-slate-500'}`}>{isCashTab ? 'Rider Due' : 'Rider Collection'}</p>
-                    {isCashTab ? (
-                      <>
-                        <h3 className="text-2xl font-semibold text-white">With cash <span className="inline-block rider-due-icon">💵</span></h3>
-                        <p className="text-sm text-slate-400">Amount rider should hand over to Usman Hotel.</p>
-                        <p className="rider-due-amount mt-2 text-4xl font-semibold text-white">{Math.max(0, displayTotals.total - riderBookExtrasServiceTotal)} Rs</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-sm text-slate-300 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span>Extras</span>
-                            <span>{displayTotals.extras}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span>Service</span>
-                            <span>{displayTotals.serviceType}</span>
-                          </div>
-                          <div className="border-t border-slate-800 pt-2 flex items-center justify-between text-white font-semibold">
-                            <span>Total</span>
-                            <span>{riderBookExtrasServiceTotal}</span>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="aspect-square rounded-full border border-slate-800 bg-slate-950/85 p-4 text-sm text-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.22)] flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Total orders</p>
-                  <p className="mt-3 text-4xl font-semibold text-white">{riderBookCashOrderCount}</p>
-                </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-3 mb-2">
+              <div
+                onClick={() => openRiderBookSummaryModal('cash')}
+                className="cursor-pointer rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-soft transition hover:border-emerald-500/40 hover:bg-slate-900"
+              >
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Cash Summary</div>
+                <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookCashSummary.riderAmount).toLocaleString()} Rs</div>
+                <div className="mt-1 text-xs text-slate-400">Cash minus extras & fees</div>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">Summary</div>
+              </div>
+              <div
+                onClick={() => openRiderBookSummaryModal('online')}
+                className="cursor-pointer rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-soft transition hover:border-sky-500/40 hover:bg-slate-900"
+              >
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Online Summary</div>
+                <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookOnlineSummary.riderAmount).toLocaleString()} Rs</div>
+                <div className="mt-1 text-xs text-slate-400">Extras + delivery fees</div>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white">Summary</div>
+              </div>
+              <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-soft">
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Difference</div>
+                <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookDifference).toLocaleString()} Rs</div>
+                <div className="mt-1 text-xs text-slate-400">Net rider amount</div>
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-800 bg-slate-950 p-5 shadow-[0_20px_40px_rgba(15,23,42,0.24)]">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Filter Rider</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">Select rider</h3>
-              <div className="mt-4 inline-flex items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-300">
-                <span>{riderBookRiders.length} riders assigned</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div className="flex flex-wrap gap-2">
+                {['live', 'sales'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      setRiderBookMainTab(tab);
+                      setRiderBookSubTab(tab === 'live' ? 'cash' : 'due');
+                    }}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${riderBookMainTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {tab === 'live' ? 'Live' : 'Sales'}
+                  </button>
+                ))}
               </div>
-              <select value={riderBookFilterRider} onChange={(e) => setRiderBookFilterRider(e.target.value)} className="mt-4 w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
+
+              <div className="flex-1 min-w-[200px] max-w-[360px]">
+                <input
+                  type="text"
+                  value={riderBookSearch}
+                  onChange={(e) => setRiderBookSearch(e.target.value)}
+                  placeholder="Search rider, order, address..."
+                  className="w-full rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <select
+                value={riderBookFilterRider}
+                onChange={(e) => {
+                  setRiderBookFilterRider(e.target.value);
+                  setRiderBookPageIndex(0);
+                }}
+                className="rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500"
+              >
                 <option value="">All Riders</option>
-                {riderBookRiders.map((rider) => (
-                  <option key={rider} value={rider}>{rider}</option>
+                {Array.from(new Set(riderBookAssignedOrders.map((o) => o.deliveryAgent).filter(Boolean))).map((rider) => (
+                  <option key={rider} value={rider}>
+                    {rider}
+                  </option>
                 ))}
               </select>
-              <p className="mt-4 text-sm leading-6 text-slate-400">Filter by rider and quickly switch between order groups below.</p>
-            </div>
-          </div>
 
-          {/* Bottom Section: Controls & Tabs */}
-          <div className="space-y-4">
-            {/* Selection & Search Row */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={() => selectAllRiderBookOrders(riderBookVisibleOrders)} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Select All</button>
-                <button onClick={clearRiderBookSelection} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Clear</button>
-                <span className="text-sm text-slate-400">{riderBookSelectedOrders.length} selected</span>
-              </div>
-              <input
-                type="text"
-                value={riderBookSearch}
-                onChange={(e) => setRiderBookSearch(e.target.value)}
-                placeholder="Search rider orders..."
-                className="w-full md:w-auto md:min-w-[240px] rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
-              <div className="flex flex-wrap items-center gap-2">
+                {riderBookSelectedOrders.length > 0 && (
+                  <>
+                    <button onClick={() => selectAllRiderBookOrders(riderBookVisibleOrders)} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Select All</button>
+                    <button onClick={clearRiderBookSelection} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Clear</button>
+                    <span className="text-sm text-slate-400">{riderBookSelectedOrders.length} selected</span>
+                  </>
+                )}
                 <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Date</span>
                 {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
                   <button
@@ -3333,102 +3489,77 @@ function App() {
                     {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
                   </button>
                 ))}
-              </div>
-              {riderBookDateFilter === 'custom' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    value={riderBookCustomDateFrom}
-                    onChange={(e) => {
-                      setRiderBookCustomDateFrom(e.target.value);
-                      setRiderBookPageIndex(0);
-                    }}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                  <span className="text-slate-400">to</span>
-                  <input
-                    type="date"
-                    value={riderBookCustomDateTo}
-                    onChange={(e) => {
-                      setRiderBookCustomDateTo(e.target.value);
-                      setRiderBookPageIndex(0);
-                    }}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Tabs Row */}
-            <div className="flex flex-wrap gap-2">
-              {['cash', 'online', 'counter', 'pending', 'all', 'paid'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setRiderBookSubTab(tab)}
-                  className={`rounded-full px-3 py-2 text-sm font-semibold transition ${riderBookSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                >
-                  {tab === 'all' ? 'All' : tab === 'paid' ? 'Paid Orders' : tab === 'cash' ? 'Cash' : tab === 'online' ? 'Online' : tab === 'counter' ? 'Paid to Counter' : 'Pending'}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-400">
-              <div>Visible orders: <span className="font-semibold text-white">{riderBookVisibleOrders.length}</span></div>
-              <div>Selected: <span className="font-semibold text-white">{riderBookSelectedOrders.length || 0}</span></div>
-              <div>Page size: <span className="font-semibold text-white">{riderBookPageSize}</span></div>
-            </div>
-
-            {/* Actions Row */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
-                <span>Show</span>
-                {[15, 50, 100].map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setRiderBookPageSize(size)}
-                    className={`rounded-full px-3 py-2 font-semibold transition ${riderBookPageSize === size ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={markRiderCash} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Cash</button>
-                <button onClick={markRiderOnline} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Online</button>
-                <button onClick={markRiderPaid} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Paid</button>
-                <button onClick={markCustomerPending} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Pending Due</button>
-              </div>
-            </div>
-          </div>
-
-          {/* Pending Rider Requests (Admin) */}
-          <div className="rounded-[12px] border border-slate-800 bg-slate-900 p-4 shadow-soft mt-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white">Pending Rider Requests</h3>
-              <button onClick={loadPendingRequests} className="text-sm px-3 py-1 rounded bg-slate-800 text-slate-200">Refresh</button>
-            </div>
-            {pendingRequests.length === 0 ? (
-              <p className="text-sm text-slate-400">No pending requests</p>
-            ) : (
-              <div className="space-y-2">
-                {pendingRequests.map((req) => (
-                  <div key={req.id} className="flex items-center justify-between bg-slate-800 p-3 rounded">
-                    <div>
-                      <div className="text-sm text-slate-200 font-semibold">{req.orderNumber}</div>
-                      <div className="text-xs text-slate-400">Rider: {req.riderName} · Status: {req.status}</div>
-                      <div className="text-xs text-slate-400">Total: {req.orderTotal} Rs</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => viewOrderById(req.orderId)} className="px-3 py-1 rounded bg-gray-700 text-white text-sm">View</button>
-                      <button onClick={() => approveRiderRequest(req.id)} className="px-3 py-1 rounded bg-emerald-600 text-white text-sm">Approve</button>
-                      <button onClick={() => rejectRiderRequest(req.id)} className="px-3 py-1 rounded bg-rose-600 text-white text-sm">Reject</button>
-                    </div>
+                {riderBookDateFilter === 'custom' && (
+                  <div className="flex flex-wrap items-center gap-2 ml-2 pl-2 border-l border-slate-700">
+                    <input
+                      type="date"
+                      value={riderBookCustomDateFrom}
+                      onChange={(e) => {
+                        setRiderBookCustomDateFrom(e.target.value);
+                        setRiderBookPageIndex(0);
+                      }}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    />
+                    <span className="text-slate-400">to</span>
+                    <input
+                      type="date"
+                      value={riderBookCustomDateTo}
+                      onChange={(e) => {
+                        setRiderBookCustomDateTo(e.target.value);
+                        setRiderBookPageIndex(0);
+                      }}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    />
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {(riderBookMainTab === 'live' ? ['cash', 'online', 'all'] : ['due', 'paid', 'all']).map((sub) => {
+                const isActive = riderBookSubTab === sub;
+                const gradient = sub === 'cash' ? 'from-emerald-500 to-emerald-700' : sub === 'online' ? 'from-sky-500 to-indigo-600' : 'from-slate-700 to-slate-800';
+                return (
+                  <div key={sub} className="flex items-center gap-2">
+                    <button
+                      onClick={() => setRiderBookSubTab(sub)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isActive ? `bg-gradient-to-r ${gradient} text-white shadow-lg` : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    >
+                      {riderBookMainTab === 'live'
+                        ? sub === 'all'
+                          ? 'All'
+                          : sub === 'cash'
+                          ? 'Cash'
+                          : 'Online'
+                        : sub === 'all'
+                        ? 'All'
+                        : sub === 'due'
+                        ? 'Due'
+                        : 'Paid'}
+                    </button>
+                    {(sub === 'cash' || sub === 'online') && (
+                      <button
+                        onClick={() => openRiderBookSummaryModal(sub)}
+                        className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 transition hover:border-cyan-500 hover:text-white hover:bg-slate-700"
+                      >
+                        Summary
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
+        {riderBookSelectedOrders.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+            <button onClick={markRiderCash} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Cash</button>
+            <button onClick={markRiderOnline} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Online</button>
+            <button onClick={markRiderPaid} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Paid</button>
+            <button onClick={markCustomerPending} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Pending Due</button>
+          </div>
+        )}
         <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-4 shadow-soft overflow-x-auto">
           <div className="hidden lg:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 text-[10px] uppercase tracking-[0.24em] text-slate-400 border-b border-slate-800 pb-3 mb-3">
             <span></span>
@@ -3548,13 +3679,283 @@ function App() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-          <div>{riderBookVisibleOrders.length ? `Showing ${pageStart}-${pageEnd} of ${riderBookVisibleOrders.length}` : 'No orders to display'}</div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setRiderBookPageIndex((prev) => Math.max(prev - 1, 0))} disabled={riderBookPageIndex === 0} className="rounded-full bg-slate-800 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-700 disabled:opacity-50">Prev</button>
-            <button onClick={() => setRiderBookPageIndex((prev) => Math.min(prev + 1, riderBookPageCount - 1))} disabled={riderBookPageIndex >= riderBookPageCount - 1} className="rounded-full bg-slate-800 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-700 disabled:opacity-50">Next</button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+            <div>Visible orders: <span className="font-semibold text-white">{riderBookVisibleOrders.length}</span></div>
+            <div>Selected: <span className="font-semibold text-white">{riderBookSelectedOrders.length || 0}</span></div>
+            <div>Page size: <span className="font-semibold text-white">{riderBookPageSize}</span></div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+            <span>Show</span>
+            {[15, 50, 100].map((size) => (
+              <button
+                key={size}
+                onClick={() => setRiderBookPageSize(size)}
+                className={`rounded-full px-3 py-2 font-semibold transition ${riderBookPageSize === size ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
+            <div>{riderBookVisibleOrders.length ? `Showing ${pageStart}-${pageEnd} of ${riderBookVisibleOrders.length}` : 'No orders to display'}</div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setRiderBookPageIndex((prev) => Math.max(prev - 1, 0))} disabled={riderBookPageIndex === 0} className="rounded-full bg-slate-800 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-700 disabled:opacity-50">Prev</button>
+              <button onClick={() => setRiderBookPageIndex((prev) => Math.min(prev + 1, riderBookPageCount - 1))} disabled={riderBookPageIndex >= riderBookPageCount - 1} className="rounded-full bg-slate-800 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-700 disabled:opacity-50">Next</button>
+            </div>
           </div>
         </div>
+        {showRiderBookSummaryModal && riderBookSummaryData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+            <div className="w-full max-w-2xl rounded-[32px] border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm uppercase tracking-[0.24em] text-slate-400">Rider Book Summary</div>
+                  <div className="mt-2 text-3xl font-semibold text-white">{riderBookSummaryType === 'cash' ? 'Cash Summary' : 'Online Summary'}</div>
+                </div>
+                <button onClick={closeRiderBookSummaryModal} className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-200 hover:border-rose-500 hover:text-white">Close</button>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Order Value</div>
+                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.orderValue).toLocaleString()} Rs</div>
+                </div>
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Extras Total</div>
+                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.extras).toLocaleString()} Rs</div>
+                </div>
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Delivery Fees</div>
+                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.serviceCharge).toLocaleString()} Rs</div>
+                </div>
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Rider Amount</div>
+                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.riderAmount).toLocaleString()} Rs</div>
+                </div>
+              </div>
+              <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-300">
+                {riderBookSummaryType === 'cash'
+                  ? 'Cash summary shows cash collected after subtracting extras and delivery fees from the order total.'
+                  : 'Online summary shows online rider balance from extras and delivery fees owed to riders.'}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderRiderOrderRequests = () => {
+    const filteredByStatus = pendingRequests.filter((req) => {
+      if (riderOrderRequestsStatus === 'pending') return req.status === 'pending';
+      if (riderOrderRequestsStatus === 'approved') return req.status === 'approved';
+      if (riderOrderRequestsStatus === 'rejected') return req.status === 'rejected';
+      return true;
+    });
+
+    const filteredByDate = filteredByStatus.filter((req) => {
+      const reqDate = req.createdAt ? new Date(req.createdAt).toDateString() : '';
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      const fiveDaysAgo = new Date(Date.now() - 5 * 86400000).toDateString();
+
+      if (riderOrderRequestsDateFilter === 'today') return reqDate === today;
+      if (riderOrderRequestsDateFilter === 'yesterday') return reqDate === yesterday;
+      if (riderOrderRequestsDateFilter === 'previous-5-days') return new Date(reqDate) >= new Date(fiveDaysAgo);
+      if (riderOrderRequestsDateFilter === 'custom') {
+        const from = riderOrderRequestsCustomDateFrom ? new Date(riderOrderRequestsCustomDateFrom).toDateString() : '';
+        const to = riderOrderRequestsCustomDateTo ? new Date(riderOrderRequestsCustomDateTo).toDateString() : '';
+        return (!from || reqDate >= from) && (!to || reqDate <= to);
+      }
+      return true;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Main Tab Switcher */}
+        <div className="flex flex-wrap gap-2 items-center rounded-3xl border border-slate-800 bg-slate-900 p-4">
+          {['requests', 'shift-control'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setRiderOrderRequestsMainTab(tab)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${riderOrderRequestsMainTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            >
+              {tab === 'requests' ? 'Requests' : 'Shift Control'}
+            </button>
+          ))}
+        </div>
+
+        {/* Rider Requests View */}
+        {riderOrderRequestsMainTab === 'requests' && (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 items-center">
+                {['pending', 'approved', 'rejected'].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setRiderOrderRequestsStatus(status)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${riderOrderRequestsStatus === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {status === 'pending' ? 'New Request' : status === 'approved' ? 'Approved' : 'Rejected'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Date</span>
+                  {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => {
+                        setRiderOrderRequestsDateFilter(filter);
+                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${riderOrderRequestsDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    >
+                      {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
+                    </button>
+                  ))}
+                </div>
+                {riderOrderRequestsDateFilter === 'custom' && (
+                  <div className="flex flex-wrap items-center gap-2 ml-2 pl-2 border-l border-slate-700">
+                    <input
+                      type="date"
+                      value={riderOrderRequestsCustomDateFrom}
+                      onChange={(e) => setRiderOrderRequestsCustomDateFrom(e.target.value)}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    />
+                    <span className="text-slate-400">to</span>
+                    <input
+                      type="date"
+                      value={riderOrderRequestsCustomDateTo}
+                      onChange={(e) => setRiderOrderRequestsCustomDateTo(e.target.value)}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[12px] border border-slate-800 bg-slate-900 p-4 shadow-soft">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-white">
+                  {riderOrderRequestsStatus === 'pending' ? 'New Requests' : riderOrderRequestsStatus === 'approved' ? 'Approved Requests' : 'Rejected Requests'}
+                  <span className="ml-2 text-slate-400">({filteredByDate.length})</span>
+                </h3>
+                <button onClick={loadPendingRequests} className="text-sm px-3 py-1 rounded bg-slate-800 text-slate-200 hover:bg-slate-700">Refresh</button>
+              </div>
+              {filteredByDate.length === 0 ? (
+                <p className="text-sm text-slate-400">No requests found</p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredByDate.map((req) => (
+                    <div key={req.id} className="flex items-center justify-between bg-slate-800 p-3 rounded">
+                      <div>
+                        <div className="text-sm text-slate-200 font-semibold">{req.orderNumber}</div>
+                        <div className="text-xs text-slate-400">Rider: {req.riderName} · Status: {req.status}</div>
+                        <div className="text-xs text-slate-400">Total: {req.orderTotal} Rs</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => viewOrderById(req.orderId)} className="px-3 py-1 rounded bg-gray-700 text-white text-sm hover:bg-gray-600">View</button>
+                        {req.status === 'pending' && (
+                          <>
+                            <button onClick={() => approveRiderRequest(req.id)} className="px-3 py-1 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">Approve</button>
+                            <button onClick={() => rejectRiderRequest(req.id)} className="px-3 py-1 rounded bg-rose-600 text-white text-sm hover:bg-rose-700">Reject</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Shift Control View */}
+        {riderOrderRequestsMainTab === 'shift-control' && (
+          <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-6 shadow-soft">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Shift Control</p>
+                <h3 className="mt-2 text-2xl font-semibold text-slate-100">Start and close rider shifts</h3>
+                <p className="mt-3 text-sm text-slate-400">Pick a biker and start the shift. Closing the shift will clear previous rider app entries so the next shift starts fresh.</p>
+              </div>
+              <div className="space-y-3">
+                {riderShifts && riderShifts.length > 0 ? (
+                  riderShifts.map((sh, idx) => (
+                    <div key={idx} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shift status</p>
+                          <p className={`mt-2 text-lg font-semibold ${sh?.active ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {sh?.active ? 'Active' : 'Inactive'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleCloseShift(idx)} disabled={shiftActionLoading} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
+                            Close Shift
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-left text-sm text-slate-400 space-y-2">
+                        {sh?.startedAt ? (
+                          <>
+                            <p>Started: {formatShiftStartedAt(sh.startedAt)}</p>
+                            <p>Elapsed: {formatShiftDuration(sh.startedAt)}</p>
+                            {sh.riderName ? <p>Assigned rider: {sh.riderName}</p> : null}
+                          </>
+                        ) : (
+                          <p>No start time</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
+                    <p className="text-sm text-slate-400">No shifts recorded</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Select Rider</label>
+                <select value={shiftRiderId} onChange={(e) => setShiftRiderId(e.target.value)} className="mt-2 w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm outline-none text-slate-100">
+                  <option value="">Select Biker role rider</option>
+                  {shiftRiderOptions.map((member) => (
+                    <option key={member.id} value={member.id}>{member.name || member.username} ({member.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Actions</label>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  <button
+                    onClick={handleStartShift}
+                    disabled={
+                      shiftActionLoading ||
+                      !shiftRiderId ||
+                      (riderShift?.active && riderShift?.riderId === shiftRiderId)
+                    }
+                    className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Start Shift
+                  </button>
+                  <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">Close Shift</button>
+                </div>
+                <p className="mt-3 text-sm text-slate-400">{riderShift?.active ? 'Closing shift removes old rider order history and unlocks the next shift.' : 'Start a new shift when the rider is ready to take delivery.'}</p>
+              </div>
+            </div>
+            <div className="mt-6 border-t border-slate-800 pt-6">
+              <label className="block text-sm font-medium text-slate-400 mb-2">Clear Selected Rider Delivered Orders</label>
+              <p className="text-sm text-slate-500 mb-3">Remove all cash and online delivered orders for the selected rider</p>
+              <button onClick={handleClearSelectedRiderOrders} disabled={shiftActionLoading || !shiftRiderId} className="rounded-3xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-50">
+                Clear Rider Orders
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -3748,7 +4149,7 @@ function App() {
   }
 
   const updateRolePermissions = (roleName, permission, value) => {
-    setRoles(roles.map(role =>
+    setRoles((prev) => prev.map((role) =>
       role.name === roleName
         ? { ...role, permissions: { ...role.permissions, [permission]: value } }
         : role
@@ -4523,7 +4924,12 @@ function App() {
       <div className="space-y-4">
         {roles.map((role) => (
           <div key={role.name} className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
-            <h4 className="text-lg font-semibold text-white mb-4">{role.name}</h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-white">{role.name}</h4>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditingRoleTabs(editingRoleTabs === role.name ? null : role.name)} className="rounded-full px-3 py-1 text-sm bg-slate-800 text-slate-200">{editingRoleTabs === role.name ? 'Close' : 'Edit Tabs'}</button>
+              </div>
+            </div>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {Object.entries(role.permissions).map(([perm, value]) => (
                 <label key={perm} className="flex items-center gap-2">
@@ -4533,10 +4939,34 @@ function App() {
                     onChange={(e) => updateRolePermissions(role.name, perm, e.target.checked)}
                     className="rounded border-slate-600"
                   />
-                  <span className="text-sm text-slate-300 capitalize">{perm.replace(/([A-Z])/g, ' $1')}</span>
+                  <span className="text-sm text-slate-300 capitalize">{formatTabName(perm)}</span>
                 </label>
               ))}
             </div>
+
+            {editingRoleTabs === role.name && (
+              <div className="mt-4 rounded-2xl border border-slate-700 p-4 bg-slate-950">
+                <h5 className="text-sm font-semibold text-slate-200 mb-2">All Sidebar Tabs</h5>
+                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                  {tabs.map((t) => (
+                    <div key={t} className="flex items-center justify-between">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={Boolean(role.permissions[t])} onChange={(e) => updateRolePermissions(role.name, t, e.target.checked)} className="rounded border-slate-600" />
+                        <span className="text-sm text-slate-300">{formatTabName(t)}</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => removeTab(t)} className="text-xs text-rose-400">Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input value={newTabKey} onChange={(e) => setNewTabKey(e.target.value)} placeholder="tab-key" className="rounded px-3 py-2 bg-slate-900 text-slate-200" />
+                  <input value={newTabLabel} onChange={(e) => setNewTabLabel(e.target.value)} placeholder="Tab Label" className="rounded px-3 py-2 bg-slate-900 text-slate-200" />
+                  <button onClick={() => addTab(newTabKey, newTabLabel)} className="rounded-full bg-emerald-600 px-3 py-2 text-sm text-white">Add Tab</button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -5102,13 +5532,21 @@ function App() {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            {['receipt', 'fonts'].map((tab) => (
-              <button key={tab} onClick={() => setReceiptSettingsSubTab(tab)} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${receiptSettingsSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{tab === 'receipt' ? 'Receipt Layout' : 'Receipt Fonts'}</button>
+            {[
+              { id: 'app', label: 'App Settings' },
+              { id: 'receipt', label: 'Receipt Layout' },
+              { id: 'fonts', label: 'Receipt Fonts' }
+            ].map((tab) => (
+              <button key={tab.id} onClick={() => setReceiptSettingsSubTab(tab.id)} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${receiptSettingsSubTab === tab.id ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+                {tab.label}
+              </button>
             ))}
           </div>
         </div>
 
-        {receiptSettingsSubTab === 'receipt' ? (
+        {receiptSettingsSubTab === 'app' ? (
+          renderRootSettings()
+        ) : receiptSettingsSubTab === 'receipt' ? (
           <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
@@ -5225,9 +5663,6 @@ function App() {
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
             <button onClick={updateSettings} className="rounded-3xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Save Settings</button>
-            <button onClick={createGoogleSheet} className="rounded-3xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">Create sheet</button>
-            <button onClick={syncServerToGoogleSheet} className="rounded-3xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500">Sync now</button>
-            <button onClick={restoreServerFromGoogleSheet} className="rounded-3xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500">Restore</button>
           </div>
           <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Use these controls to define receipt layout, font styling and printing behavior.</p>
         </div>
@@ -5395,8 +5830,8 @@ function App() {
         <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Rider Portal Root Settings</p>
-              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Manage Rider portal App root configuration</h3>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Settings</p>
+              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Manage Rider App configuration</h3>
             </div>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -5420,87 +5855,6 @@ function App() {
               <label className="block text-sm font-medium text-slate-400">Rider App Avatar URL</label>
               <input value={settings.riderAppAvatar} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppAvatar: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Avatar image URL" />
             </div>
-          </div>
-        </div>
-        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Shift Control</p>
-              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Start and close rider shifts</h3>
-              <p className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pick a biker and start the shift. Closing the shift will clear previous rider app entries so the next shift starts fresh.</p>
-            </div>
-            <div className="space-y-3">
-              {riderShifts && riderShifts.length > 0 ? (
-                riderShifts.map((sh, idx) => (
-                  <div key={idx} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shift status</p>
-                        <p className={`mt-2 text-lg font-semibold ${sh?.active ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {sh?.active ? 'Active' : 'Inactive'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleCloseShift(idx)} disabled={shiftActionLoading} className="rounded-3xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">
-                          Close Shift
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-4 text-left text-sm text-slate-400 space-y-2">
-                      {sh?.startedAt ? (
-                        <>
-                          <p>Started: {formatShiftStartedAt(sh.startedAt)}</p>
-                          <p>Elapsed: {formatShiftDuration(sh.startedAt)}</p>
-                          {sh.riderName ? <p>Assigned rider: {sh.riderName}</p> : null}
-                        </>
-                      ) : (
-                        <p>No start time</p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 text-right">
-                  <p className="text-sm text-slate-400">No shifts recorded</p>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-slate-400">Select Rider</label>
-              <select value={shiftRiderId} onChange={(e) => setShiftRiderId(e.target.value)} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                <option value="">Select Biker role rider</option>
-                {shiftRiderOptions.map((member) => (
-                  <option key={member.id} value={member.id}>{member.name || member.username} ({member.role})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-400">Actions</label>
-              <div className="mt-2 flex flex-wrap gap-3">
-                <button
-                  onClick={handleStartShift}
-                  disabled={
-                    shiftActionLoading ||
-                    !shiftRiderId ||
-                    (riderShift?.active && riderShift?.riderId === shiftRiderId)
-                  }
-                  className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Start Shift
-                </button>
-                <button onClick={handleCloseShift} disabled={shiftActionLoading || !riderShift?.active} className="rounded-3xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">Close Shift</button>
-              </div>
-              <p className="mt-3 text-sm text-slate-400">{riderShift?.active ? 'Closing shift removes old rider order history and unlocks the next shift.' : 'Start a new shift when the rider is ready to take delivery.'}</p>
-            </div>
-          </div>
-          <div className="mt-6 border-t border-slate-800 pt-6">
-            <label className="block text-sm font-medium text-slate-400 mb-2">Clear Selected Rider Delivered Orders</label>
-            <p className="text-sm text-slate-500 mb-3">Remove all cash and online delivered orders for the selected rider</p>
-            <button onClick={handleClearSelectedRiderOrders} disabled={shiftActionLoading || !shiftRiderId} className="rounded-3xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-50">
-              Clear Rider Orders
-            </button>
           </div>
         </div>
       </div>
@@ -7478,10 +7832,13 @@ function App() {
             <label className="block text-sm font-medium text-slate-200">Email</label>
             <input value={authForm.email} onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })} className="w-full rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-slate-500" />
             <label className="block text-sm font-medium text-slate-200">Password</label>
-            <input type="password" value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} className="w-full rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-slate-500" />
+            <div className="relative">
+              <input type={showAuthPassword ? 'text' : 'password'} value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} className="w-full rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-slate-500" />
+              <button type="button" onClick={() => setShowAuthPassword((s) => !s)} className="absolute right-2 top-2 text-sm text-slate-300">{showAuthPassword ? 'Hide' : 'Show'}</button>
+            </div>
             <button onClick={login} className="w-full rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Sign In</button>
           </div>
-          <p className="mt-5 text-center text-sm text-slate-400">Use <strong className="text-white">admin@usmanhotel.com</strong> / <strong className="text-white">admin123</strong></p>
+          {/* Demo credentials removed */}
         </div>
       </div>
     );
@@ -7529,12 +7886,16 @@ function App() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => setActiveTab('dashboard')} className={`top-header-icon relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-slate-900 via-slate-700 to-slate-900 text-white shadow-[0_12px_30px_rgba(15,23,42,0.45)] transition-transform duration-300 hover:-translate-y-1 focus:outline-none ${activeTab === 'dashboard' ? 'ring-4 ring-emerald-500/30' : ''}`}>
-                <span className="relative z-10 text-2xl">🏠</span>
-              </button>
-              <button type="button" onClick={() => setActiveTab('pos')} className={`top-header-icon relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-indigo-500 to-emerald-400 text-white shadow-[0_12px_30px_rgba(59,130,246,0.45)] transition-transform duration-300 hover:-translate-y-1 focus:outline-none ${activeTab === 'pos' ? 'ring-4 ring-emerald-500/30' : ''}`}>
-                <span className="relative z-10 text-2xl">🛒</span>
-              </button>
+              {canAccessTab('dashboard') && (
+                <button type="button" onClick={() => setActiveTab('dashboard')} className={`top-header-icon relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-slate-900 via-slate-700 to-slate-900 text-white shadow-[0_12px_30px_rgba(15,23,42,0.45)] transition-transform duration-300 hover:-translate-y-1 focus:outline-none ${activeTab === 'dashboard' ? 'ring-4 ring-emerald-500/30' : ''}`}>
+                  <span className="relative z-10 text-2xl">🏠</span>
+                </button>
+              )}
+              {canAccessTab('pos') && (
+                <button type="button" onClick={() => setActiveTab('pos')} className={`top-header-icon relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-indigo-500 to-emerald-400 text-white shadow-[0_12px_30px_rgba(59,130,246,0.45)] transition-transform duration-300 hover:-translate-y-1 focus:outline-none ${activeTab === 'pos' ? 'ring-4 ring-emerald-500/30' : ''}`}>
+                  <span className="relative z-10 text-2xl">🛒</span>
+                </button>
+              )}
               <button onClick={copyRiderAppLink} className="rounded-full border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/20 transition">
                 Copy Rider Link
               </button>
@@ -7561,19 +7922,19 @@ function App() {
             <div className={`rounded-[28px] border p-4 mb-6 flex items-center gap-3 transition ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-slate-200 bg-amber-50 text-slate-900'} ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
               <div className="developer-photo relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-500 via-sky-500 to-emerald-500 shadow-[0_0_24px_rgba(59,130,246,0.25)] transition-transform duration-300 hover:-translate-y-1">
                 {settings.developerPhoto ? (
-                  <img src={settings.developerPhoto} alt="Farhan Sardar" className="h-full w-full object-cover" />
+                  <img src={settings.developerPhoto} alt={user?.name || 'User'} className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-2xl font-bold text-white">FS</span>
+                  <span className="text-2xl font-bold text-white">{(user?.name || user?.email || 'U').toString().split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}</span>
                 )}
                 <div className="absolute inset-0 rounded-full border border-white/20 opacity-70"></div>
               </div>
               <div className={`${isSidebarOpen ? 'block' : 'hidden'}`}>
-                <div className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} text-xs uppercase tracking-[0.2em]`}>Developer</div>
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-lg font-semibold`}>Farhan Sardar</div>
+                <div className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} text-xs uppercase tracking-[0.2em]`}>{user?.role ? user.role : 'User'}</div>
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-lg font-semibold`}>{user?.name || user?.email || 'Guest'}</div>
               </div>
             </div>
             <div className="space-y-2">
-              {tabs.filter((tab) => tab !== 'dashboard' && tab !== 'pos').map((tab) => (
+              {tabs.filter((tab) => tab !== 'dashboard' && tab !== 'pos' && canAccessTab(tab)).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -7616,10 +7977,10 @@ function App() {
             {activeTab === 'catalogue-qr' && renderCatalogueQrModule()}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'riders-app' && <RidersApp />}
-            {activeTab === 'rider-root-settings' && renderRootSettings()}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'rider-book' && renderRiderBook()}
+            {activeTab === 'rider-order-requests' && renderRiderOrderRequests()}
 
             {(activeTab === 'tables' || activeTab === 'inventory' || activeTab === 'staff' || activeTab === 'sales') && (
               <section className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft">

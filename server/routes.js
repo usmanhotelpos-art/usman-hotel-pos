@@ -11,7 +11,6 @@ import {
   saveCollection,
   writeDb
 } from './db.js';
-import { createSpreadsheet, saveDbAsJson, loadDbFromSheet } from './google-sheets.js';
 import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup-restore.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'usman-hotel-secret';
@@ -58,7 +57,31 @@ router.post('/auth/login', safe(async (req, res) => {
   const { email, password } = req.body;
   const user = findUserByEmail(email || '');
   if (!user) {
-    return res.status(401).send({ error: 'Invalid credentials' });
+    // Attempt staff fallback: allow staff members (helpers, cashiers, etc.) to login
+    const staffMembers = getCollection('staff') || [];
+    const loginValue = (email || '').toString().trim().toLowerCase();
+    const staff = staffMembers.find((s) => {
+      const username = (s.username || '').toString().trim().toLowerCase();
+      const staffEmail = (s.email || '').toString().trim().toLowerCase();
+      const loginEnabled = s.loginEnabled !== false;
+      if (!loginEnabled) return false;
+      return username === loginValue || staffEmail === loginValue;
+    });
+
+    if (!staff) return res.status(401).send({ error: 'Invalid credentials' });
+
+    // staff passwords are stored as plain `password` field in many setups
+    let validStaff = false;
+    if (typeof staff.password === 'string') {
+      validStaff = password === staff.password;
+    }
+    if (!validStaff && staff.passwordHash) {
+      validStaff = await bcrypt.compare(password || '', staff.passwordHash);
+    }
+    if (!validStaff) return res.status(401).send({ error: 'Invalid credentials' });
+
+    const token = createToken({ id: staff.id, email: staff.username || staff.email, role: staff.role, name: staff.name });
+    return res.send({ token, user: { id: staff.id, name: staff.name, email: staff.username || staff.email, role: staff.role } });
   }
 
   const valid = await bcrypt.compare(password || '', user.passwordHash);
@@ -72,8 +95,18 @@ router.post('/auth/login', safe(async (req, res) => {
 
 router.get('/auth/me', authenticate, (req, res) => {
   const db = readDb();
-  const user = db.users?.find((item) => item.id === req.user.id);
+  let user = db.users?.find((item) => item.id === req.user.id);
   if (!user) {
+    // Try staff collection
+    user = (db.staff || []).find((s) => s.id === req.user.id);
+    if (user) {
+      return res.send({ id: user.id, name: user.name, email: user.username || user.email, role: user.role });
+    }
+    // Try riders
+    user = (db.riders || []).find((r) => r.id === req.user.id);
+    if (user) {
+      return res.send({ id: user.id, name: user.name, email: user.email, role: user.role });
+    }
     return res.status(401).send({ error: 'User not found' });
   }
   res.send({ id: user.id, name: user.name, email: user.email, role: user.role });
@@ -780,33 +813,7 @@ router.use((err, req, res, next) => {
   res.status(500).send({ error: err.message || 'Internal Server Error' });
 });
 
-// Google Sheets endpoints
-router.post('/google/create-sheet', safe(async (req, res) => {
-  const title = req.body.title || 'Usman POS Backup';
-  const sheet = await createSpreadsheet(title);
-  res.send({ spreadsheetId: sheet.spreadsheetId, url: sheet.spreadsheetUrl });
-}));
-
-router.post('/google/save-db', safe(async (req, res) => {
-  const { spreadsheetId } = req.body;
-  if (!spreadsheetId) return res.status(400).send({ error: 'spreadsheetId is required' });
-  await saveDbAsJson(spreadsheetId);
-  res.send({ success: true });
-}));
-
-router.get('/google/load-db', safe(async (req, res) => {
-  const spreadsheetId = req.query.spreadsheetId;
-  if (!spreadsheetId) return res.status(400).send({ error: 'spreadsheetId is required' });
-  const db = await loadDbFromSheet(spreadsheetId);
-  res.send({ db });
-}));
-
-router.post('/google/restore-db', safe(async (req, res) => {
-  const { spreadsheetId } = req.body;
-  if (!spreadsheetId) return res.status(400).send({ error: 'spreadsheetId is required' });
-  const db = await restoreDbFromSheet(spreadsheetId);
-  res.send({ success: true, db });
-}));
+// Google Sheets endpoints removed
 
 // Rider Order Management Routes
 router.get('/rider/assigned-orders/:riderId', authenticate, (req, res) => {
@@ -982,8 +989,13 @@ router.post('/rider/request-approval', authenticate, (req, res) => {
   res.status(201).send(request);
 });
 
+router.get('/rider/requests', authenticate, (req, res) => {
+  const requests = getCollection('rider_order_requests') || [];
+  res.send(requests);
+});
+
 router.get('/rider/pending-requests', authenticate, (req, res) => {
-  const requests = getCollection('rider_order_requests');
+  const requests = getCollection('rider_order_requests') || [];
   const pending = requests.filter((r) => r.status === 'pending');
   res.send(pending);
 });

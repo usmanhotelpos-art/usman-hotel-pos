@@ -114,7 +114,15 @@ const OrdersPanel = () => {
     { id: 6, orderNum: 'ORD-006', table: 4, items: 'Haleem (2)', category: 'Haleem', total: 2000, status: 'completed', date: '2026-05-09', time: '06:15 PM' },
   ]);
 
-  const [dateFilter, setDateFilter] = useState('');
+  const [ordersTab, setOrdersTab] = useState('live');
+  const [liveSearch, setLiveSearch] = useState('');
+  const [salesSearch, setSalesSearch] = useState('');
+  const [liveDateFilter, setLiveDateFilter] = useState('today');
+  const [salesDateFilter, setSalesDateFilter] = useState('today');
+  const [liveCustomFrom, setLiveCustomFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [liveCustomTo, setLiveCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [salesCustomFrom, setSalesCustomFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [salesCustomTo, setSalesCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [categoryFilter, setCategoryFilter] = useState('');
   const [activeMenuCategory, setActiveMenuCategory] = useState(menuCategories[0].id);
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -126,13 +134,43 @@ const OrdersPanel = () => {
 
   const activeMenu = menuCategories.find(category => category.id === activeMenuCategory) || menuCategories[0];
 
+  const activeSearch = ordersTab === 'live' ? liveSearch : salesSearch;
+  const activeDateFilter = ordersTab === 'live' ? liveDateFilter : salesDateFilter;
+  const activeCustomFrom = ordersTab === 'live' ? liveCustomFrom : salesCustomFrom;
+  const activeCustomTo = ordersTab === 'live' ? liveCustomTo : salesCustomTo;
+
+  const dateRange = useMemo(() => {
+    const today = new Date();
+    const format = (date) => date.toISOString().slice(0, 10);
+    const current = format(today);
+    const yesterday = format(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1));
+
+    if (activeDateFilter === 'today') {
+      return [current, current];
+    }
+    if (activeDateFilter === 'yesterday') {
+      return [yesterday, yesterday];
+    }
+    if (activeDateFilter === 'last5') {
+      return [format(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 4)), current];
+    }
+    if (activeDateFilter === 'custom') {
+      return [activeCustomFrom || current, activeCustomTo || current];
+    }
+    return [null, null];
+  }, [activeDateFilter, activeCustomFrom, activeCustomTo]);
+
   const filteredOrders = useMemo(() => {
+    const searchTerm = activeSearch.trim().toLowerCase();
     return orders.filter(order => {
-      const dateMatch = !dateFilter || order.date === dateFilter;
+      const matchesSearch = !searchTerm || [order.orderNum, order.table?.toString(), order.items, order.category, order.status]
+        .some(value => String(value || '').toLowerCase().includes(searchTerm));
+      const [fromDate, toDate] = dateRange;
+      const matchesDate = !fromDate || (order.date >= fromDate && order.date <= toDate);
       const categoryMatch = !categoryFilter || order.category === categoryFilter;
-      return dateMatch && categoryMatch;
+      return matchesSearch && matchesDate && categoryMatch;
     });
-  }, [orders, dateFilter, categoryFilter]);
+  }, [orders, activeSearch, dateRange, categoryFilter]);
 
   const stats = useMemo(() => {
     return {
@@ -145,7 +183,10 @@ const OrdersPanel = () => {
   }, [filteredOrders]);
 
   const handleClearFilters = () => {
-    setDateFilter('');
+    setLiveSearch('');
+    setSalesSearch('');
+    setLiveDateFilter('today');
+    setSalesDateFilter('today');
     setCategoryFilter('');
   };
 
@@ -267,18 +308,84 @@ const OrdersPanel = () => {
         </div>
       </div>
 
-      <div className="filters-container">
-        <div className="filter-group">
-          <label htmlFor="date-filter">📅 Date:</label>
+      <div className="toolbar-container">
+        <div className="toolbar-panel toolbar-tabs-panel">
+          <div className="toolbar-label">Tabs</div>
+          <button
+            className={`tab-pill ${ordersTab === 'live' ? 'active' : ''}`}
+            onClick={() => setOrdersTab('live')}
+          >
+            Live
+          </button>
+          <button
+            className={`tab-pill ${ordersTab === 'sales' ? 'active' : ''}`}
+            onClick={() => setOrdersTab('sales')}
+          >
+            Sales
+          </button>
+        </div>
+
+        <div className="toolbar-panel toolbar-search-panel">
+          <label htmlFor="orders-search" className="toolbar-label">Search</label>
           <input
-            id="date-filter"
-            type="date"
-            className="filter-input"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            id="orders-search"
+            type="text"
+            className="toolbar-search-input"
+            placeholder={ordersTab === 'live' ? 'Search live orders...' : 'Search sales orders...'}
+            value={activeSearch}
+            onChange={(e) => ordersTab === 'live' ? setLiveSearch(e.target.value) : setSalesSearch(e.target.value)}
           />
         </div>
 
+        <div className="toolbar-panel toolbar-date-panel">
+          <div className="toolbar-label">Date</div>
+          <div className="date-pill-group">
+            {['today', 'yesterday', 'last5', 'custom'].map((key) => {
+              const label = key === 'today' ? 'Today' : key === 'yesterday' ? 'Yesterday' : key === 'last5' ? 'Last 5 Days' : 'Custom';
+              return (
+                <button
+                  key={key}
+                  className={`date-pill ${activeDateFilter === key ? 'active' : ''}`}
+                  onClick={() => {
+                    if (ordersTab === 'live') {
+                      setLiveDateFilter(key);
+                    } else {
+                      setSalesDateFilter(key);
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeDateFilter === 'custom' && (
+            <div className="custom-date-inputs">
+              <div className="custom-date-group">
+                <label htmlFor="custom-from">From</label>
+                <input
+                  id="custom-from"
+                  type="date"
+                  value={activeCustomFrom}
+                  onChange={(e) => ordersTab === 'live' ? setLiveCustomFrom(e.target.value) : setSalesCustomFrom(e.target.value)}
+                />
+              </div>
+              <div className="custom-date-group">
+                <label htmlFor="custom-to">To</label>
+                <input
+                  id="custom-to"
+                  type="date"
+                  value={activeCustomTo}
+                  onChange={(e) => ordersTab === 'live' ? setLiveCustomTo(e.target.value) : setSalesCustomTo(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="filters-container">
         <div className="filter-group">
           <label htmlFor="category-filter">🍛 Category:</label>
           <select

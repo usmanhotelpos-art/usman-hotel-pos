@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "install:all": "npm install --workspaces",
+    "dev": "powershell -ExecutionPolicy Bypass -File ./scripts/start-app.ps1",
     "dev:server": "npm --workspace server run dev",
     "dev:client": "npm --workspace client run dev",
     "build:client": "npm --workspace client run build",

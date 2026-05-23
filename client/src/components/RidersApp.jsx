@@ -941,12 +941,20 @@ export function RidersApp() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-4">
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-cyan-500/10 transition hover:-translate-y-1">
+            <div
+              role="button"
+              onClick={() => openSummaryModal('cash')}
+              className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-cyan-500/10 transition hover:-translate-y-1 hover:bg-slate-800 cursor-pointer"
+            >
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Cash amount</p>
               <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(cashSummaryData.riderAmount)}</p>
               <p className="mt-2 text-sm text-slate-400">Cash summary for collected orders.</p>
             </div>
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-sky-500/10 transition hover:-translate-y-1">
+            <div
+              role="button"
+              onClick={() => openSummaryModal('online')}
+              className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl shadow-sky-500/10 transition hover:-translate-y-1 hover:bg-slate-800 cursor-pointer"
+            >
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Online amount</p>
               <p className="mt-4 text-3xl font-semibold text-white">{formatCurrency(onlineSummaryData.riderAmount)}</p>
               <p className="mt-2 text-sm text-slate-400">Online summary for owed rider amount.</p>
@@ -1013,6 +1021,17 @@ export function RidersApp() {
                   <div>
                     <p className="text-sm font-semibold">{tab.label}</p>
                     <p className="text-xs text-slate-400">{tab.subtitle}</p>
+                    {(tab.key === 'deliveredCash' || tab.key === 'deliveredOnline') && (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openSummaryModal(tab.key === 'deliveredCash' ? 'cash' : 'online');
+                        }}
+                        className="mt-3 inline-flex cursor-pointer rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:bg-white/10"
+                      >
+                        Summary
+                      </span>
+                    )}
                   </div>
                 </div>
               </button>

@@ -1,5 +1,5 @@
 {
-  "watch": ["*.js", "routes.js", "db.js", "google-sheets.js", "config"],
+  "watch": ["*.js", "routes.js", "db.js", "config"],
   "ignore": ["node_modules", "data", "*.json", "debug-route*.js", "tmp-*"],
   "ext": "js",
   "delay": 500
