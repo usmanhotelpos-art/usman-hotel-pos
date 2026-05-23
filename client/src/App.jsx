@@ -3516,7 +3516,7 @@ function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {(riderBookMainTab === 'live' ? ['cash', 'online', 'all'] : ['due', 'paid', 'all']).map((sub) => {
+              {(riderBookMainTab === 'live' ? ['cash', 'online'] : ['due', 'paid', 'all']).map((sub) => {
                 const isActive = riderBookSubTab === sub;
                 const gradient = sub === 'cash' ? 'from-emerald-500 to-emerald-700' : sub === 'online' ? 'from-sky-500 to-indigo-600' : 'from-slate-700 to-slate-800';
                 return (
