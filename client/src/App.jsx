@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
+import { calculateRiderSummary } from './utils/riderSummary';
 
 const envApiBase = import.meta.env.VITE_API_BASE || '';
 const apiBase = envApiBase
@@ -3106,24 +3107,10 @@ function App() {
   };
 
   const calculateRiderBookSummary = (orders, type) => {
-    return orders.reduce(
-      (summary, order) => {
-        const amount = Number(order.total || order.amount || 0);
-        const extras = getOrderExtrasAmount(order);
-        const serviceCharge = getOrderServiceTypeCharge(order);
-        summary.orderValue += amount;
-        summary.extras += extras;
-        summary.serviceCharge += serviceCharge;
-        if (type === 'cash') {
-          summary.riderAmount += amount - extras - serviceCharge;
-        } else {
-          summary.riderAmount += extras + serviceCharge;
-        }
-        summary.count += 1;
-        return summary;
-      },
-      { orderValue: 0, extras: 0, serviceCharge: 0, riderAmount: 0, count: 0 }
-    );
+    return calculateRiderSummary(orders, type, {
+      getProductById: (id) => getProductById(id),
+      getServiceCharge: (order) => getOrderServiceTypeCharge(order)
+    });
   };
 
   const openRiderBookSummaryModal = (type) => {
