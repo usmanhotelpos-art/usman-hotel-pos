@@ -353,7 +353,7 @@ function App() {
   const [showWeightPopup, setShowWeightPopup] = useState(false);
   const [showFlavorPopup, setShowFlavorPopup] = useState(false);
   const [ordersMainTab, setOrdersMainTab] = useState('delivery');
-  const [deliverySubTab, setDeliverySubTab] = useState('all');
+  const [deliverySubTab, setDeliverySubTab] = useState('kitchen');
   const [deliveryDateFilter, setDeliveryDateFilter] = useState('today');
   const [deliveryCustomDateFrom, setDeliveryCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [deliveryCustomDateTo, setDeliveryCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -6921,24 +6921,20 @@ function App() {
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
     const filteredOrders = deliveryOrders.filter((o) => {
-      // Filter by payment status tab (Cash, Online, Paid, Due, All)
-      let matchesPaymentTab = true;
-      if (deliverySubTab === 'cash') {
-        matchesPaymentTab = o.paymentMethod === 'Cash' && o.paymentStatus !== 'Paid';
-      } else if (deliverySubTab === 'online') {
-        matchesPaymentTab = o.paymentMethod === 'Online' && o.paymentStatus !== 'Paid';
-      } else if (deliverySubTab === 'paid') {
-        matchesPaymentTab = o.paymentStatus === 'Paid';
-      } else if (deliverySubTab === 'due') {
-        matchesPaymentTab = o.paymentStatus === 'Due';
+      const status = String(o.status || '').toLowerCase();
+      const hasRider = Boolean(o.deliveryAgent);
+      let matchesDeliveryTab = true;
+      if (deliverySubTab === 'kitchen') {
+        matchesDeliveryTab = !hasRider || status === 'kitchen';
+      } else if (deliverySubTab === 'assigned') {
+        matchesDeliveryTab = hasRider || status === 'riders assigned';
       }
-      // deliverySubTab === 'all' means show all, so matchesPaymentTab stays true
-      
       const matchesSearch = !orderSearch || 
-        (o.orderNumber || o.id).toLowerCase().includes(orderSearch.toLowerCase()) ||
+        (String(o.orderNumber || o.id)).toLowerCase().includes(orderSearch.toLowerCase()) ||
         (o.customerName || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
         (o.phone || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
         (o.address || '').toLowerCase().includes(orderSearch.toLowerCase());
+
       const matchesRider = !orderFilterRider || o.deliveryAgent === orderFilterRider;
       const matchesPayment = !orderFilterPayment || o.paymentMethod === orderFilterPayment;
       let matchesDate = true;
@@ -6971,7 +6967,7 @@ function App() {
         const orderDate = o.createdAt ? new Date(o.createdAt) : o.date ? new Date(o.date) : null;
         matchesDate = orderDate ? orderDate >= from && orderDate <= to : false;
       }
-      return matchesPaymentTab && matchesSearch && matchesRider && matchesPayment && matchesDate;
+      return matchesDeliveryTab && matchesSearch && matchesRider && matchesPayment && matchesDate;
     });
     const paginatedOrders = filteredOrders.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize);
     const pageCount = Math.max(1, Math.ceil(filteredOrders.length / orderPageSize));
@@ -6979,13 +6975,13 @@ function App() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {['cash', 'online', 'paid', 'due', 'all'].map((status) => (
+            {['kitchen', 'assigned', 'all'].map((status) => (
               <button
                 key={status}
                 onClick={() => setDeliverySubTab(status)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliverySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                {status === 'cash' ? '💳 Cash' : status === 'online' ? '📱 Online' : status === 'paid' ? '✓ Paid' : status === 'due' ? '⏳ Due' : '📋 All'}
+                {status === 'kitchen' ? '🍳 Kitchen' : status === 'assigned' ? '👤 Assigned' : '📋 All'}
               </button>
             ))}
           </div>
