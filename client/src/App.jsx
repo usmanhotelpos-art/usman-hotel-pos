@@ -97,9 +97,10 @@ function App() {
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
   const [authMessage, setAuthMessage] = useState('');
-  const [token, setToken] = useState(localStorage.getItem('posToken') || '');
+  // Require manual login on app open — don't auto-use stored token
+  const [token, setToken] = useState('');
   const [user, setUser] = useState(null);
-  const [authForm, setAuthForm] = useState({ email: 'admin@usmanhotel.com', password: '' });
+  const [authForm, setAuthForm] = useState({ email: '', password: '' });
 
   const copyAppLink = async () => {
     const link = `${window.location.origin}`;
@@ -940,7 +941,7 @@ function App() {
     localStorage.removeItem('posToken');
     setToken('');
     setUser(null);
-    setAuthForm({ email: 'admin@usmanhotel.com', password: '' });
+    setAuthForm({ email: '', password: '' });
     setMessage('Logged out');
   }
 
