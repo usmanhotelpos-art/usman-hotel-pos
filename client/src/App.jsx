@@ -6664,7 +6664,19 @@ function App() {
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
     const filteredOrders = deliveryOrders.filter((o) => {
-      const matchesStatus = deliverySubTab === 'all' || o.status === deliverySubTab;
+      // Filter by payment status tab (Cash, Online, Paid, Due, All)
+      let matchesPaymentTab = true;
+      if (deliverySubTab === 'cash') {
+        matchesPaymentTab = o.paymentMethod === 'Cash' && o.paymentStatus !== 'Paid';
+      } else if (deliverySubTab === 'online') {
+        matchesPaymentTab = o.paymentMethod === 'Online' && o.paymentStatus !== 'Paid';
+      } else if (deliverySubTab === 'paid') {
+        matchesPaymentTab = o.paymentStatus === 'Paid';
+      } else if (deliverySubTab === 'due') {
+        matchesPaymentTab = o.paymentStatus === 'Due';
+      }
+      // deliverySubTab === 'all' means show all, so matchesPaymentTab stays true
+      
       const matchesSearch = !orderSearch || 
         (o.orderNumber || o.id).toLowerCase().includes(orderSearch.toLowerCase()) ||
         (o.customerName || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
@@ -6702,7 +6714,7 @@ function App() {
         const orderDate = o.createdAt ? new Date(o.createdAt) : o.date ? new Date(o.date) : null;
         matchesDate = orderDate ? orderDate >= from && orderDate <= to : false;
       }
-      return matchesStatus && matchesSearch && matchesRider && matchesPayment && matchesDate;
+      return matchesPaymentTab && matchesSearch && matchesRider && matchesPayment && matchesDate;
     });
     const paginatedOrders = filteredOrders.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize);
     const pageCount = Math.max(1, Math.ceil(filteredOrders.length / orderPageSize));
@@ -6710,13 +6722,13 @@ function App() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {['all', 'Kitchen', 'Riders Assigned'].map((status) => (
+            {['cash', 'online', 'paid', 'due', 'all'].map((status) => (
               <button
                 key={status}
                 onClick={() => setDeliverySubTab(status)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliverySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                {status === 'Kitchen' ? '👨‍🍳 Kitchen' : status === 'Riders Assigned' ? '🚴 Rider Assigned' : '📋 All'}
+                {status === 'cash' ? '💳 Cash' : status === 'online' ? '📱 Online' : status === 'paid' ? '✓ Paid' : status === 'due' ? '⏳ Due' : '📋 All'}
               </button>
             ))}
           </div>
