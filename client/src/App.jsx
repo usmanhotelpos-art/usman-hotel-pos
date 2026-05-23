@@ -2178,8 +2178,8 @@ function App() {
       if (orderType === 'Delivery' && order.address) {
         syncDeliveryCustomerFromOrder(order.address, order.phone, order.orderNumber);
       }
-      await loadPosData();
-      await loadOrdersData();
+      // Load orders data in background to avoid blocking print
+      loadOrdersData().catch(err => console.warn('Failed to refresh orders', err));
       return order;
     } catch (error) {
       throw new Error(error.message || 'Failed to save order');
@@ -2337,7 +2337,8 @@ function App() {
           : 'Completed';
       const order = await savePosOrder(saveStatus);
       if (order) {
-        setTimeout(() => printReceipt(order), 500);
+        // Print immediately without delay
+        printReceipt(order).catch(err => console.warn('Print failed', err));
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
         const targetTab = orderType === 'Dine-In' ? 'dinein' : orderType === 'Delivery' ? 'delivery' : 'takeaway';
@@ -2373,7 +2374,8 @@ function App() {
         : 'Kitchen';
       const order = await savePosOrder(saveStatus, { paymentStatus: status });
       if (order) {
-        setTimeout(() => printReceipt(order), 500);
+        // Print immediately without delay
+        printReceipt(order).catch(err => console.warn('Print failed', err));
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
         setActiveTab('orders');
@@ -2406,10 +2408,9 @@ function App() {
         : 'Completed';
     const order = await savePosOrder(saveStatus);
     if (order) {
-      await printReceipt(order);
+      printReceipt(order).catch(err => console.warn('Print failed', err));
       setShowCustomerDetailsPopup(false);
       setShowPaymentPopup(false);
-      await loadOrdersData();
       setActiveTab('orders');
     }
   }
@@ -2417,7 +2418,7 @@ function App() {
   async function handlePaymentSave() {
     const order = await completePayment();
     if (order) {
-      await printReceipt(order);
+      printReceipt(order).catch(err => console.warn('Print failed', err));
       setShowPaymentPopup(false);
     }
   }
@@ -2431,7 +2432,7 @@ function App() {
     try {
       const order = await savePosOrder('Pay Later');
       if (order) {
-        await printReceipt(order);
+        printReceipt(order).catch(err => console.warn('Print failed', err));
         setShowPaymentPopup(false);
       }
     } catch (err) {
