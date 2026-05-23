@@ -576,6 +576,48 @@ function App() {
   const [orderSearch, setOrderSearch] = useState('');
   const [viewOrderModal, setViewOrderModal] = useState(null);
   const [orderDetailsModal, setOrderDetailsModal] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+
+  function playBeep(freq = 440, duration = 120) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.value = 0.02;
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start();
+      setTimeout(() => {
+        o.stop();
+        try { ctx.close(); } catch (e) {}
+      }, duration);
+    } catch (e) {
+      // ignore if audio not supported
+    }
+  }
+
+  function requestDeleteOrder(order) {
+    setOrderToDelete(order);
+    setDeleteConfirmOpen(true);
+    playBeep(440, 140);
+  }
+
+  async function handleConfirmDelete() {
+    if (!orderToDelete) return;
+    playBeep(880, 140);
+    setDeleteConfirmOpen(false);
+    const id = orderToDelete.id || orderToDelete;
+    setOrderToDelete(null);
+    try {
+      await deleteOrder(id);
+    } catch (e) {
+      // deleteOrder reports errors via setMessage
+    }
+  }
 
   useEffect(() => {
     setOrderPageIndex(0);
@@ -7380,6 +7422,7 @@ function App() {
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 bg-slate-950">
@@ -7391,7 +7434,14 @@ function App() {
                   <td className="px-4 py-3">{order.total || 0} PKR</td>
                   <td className="px-4 py-3">{order.paymentMethod || 'Online'}</td>
                   <td className="px-4 py-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status}</span></td>
-                  <td className="px-4 py-3">{order.createdAt || order.date || 'N/A'}</td>
+                  <td className="px-4 py-3">{order.createdAt || order.date || 'N/A'}{order.createdAt ? ` (${Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000))}m)` : ''}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      {renderOrderEditButton(order)}
+                      <button type="button" title="Delete order" onClick={() => requestDeleteOrder(order)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500">Delete</button>
+                      <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-500">Print</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!filteredOrders.length && (
@@ -8541,6 +8591,35 @@ function App() {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {deleteConfirmOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/92 p-4 backdrop-blur-sm flex items-center justify-center">
+              <div className="relative w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white/10 shadow-2xl">
+                <div className="flex-shrink-0 border-b border-white/10 p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">Confirm Delete</h2>
+                      <p className="text-sm text-slate-400">Are you sure you want to delete this order?</p>
+                    </div>
+                    <button onClick={() => { setDeleteConfirmOpen(false); setOrderToDelete(null); }} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition hover:bg-slate-800">
+                      <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-300">
+                      <div className="flex justify-between"><span className="text-slate-400">Order</span><span className="text-white">{orderToDelete ? (orderToDelete.orderNumber || orderToDelete.id) : '-'}</span></div>
+                      <div className="flex justify-between mt-2"><span className="text-slate-400">Customer</span><span className="text-white">{orderToDelete ? (orderToDelete.customerName || orderToDelete.phone || '-') : '-'}</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 p-4 border-t border-white/10 flex justify-end gap-3">
+                  <button onClick={() => { setDeleteConfirmOpen(false); setOrderToDelete(null); }} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Cancel</button>
+                  <button onClick={handleConfirmDelete} className="rounded-3xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">Delete Order</button>
                 </div>
               </div>
             </div>
