@@ -24,6 +24,7 @@ function App() {
   });
   const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : isHelperRoute ? 'pos' : 'dashboard');
   const [isMobile, setIsMobile] = useState(false);
+  const [helperRouteVisited, setHelperRouteVisited] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState(null);
   const [items, setItems] = useState([]);
@@ -402,6 +403,18 @@ function App() {
     window.addEventListener('resize', updateMobile);
     return () => window.removeEventListener('resize', updateMobile);
   }, []);
+
+  // If the app was opened via /rider link, clear any existing rider token
+  useEffect(() => {
+    try {
+      if (isMobileRiderRoute && typeof window !== 'undefined') {
+        // Ensure riders must enter credentials on link open
+        localStorage.removeItem('riderToken');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [isMobileRiderRoute]);
   const [catalogueAssignedProducts, setCatalogueAssignedProducts] = useState({});
   const [catalogueAssignCategory, setCatalogueAssignCategory] = useState('');
   const [catalogueAssignSearch, setCatalogueAssignSearch] = useState('');
@@ -8157,7 +8170,7 @@ function App() {
 
             {message && <div className="rounded-[24px] border border-emerald-500 bg-emerald-900/40 px-4 py-3 text-sm text-emerald-200">{message}</div>}
 
-            {activeTab === 'dashboard' && (
+            {activeTab === 'dashboard' && !isMobile && (
               <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   { label: 'Total Rooms', value: dashboard?.totalRooms ?? 'Loading...' },
