@@ -5256,24 +5256,24 @@ function App() {
                 <p className="mt-2 text-xs text-slate-500">Shortcuts: Alt+S focus search, Alt+1 Dine-In, Alt+2 Takeaway, Alt+3 Delivery, Alt+A add first product, ↑/↓ select cart item, + / - qty, S/P/R save/print, L pay later.</p>
               </div>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-4 gap-2">
               {filteredProducts.map((product) => (
                 <button
                   key={product.id}
                   type="button"
-                  className="rounded-3xl border border-slate-200 bg-white p-4 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
                   onClick={() => addToCart(product)}
                 >
-                  <div className="flex flex-col items-center text-center mb-3">
+                  <div className="flex flex-col items-center text-center mb-2">
                     {product.photo ? (
-                      <img src={product.photo} alt={product.name} className="w-16 h-16 rounded-full object-cover mb-3 shadow-sm" />
+                      <img src={product.photo} alt={product.name} className="w-12 h-12 rounded-full object-cover mb-2 shadow-sm" />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-3 text-slate-400 text-2xl">📦</div>
+                      <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center mb-2 text-slate-400 text-xl">📦</div>
                     )}
                   </div>
                   <div className="text-left">
-                    <div className="text-sm font-semibold text-slate-900 mb-2">{product.name}</div>
-                    <div className="text-base font-bold text-emerald-600">
+                    <div className="text-xs font-semibold text-slate-900 mb-1">{product.name}</div>
+                    <div className="text-sm font-bold text-emerald-600">
                       {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
                     </div>
                   </div>
