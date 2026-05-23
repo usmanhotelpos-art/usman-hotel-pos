@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
-import { calculateRiderSummary } from './utils/riderSummary';
 
 const envApiBase = import.meta.env.VITE_API_BASE || '';
 const apiBase = envApiBase
@@ -3107,10 +3106,24 @@ function App() {
   };
 
   const calculateRiderBookSummary = (orders, type) => {
-    return calculateRiderSummary(orders, type, {
-      getProductById: (id) => getProductById(id),
-      getServiceCharge: (order) => getOrderServiceTypeCharge(order)
-    });
+    return orders.reduce(
+      (summary, order) => {
+        const amount = Number(order.total || order.amount || 0);
+        const extras = getOrderExtrasAmount(order);
+        const serviceCharge = getOrderServiceTypeCharge(order);
+        summary.orderValue += amount;
+        summary.extras += extras;
+        summary.serviceCharge += serviceCharge;
+        if (type === 'cash') {
+          summary.riderAmount += amount - extras - serviceCharge;
+        } else {
+          summary.riderAmount += extras + serviceCharge;
+        }
+        summary.count += 1;
+        return summary;
+      },
+      { orderValue: 0, extras: 0, serviceCharge: 0, riderAmount: 0, count: 0 }
+    );
   };
 
   const openRiderBookSummaryModal = (type) => {
@@ -3348,13 +3361,13 @@ function App() {
     const isCashTab = riderBookSubTab === 'cash';
     const riderBookExtrasServiceTotal = displayTotals.extras + displayTotals.serviceType;
     const riderBookCashOrderCount = riderBookVisibleOrders.length;
-    const cashSummaryOrders = riderBookFilteredByRider.filter((order) => {
+    const cashSummaryOrders = riderBookVisibleOrders.filter((order) => {
       const paymentStatus = String(order.paymentStatus || '').toLowerCase();
       const paymentMethod = String(order.paymentMethod || '').toLowerCase();
       const orderStatus = String(order.status || '').toLowerCase();
       return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
     });
-    const onlineSummaryOrders = riderBookFilteredByRider.filter((order) => {
+    const onlineSummaryOrders = riderBookVisibleOrders.filter((order) => {
       const paymentStatus = String(order.paymentStatus || '').toLowerCase();
       const paymentMethod = String(order.paymentMethod || '').toLowerCase();
       const orderStatus = String(order.status || '').toLowerCase();

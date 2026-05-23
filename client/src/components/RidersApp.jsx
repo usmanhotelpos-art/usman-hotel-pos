@@ -22,7 +22,6 @@ import {
   Truck,
   HelpingHand
 } from 'lucide-react';
-import { calculateRiderSummary } from '../utils/riderSummary';
 
 const apiBase = '/api';
 
@@ -165,10 +164,47 @@ export function RidersApp() {
   };
 
   const calculateSummaryForOrders = (orders, type) => {
-    return calculateRiderSummary(orders, type, {
-      getProductById: (id) => products.find((p) => p.id === id || String(p.id) === String(id)) || {},
-      getServiceCharge: getOrderDeliveryFee
+    const totals = {
+      orderTotal: 0,
+      productTotal: 0,
+      extrasTotal: 0,
+      deliveryFeeTotal: 0,
+      riderAmount: 0,
+      count: 0
+    };
+
+    orders.forEach((order) => {
+      const original = order.originalOrder || order || {};
+      const items = Array.isArray(original.items) ? original.items : [];
+      const deliveryFee = Number(original.deliveryCharge || original.deliveryFee || original.serviceCharge || 0);
+      let itemTotal = 0;
+      let extrasTotal = 0;
+
+      items.forEach((item) => {
+        const quantity = Number(item.quantity || 1);
+        const price = Number(item.price || 0);
+        const amount = quantity * price;
+        itemTotal += amount;
+        if (isExtrasItem(item)) {
+          extrasTotal += amount;
+        }
+      });
+
+      const orderTotal = Math.max(0, itemTotal + deliveryFee);
+      const productTotal = Math.max(0, itemTotal - extrasTotal);
+      const riderAmount = type === 'cash'
+        ? productTotal
+        : Math.max(0, extrasTotal + deliveryFee);
+
+      totals.orderTotal += orderTotal;
+      totals.productTotal += productTotal;
+      totals.extrasTotal += extrasTotal;
+      totals.deliveryFeeTotal += deliveryFee;
+      totals.riderAmount += riderAmount;
+      totals.count += 1;
     });
+
+    return totals;
   };
 
   const formatSignedCurrency = (value) => {
