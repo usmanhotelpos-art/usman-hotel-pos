@@ -3105,6 +3105,72 @@ function App() {
     return fee;
   };
 
+  const getRiderBookDateRange = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (riderBookDateFilter === 'today') {
+      return { from: new Date(today), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+    }
+    if (riderBookDateFilter === 'yesterday') {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return { from: new Date(yesterday), to: new Date(today) };
+    }
+    if (riderBookDateFilter === 'previous-5-days') {
+      const fiveDaysAgo = new Date(today);
+      fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+      return { from: new Date(fiveDaysAgo), to: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
+    }
+    if (riderBookDateFilter === 'custom') {
+      return {
+        from: new Date(riderBookCustomDateFrom + 'T00:00:00'),
+        to: new Date(riderBookCustomDateTo + 'T23:59:59')
+      };
+    }
+    return { from: null, to: null };
+  };
+
+  const getRiderBookOrderDate = (order) => {
+    if (order.createdAt) return new Date(order.createdAt);
+    if (order.date) return new Date(order.date);
+    return null;
+  };
+
+  const matchesRiderBookSearch = (order, search) => {
+    if (!search) return true;
+    const lowered = search.toLowerCase();
+    return [order.orderNumber, order.customerName, order.phone, order.address, order.deliveryAgent, order.serviceType]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(lowered));
+  };
+
+  const isRiderBookOrderInDateRange = (order, from, to) => {
+    if (!from || !to) return true;
+    const orderDate = getRiderBookOrderDate(order);
+    return orderDate ? orderDate >= from && orderDate <= to : false;
+  };
+
+  const riderBookCashFilter = (order) => {
+    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+    const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+    const orderStatus = String(order.status || '').toLowerCase();
+    return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
+  };
+
+  const riderBookOnlineFilter = (order) => {
+    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+    const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+    const orderStatus = String(order.status || '').toLowerCase();
+    return (
+      paymentStatus === 'may be online' ||
+      paymentStatus === 'online' ||
+      paymentMethod === 'online' ||
+      paymentStatus === 'paid to cash on counter' ||
+      (orderStatus === 'payment collected' && paymentMethod === 'online')
+    );
+  };
+
   const calculateRiderBookSummary = (orders, type) => {
     return orders.reduce(
       (summary, order) => {
@@ -3127,25 +3193,11 @@ function App() {
   };
 
   const openRiderBookSummaryModal = (type) => {
-    const cashOrders = riderBookFilteredByRider.filter((order) => {
-      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
-      const orderStatus = String(order.status || '').toLowerCase();
-      return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
-    });
-    const onlineOrders = riderBookFilteredByRider.filter((order) => {
-      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
-      const orderStatus = String(order.status || '').toLowerCase();
-      return (
-        paymentStatus === 'may be online' ||
-        paymentStatus === 'online' ||
-        paymentMethod === 'online' ||
-        paymentStatus === 'paid to cash on counter' ||
-        (orderStatus === 'payment collected' && paymentMethod === 'online')
-      );
-    });
-    const summaryOrders = type === 'cash' ? cashOrders : onlineOrders;
+    const { from, to } = getRiderBookDateRange();
+    const search = riderBookSearch.trim();
+    const summaryOrders = (type === 'cash' ? riderBookFilteredByRider.filter(riderBookCashFilter) : riderBookFilteredByRider.filter(riderBookOnlineFilter))
+      .filter((order) => isRiderBookOrderInDateRange(order, from, to))
+      .filter((order) => matchesRiderBookSearch(order, search));
     const summaryData = calculateRiderBookSummary(summaryOrders, type);
     setRiderBookSummaryType(type);
     setRiderBookSummaryData(summaryData);
@@ -3254,6 +3306,28 @@ function App() {
       .some((value) => value.toLowerCase().includes(search));
   });
 
+  const riderBookCashVisibleOrders = riderBookFilteredByRider
+    .filter(riderBookCashFilter)
+    .filter((order) => {
+      const { from, to } = getRiderBookDateRange();
+      return isRiderBookOrderInDateRange(order, from, to);
+    })
+    .filter((order) => matchesRiderBookSearch(order, riderBookSearch.trim()));
+
+  const riderBookOnlineVisibleOrders = riderBookFilteredByRider
+    .filter(riderBookOnlineFilter)
+    .filter((order) => {
+      const { from, to } = getRiderBookDateRange();
+      return isRiderBookOrderInDateRange(order, from, to);
+    })
+    .filter((order) => matchesRiderBookSearch(order, riderBookSearch.trim()));
+
+  const riderBookVisibleCashOnlineOrders = Array.from(
+    new Map(
+      [...riderBookCashVisibleOrders, ...riderBookOnlineVisibleOrders].map((order) => [order.id, order])
+    ).values()
+  );
+
   const riderBookSelectedOrdersList = posOrders.filter((order) => riderBookSelectedOrders.includes(order.id));
   const selectedTotals = riderBookSelectedOrdersList.reduce((sum, order) => {
     const amount = Number(order.total || order.amount || 0);
@@ -3361,26 +3435,8 @@ function App() {
     const isCashTab = riderBookSubTab === 'cash';
     const riderBookExtrasServiceTotal = displayTotals.extras + displayTotals.serviceType;
     const riderBookCashOrderCount = riderBookVisibleOrders.length;
-    const cashSummaryOrders = riderBookVisibleOrders.filter((order) => {
-      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
-      const orderStatus = String(order.status || '').toLowerCase();
-      return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
-    });
-    const onlineSummaryOrders = riderBookVisibleOrders.filter((order) => {
-      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-      const paymentMethod = String(order.paymentMethod || '').toLowerCase();
-      const orderStatus = String(order.status || '').toLowerCase();
-      return (
-        paymentStatus === 'may be online' ||
-        paymentStatus === 'online' ||
-        paymentMethod === 'online' ||
-        paymentStatus === 'paid to cash on counter' ||
-        (orderStatus === 'payment collected' && paymentMethod === 'online')
-      );
-    });
-    const riderBookCashSummary = calculateRiderBookSummary(cashSummaryOrders, 'cash');
-    const riderBookOnlineSummary = calculateRiderBookSummary(onlineSummaryOrders, 'online');
+    const riderBookCashSummary = calculateRiderBookSummary(riderBookCashVisibleOrders, 'cash');
+    const riderBookOnlineSummary = calculateRiderBookSummary(riderBookOnlineVisibleOrders, 'online');
     const riderBookDifference = riderBookCashSummary.riderAmount - riderBookOnlineSummary.riderAmount;
     const pageStart = riderBookPageIndex * riderBookPageSize + 1;
     const pageEnd = Math.min((riderBookPageIndex + 1) * riderBookPageSize, riderBookVisibleOrders.length);
@@ -3423,6 +3479,22 @@ function App() {
                 <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Difference</div>
                 <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookDifference).toLocaleString()} Rs</div>
                 <div className="mt-1 text-xs text-slate-400">Net rider amount</div>
+                {riderBookVisibleCashOnlineOrders.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      await updateRiderBookOrdersStatus(
+                        riderBookVisibleCashOnlineOrders.map((order) => order.id),
+                        'Payment Collected',
+                        null,
+                        'Paid'
+                      );
+                      setRiderBookSubTab('paid');
+                    }}
+                    className="mt-4 w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                  >
+                    {riderBookDifference < 0 ? 'Pay to Rider' : 'Collect Amount from Rider'}
+                  </button>
+                )}
               </div>
             </div>
 
