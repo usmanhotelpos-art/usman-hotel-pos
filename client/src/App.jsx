@@ -3193,11 +3193,10 @@ function App() {
   };
 
   const openRiderBookSummaryModal = (type) => {
-    const { from, to } = getRiderBookDateRange();
-    const search = riderBookSearch.trim();
-    const summaryOrders = (type === 'cash' ? riderBookFilteredByRider.filter(riderBookCashFilter) : riderBookFilteredByRider.filter(riderBookOnlineFilter))
-      .filter((order) => isRiderBookOrderInDateRange(order, from, to))
-      .filter((order) => matchesRiderBookSearch(order, search));
+    // Use the same fully-filtered orders as the table so the modal matches visible data
+    const summaryOrders = type === 'cash'
+      ? riderBookSearchFiltered.filter(riderBookCashFilter)
+      : riderBookSearchFiltered.filter(riderBookOnlineFilter);
     const summaryData = calculateRiderBookSummary(summaryOrders, type);
     setRiderBookSummaryType(type);
     setRiderBookSummaryData(summaryData);
@@ -3306,21 +3305,10 @@ function App() {
       .some((value) => value.toLowerCase().includes(search));
   });
 
-  const riderBookCashVisibleOrders = riderBookFilteredByRider
-    .filter(riderBookCashFilter)
-    .filter((order) => {
-      const { from, to } = getRiderBookDateRange();
-      return isRiderBookOrderInDateRange(order, from, to);
-    })
-    .filter((order) => matchesRiderBookSearch(order, riderBookSearch.trim()));
+  // Build visible cash/online lists from the same filtered set the table uses
+  const riderBookCashVisibleOrders = riderBookSearchFiltered.filter(riderBookCashFilter);
 
-  const riderBookOnlineVisibleOrders = riderBookFilteredByRider
-    .filter(riderBookOnlineFilter)
-    .filter((order) => {
-      const { from, to } = getRiderBookDateRange();
-      return isRiderBookOrderInDateRange(order, from, to);
-    })
-    .filter((order) => matchesRiderBookSearch(order, riderBookSearch.trim()));
+  const riderBookOnlineVisibleOrders = riderBookSearchFiltered.filter(riderBookOnlineFilter);
 
   const riderBookVisibleCashOnlineOrders = Array.from(
     new Map(
