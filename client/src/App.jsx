@@ -1032,6 +1032,7 @@ function App() {
         await loadInventoryData();
       } else if (tab === 'rider-order-requests') {
         await loadPendingRequests();
+        await loadStaffMembers();
       } else if (tab === 'riders-app') {
         // Riders App is a self-contained component and does not need generic tab data loading.
       } else if (tab === 'pos' || tab === 'catalogue-qr') {
@@ -1177,6 +1178,21 @@ function App() {
       setLoading(false);
     }
   }
+
+  async function loadStaffMembers() {
+    try {
+      const staffData = await fetchJson(`${apiBase}/staff`);
+      setStaff(Array.isArray(staffData) ? staffData : []);
+    } catch (error) {
+      console.warn('Failed to load staff members for shift control:', error.message || error);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'rider-order-requests' && riderOrderRequestsMainTab === 'shift-control') {
+      loadStaffMembers();
+    }
+  }, [activeTab, riderOrderRequestsMainTab]);
 
   // Realtime: try Server-Sent Events (SSE) and fallback to polling every 7s
   useEffect(() => {
