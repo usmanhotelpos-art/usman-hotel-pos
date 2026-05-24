@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ChevronDown,
   LogOut,
@@ -35,7 +35,7 @@ function getDisplayOrderNumber(order) {
 
 export function RidersApp() {
   const [view, setView] = useState('login'); // login, app
-  const [riderTab, setRiderTab] = useState('assigned'); // assigned, kitchen, requested, deliveredCash, deliveredOnline
+  const [riderTab, setRiderTab] = useState('assigned'); // assigned, deliveredCash, deliveredOnline
   const [selectedRoleTab, setSelectedRoleTab] = useState('biker'); // biker, admin-biker
   const [loading, setLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
@@ -45,11 +45,15 @@ export function RidersApp() {
   const [rider, setRider] = useState(null);
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [kitchenOrders, setKitchenOrders] = useState([]);
-  const [requestedOrders, setRequestedOrders] = useState([]);
   const [deliveredCashOrders, setDeliveredCashOrders] = useState([]);
   const [deliveredOnlineOrders, setDeliveredOnlineOrders] = useState([]);
-  const [requestingIds, setRequestingIds] = useState([]);
+  const [newDeliveryOrders, setNewDeliveryOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [editingOrderForm, setEditingOrderForm] = useState({});
+  const [editingProductSearch, setEditingProductSearch] = useState('');
+  const [editingProductCategory, setEditingProductCategory] = useState('All');
+  const [editingOrderCart, setEditingOrderCart] = useState([]);
   const [hotelSettings, setHotelSettings] = useState(null);
   const [products, setProducts] = useState([]);
   const [deleteError, setDeleteError] = useState('');
@@ -60,6 +64,9 @@ export function RidersApp() {
   const [summaryData, setSummaryData] = useState(null);
   const [shiftTimer, setShiftTimer] = useState(0);
   const shiftResetRef = useRef({ active: false, startedAt: '' });
+  const [availableRiders, setAvailableRiders] = useState([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedOrderForAssign, setSelectedOrderForAssign] = useState(null);
 
   const tabItems = [
     {
@@ -69,20 +76,7 @@ export function RidersApp() {
       icon: Package,
       accent: 'from-orange-500 to-rose-500'
     },
-    {
-      key: 'kitchen',
-      label: 'Available',
-      subtitle: 'Request approval',
-      icon: ShoppingBag,
-      accent: 'from-sky-500 to-cyan-500'
-    },
-    {
-      key: 'requested',
-      label: 'Requests',
-      subtitle: 'Approval queue',
-      icon: XCircle,
-      accent: 'from-violet-500 to-fuchsia-500'
-    },
+    // removed 'Available' and 'Requests' tabs per requirements
     {
       key: 'deliveredCash',
       label: 'Rider Book Cash',
@@ -97,6 +91,17 @@ export function RidersApp() {
       icon: CreditCard,
       accent: 'from-blue-500 to-indigo-500'
     }
+  ];
+
+  const adminRiderTabItems = [
+    {
+      key: 'newOrders',
+      label: 'New Orders',
+      subtitle: 'Unassigned deliveries',
+      icon: Zap,
+      accent: 'from-red-500 to-orange-500'
+    },
+    ...tabItems
   ];
 
   useEffect(() => {
@@ -286,7 +291,6 @@ export function RidersApp() {
     if (becameActive || newShiftStarted) {
       setAssignedOrders([]);
       setKitchenOrders([]);
-      setRequestedOrders([]);
       setDeliveredCashOrders([]);
       setDeliveredOnlineOrders([]);
       setSelectedOrder(null);
@@ -455,22 +459,24 @@ export function RidersApp() {
           const data = await res.json();
           setAssignedOrders(deduplicateOrders(data));
         }
+      } else if (riderTab === 'newOrders') {
+        // Admin rider: fetch all unassigned delivery orders
+        const res = await fetch(`${apiBase}/pos/orders`, {
+          headers: { Authorization: `Bearer ${riderToken}` }
+        });
+        if (res.ok) {
+          const allOrders = await res.json();
+          const unassignedDeliveries = (Array.isArray(allOrders) ? allOrders : []).filter(o => 
+            o.orderType === 'Delivery' && (!o.deliveryAgent || o.status === 'Kitchen')
+          );
+          setNewDeliveryOrders(deduplicateOrders(unassignedDeliveries));
+        }
+        // Fetch available riders when showing new orders
+        await fetchAvailableRiders();
       } else if (riderTab === 'kitchen') {
-        const res = await fetch(`${apiBase}/rider/kitchen-orders`, {
-          headers: { Authorization: `Bearer ${riderToken}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setKitchenOrders(deduplicateOrders(data));
-        }
+        // 'Available' tab removed
       } else if (riderTab === 'requested') {
-        const res = await fetch(`${apiBase}/rider/requested-orders/${rider.id}`, {
-          headers: { Authorization: `Bearer ${riderToken}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setRequestedOrders(deduplicateOrders(data));
-        }
+        // 'Requests' tab removed
       } else if (riderTab === 'deliveredCash') {
         const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}/cash`, {
           headers: { Authorization: `Bearer ${riderToken}` }
@@ -492,6 +498,24 @@ export function RidersApp() {
       console.error('Error loading orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableRiders = async () => {
+    try {
+      const res = await fetch(`${apiBase}/riders`, {
+        headers: { Authorization: `Bearer ${riderToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Filter out the current rider from the list, and only show active riders
+        const riders = (Array.isArray(data) ? data : []).filter(r => 
+          r.id !== rider?.id && (r.status === 'active' || !r.status)
+        );
+        setAvailableRiders(riders.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+      }
+    } catch (error) {
+      console.error('Error fetching riders:', error);
     }
   };
 
@@ -559,7 +583,6 @@ export function RidersApp() {
         const clearShiftOrders = () => {
           setAssignedOrders([]);
           setKitchenOrders([]);
-          setRequestedOrders([]);
           setDeliveredCashOrders([]);
           setDeliveredOnlineOrders([]);
           setSelectedOrder(null);
@@ -593,39 +616,7 @@ export function RidersApp() {
     setLoginForm({ email: '', password: '' });
   };
 
-  const requestApproval = async (orderId) => {
-    try {
-      // mark this order id as requesting to disable its button
-      setRequestingIds((ids) => [...ids, orderId]);
-      setLoading(true);
-      const res = await fetch(`${apiBase}/rider/request-approval`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${riderToken}`
-        },
-        body: JSON.stringify({ riderId: rider.id, orderId: orderId })
-      });
-
-      if (res.ok) {
-        setRequestingIds((ids) => ids.filter((id) => id !== orderId));
-        setKitchenOrders(kitchenOrders.filter((o) => o.id !== orderId));
-        const order = kitchenOrders.find((o) => o.id === orderId);
-        if (order) {
-          setRequestedOrders((prev) => [...prev, { ...order, status: 'pending', orderId }]);
-        }
-        notify('Approval request sent to hotel manager.', 'success');
-      } else {
-        setRequestingIds((ids) => ids.filter((id) => id !== orderId));
-        notify('Unable to request approval right now.', 'error');
-      }
-    } catch (error) {
-      console.error('Error requesting approval:', error);
-      setRequestingIds((ids) => ids.filter((id) => id !== orderId));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // request approval removed with 'Available'/'Requests' tabs
 
   const markDelivered = async (order, paymentMethod, paymentStatus) => {
     const targetOrderId = order.originalOrder?.id || order.id;
@@ -683,7 +674,6 @@ export function RidersApp() {
       if (res.ok) {
         setAssignedOrders(assignedOrders.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
         setKitchenOrders(kitchenOrders.filter((o) => (o.originalOrder?.id || o.id) !== targetOrderId));
-        setRequestedOrders(requestedOrders.filter((o) => (o.orderId || o.originalOrder?.id || o.id) !== targetOrderId));
         if (selectedOrder && ((selectedOrder.originalOrder?.id || selectedOrder.orderId || selectedOrder.id) === targetOrderId)) {
           setSelectedOrder(null);
         }
@@ -727,15 +717,198 @@ export function RidersApp() {
 
   const riderRole = (rider?.role || '').toString().toLowerCase() || decodeRiderRoleFromToken(riderToken);
   const isAdminRider = riderRole.includes('admin');
-  const pendingRequestOrderIds = requestedOrders.filter((request) => request.status === 'pending').map((request) => request.orderId);
-
-  useEffect(() => {
-    if (requestingIds.length === 0) return;
-    setRequestingIds((ids) => ids.filter((id) => pendingRequestOrderIds.includes(id)));
-  }, [pendingRequestOrderIds]);
+  // requestedOrders/pending request logic removed
 
   const viewOrderSlip = (order) => {
     setSelectedOrder(order);
+  };
+
+  const openEditOrderModal = (order) => {
+    const original = order.originalOrder || order;
+    const orderItems = Array.isArray(original.items) ? original.items : [];
+    setEditingOrder(order);
+    setEditingOrderForm({
+      address: original.address || original.deliveryAddress || '',
+      serviceType: original.serviceType || '',
+      phone: original.phone || original.customerPhone || '',
+      customerName: original.customerName || ''
+    });
+    setEditingOrderCart(orderItems.map((item, index) => {
+      const product = products.find((product) =>
+        String(product.id || product._id) === String(item.productId || item.id || item.productId)
+      );
+      return {
+        itemId: item.itemId || item.id || item.productId || String(index),
+        productId: item.productId || item.id || '',
+        name: item.name || product?.name || item.productName || '',
+        quantity: Number(item.quantity || 1),
+        price: Number(item.price ?? product?.price ?? item.total ?? 0),
+        category: item.category || product?.category || product?.categoryName || product?.type || product?.group || ''
+      };
+    }));
+    setEditingProductSearch('');
+    setEditingProductCategory('All');
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditingOrderForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const saveOrderChanges = async () => {
+    if (!editingOrder) return;
+    const targetOrderId = editingOrder.originalOrder?.id || editingOrder.id;
+    const original = editingOrder.originalOrder || editingOrder;
+
+    try {
+      setLoading(true);
+      const subtotal = editingOrderCart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+      const extraCharges = Number(original.deliveryCharge || original.deliveryFee || 0) + Number(original.serviceCharge || 0);
+      const updatedOrder = {
+        ...original,
+        items: editingOrderCart.map((item) => ({
+          ...item,
+          quantity: Number(item.quantity || 1),
+          price: Number(item.price || 0)
+        })),
+        subtotal: Number(subtotal.toFixed(2)),
+        total: Number((subtotal + extraCharges).toFixed(2)),
+        address: editingOrderForm.address,
+        deliveryAddress: editingOrderForm.address,
+        serviceType: editingOrderForm.serviceType,
+        phone: editingOrderForm.phone,
+        customerPhone: editingOrderForm.phone,
+        customerName: editingOrderForm.customerName
+      };
+
+      const res = await fetch(`${apiBase}/pos/orders/${targetOrderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${riderToken}`
+        },
+        body: JSON.stringify(updatedOrder)
+      });
+
+      if (res.ok) {
+        notify('Order updated successfully', 'success');
+        setEditingOrder(null);
+        setEditingOrderForm({});
+        setEditingOrderCart([]);
+        setEditingProductSearch('');
+        setEditingProductCategory('All');
+        await loadOrders();
+      } else {
+        notify('Unable to update order. Try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving order changes:', error);
+      notify('Error updating order: ' + error.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const normalizeText = (value) => value?.toString().trim().toLowerCase() || '';
+
+  const editingProductCategories = useMemo(() => {
+    const categories = products
+      .map((product) => product.category || product.categoryName || product.type || product.group)
+      .filter(Boolean);
+    return ['All', ...Array.from(new Set(categories))];
+  }, [products]);
+
+  const filteredEditingProducts = useMemo(() => {
+    const searchTerm = normalizeText(editingProductSearch);
+    return products.filter((product) => {
+      const category = product.category || product.categoryName || product.type || product.group || '';
+      const name = product.name || product.productName || '';
+      const matchesCategory = editingProductCategory === 'All' || normalizeText(category) === normalizeText(editingProductCategory);
+      const matchesSearch =
+        !searchTerm ||
+        normalizeText(name).includes(searchTerm) ||
+        normalizeText(category).includes(searchTerm) ||
+        normalizeText(product.code || '').includes(searchTerm);
+      return matchesCategory && matchesSearch;
+    });
+  }, [products, editingProductSearch, editingProductCategory]);
+
+  const addToEditingCart = (product) => {
+    if (!product) return;
+    setEditingOrderCart((prev) => {
+      const productId = product.id || product._id || '';
+      const existing = prev.find((item) => String(item.productId) === String(productId));
+      if (existing) {
+        return prev.map((item) =>
+          String(item.productId) === String(productId)
+            ? { ...item, quantity: Number(item.quantity || 0) + 1 }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          itemId: productId || String(Date.now()),
+          productId,
+          name: product.name || product.productName || '',
+          quantity: 1,
+          price: Number(product.price || 0),
+          category: product.category || product.categoryName || product.type || product.group || ''
+        }
+      ];
+    });
+  };
+
+  const updateEditingCartItemQuantity = (itemId, quantity) => {
+    setEditingOrderCart((prev) =>
+      prev.map((item) =>
+        item.itemId === itemId
+          ? { ...item, quantity: Math.max(1, Number(quantity) || 1) }
+          : item
+      )
+    );
+  };
+
+  const removeEditingCartItem = (itemId) => {
+    setEditingOrderCart((prev) => prev.filter((item) => item.itemId !== itemId));
+  };
+
+  const assignRiderToNewOrder = async (order, selectedRider) => {
+    if (!selectedRider || !selectedRider.id) return;
+    const targetOrderId = order.originalOrder?.id || order.id;
+    const original = order.originalOrder || order;
+
+    try {
+      setLoading(true);
+      const riderName = selectedRider.name || selectedRider.username || selectedRider.email || '';
+      const res = await fetch(`${apiBase}/pos/orders/${targetOrderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${riderToken}`
+        },
+        body: JSON.stringify({
+          ...original,
+          deliveryAgent: riderName,
+          deliveryAgentId: selectedRider.id,
+          status: 'Riders Assigned'
+        })
+      });
+
+      if (res.ok) {
+        notify(`Order assigned to ${riderName}`, 'success');
+        setNewDeliveryOrders(prev => prev.filter(o => (o.originalOrder?.id || o.id) !== targetOrderId));
+        setShowAssignModal(false);
+        setSelectedOrderForAssign(null);
+        await loadOrders();
+      } else {
+        notify('Unable to assign rider. Try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Error assigning rider:', error);
+      notify('Error: ' + error.message, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (view === 'login') {
@@ -887,16 +1060,7 @@ export function RidersApp() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Requests</p>
-                <div className="mt-3 flex items-center gap-3">
-                  <HelpingHand size={24} className="text-violet-400" />
-                  <div>
-                    <p className="text-2xl font-semibold text-white">{requestedOrders.length}</p>
-                    <p className="text-sm text-slate-500">Approval queue</p>
-                  </div>
-                </div>
-              </div>
+              {/* 'Requests' card removed */}
               <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Delivered</p>
                 <div className="mt-3 flex items-center gap-3">
@@ -1006,7 +1170,7 @@ export function RidersApp() {
       {/* Tabs */}
       <div className="bg-slate-950/95 border-b border-slate-800 sticky top-0 z-20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 py-3 flex gap-3 overflow-x-auto">
-          {tabItems.map((tab) => {
+          {(selectedRoleTab === 'admin-biker' && isAdminRider ? adminRiderTabItems : tabItems).map((tab) => {
             const Icon = tab.icon;
             return (
               <button
@@ -1047,6 +1211,69 @@ export function RidersApp() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {loading && <div className="text-center text-gray-500 py-4">Loading...</div>}
+
+        {riderTab === 'newOrders' && isAdminRider && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {newDeliveryOrders.length === 0 ? (
+              <p className="text-gray-500 col-span-full text-center py-8">No new delivery orders</p>
+            ) : (
+              newDeliveryOrders.map(order => {
+                const original = order.originalOrder || order;
+                return (
+                  <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-red-200">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
+                        <p className="text-sm text-gray-600">{original.customerName || 'Customer'}</p>
+                        <p className="text-xs text-gray-500 mt-1">{original.address || 'No address'}</p>
+                        <p className="text-xs text-gray-500 mt-1">{original.serviceType || 'No service type'}</p>
+                        <p className="text-xs text-gray-500 mt-1">📞 {original.phone || 'No phone'}</p>
+                      </div>
+                      <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">New</span>
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded mb-3">
+                      <p className="text-sm text-gray-700"><strong>Items:</strong> {original.items?.length || 0}</p>
+                      <p className="text-sm text-gray-700"><strong>Total:</strong> {hotelSettings?.currency} {original.total || 0}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => openEditOrderModal(order)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-2xl font-semibold transition"
+                      >
+                        ✎ Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedOrderForAssign(order);
+                          setShowAssignModal(true);
+                        }}
+                        className="flex-1 inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-2xl font-semibold transition"
+                      >
+                        👤 Assign
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button
+                        onClick={() => handlePrintOrder(order)}
+                        className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition inline-flex items-center justify-center gap-2"
+                      >
+                        🖨️ Print
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOrder(order)}
+                        className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition inline-flex items-center justify-center gap-2"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {riderTab === 'assigned' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1098,146 +1325,9 @@ export function RidersApp() {
           </div>
         )}
 
-        {riderTab === 'kitchen' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {kitchenOrders.length === 0 ? (
-              <p className="text-gray-500 col-span-full text-center py-8">No available orders</p>
-            ) : (
-              kitchenOrders.map(order => (
-                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-gray-200">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
-                      <p className="text-sm text-gray-600">
-                        {order.originalOrder?.customerName || 'Customer'}
-                      </p>
-                    </div>
-                    <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Available</span>
-                  </div>
+        {/* 'Available' tab removed */}
 
-                  <div className="bg-gray-50 p-3 rounded mb-3">
-                    <p className="text-sm text-gray-700">
-                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => requestApproval(order.originalOrder?.id || order.id)}
-                      disabled={
-                        loading ||
-                        requestingIds.includes(order.originalOrder?.id || order.id) ||
-                        pendingRequestOrderIds.includes(order.originalOrder?.id || order.id)
-                      }
-                      className={`flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-semibold transition ${
-                        loading ||
-                        requestingIds.includes(order.originalOrder?.id || order.id) ||
-                        pendingRequestOrderIds.includes(order.originalOrder?.id || order.id)
-                          ? 'bg-white text-gray-400 border border-gray-200 cursor-not-allowed'
-                          : 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20'
-                      }`}
-                    >
-                      <HelpingHand size={18} />
-                      {requestingIds.includes(order.originalOrder?.id || order.id) || pendingRequestOrderIds.includes(order.originalOrder?.id || order.id)
-                        ? 'Requested'
-                        : 'Request Approval'}
-                    </button>
-                    <button
-                      onClick={() => viewOrderSlip(order)}
-                      className="bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl transition inline-flex items-center justify-center gap-2 shadow-md shadow-slate-950/20"
-                    >
-                      <Eye size={18} />
-                      Slip
-                    </button>
-                    {isAdminRider && (
-                      <>
-                        <button
-                          onClick={() => handlePrintOrder(order)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
-                        >
-                          <ArrowUpRight size={18} />
-                          Print
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order)}
-                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
-                        >
-                          <Trash2 size={18} />
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {riderTab === 'requested' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {requestedOrders.length === 0 ? (
-              <p className="text-gray-500 col-span-full text-center py-8">No requested orders</p>
-            ) : (
-              requestedOrders.map((order) => (
-                <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-orange-200">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
-                      <p className="text-sm text-gray-600">
-                        {order.originalOrder?.customerName || 'Customer'}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
-                      </p>
-                    </div>
-                    <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded">Requested</span>
-                  </div>
-
-                  <div className="bg-gray-50 p-3 rounded mb-3">
-                    <p className="text-sm text-gray-700">
-                      <strong>Items:</strong> {order.originalOrder?.items?.length || 0}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      <strong>Total:</strong> {hotelSettings?.currency} {order.originalOrder?.total || 0}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => viewOrderSlip(order)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-md shadow-slate-950/20"
-                    >
-                      <Eye size={18} />
-                      Order Slip
-                    </button>
-                    {isAdminRider && (
-                      <>
-                        <button
-                          onClick={() => handlePrintOrder(order)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-cyan-500/20 inline-flex items-center gap-2"
-                        >
-                          <ArrowUpRight size={18} />
-                          Print
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrder(order)}
-                          className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-3 rounded-2xl font-semibold transition shadow-lg shadow-rose-500/20 inline-flex items-center gap-2"
-                        >
-                          <Trash2 size={18} />
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        {/* 'Requests' tab content removed */}
 
         {riderTab === 'deliveredCash' && (
           <div className="space-y-4">
@@ -1268,6 +1358,9 @@ export function RidersApp() {
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Rider: {order.originalOrder?.deliveryAgent || order.deliveryAgent || 'Unassigned'}
                         </p>
                       </div>
                       <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded flex items-center gap-1">
@@ -1351,6 +1444,9 @@ export function RidersApp() {
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Rider: {order.originalOrder?.deliveryAgent || order.deliveryAgent || 'Unassigned'}
                         </p>
                       </div>
                       <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center gap-1">
@@ -1519,12 +1615,12 @@ export function RidersApp() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedOrder.originalOrder?.items?.map((item, idx) => (
+                      {(selectedOrder.originalOrder?.items || selectedOrder.items || []).map((item, idx) => (
                         <tr key={idx} className="border-b border-cyan-500/10 hover:bg-slate-900/50 transition">
                           <td className="py-3 px-4 text-slate-200">{item.name}</td>
                           <td className="text-center py-3 px-4 text-slate-300">{item.quantity}</td>
                           <td className="text-right py-3 px-4 text-slate-300">{hotelSettings?.currency || 'PKR'} {item.price}</td>
-                          <td className="text-right py-3 px-4 font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {(item.quantity * item.price).toFixed(2)}</td>
+                          <td className="text-right py-3 px-4 font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {(Number(item.quantity || 0) * Number(item.price || 0)).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1535,7 +1631,7 @@ export function RidersApp() {
               <div className="border-t border-cyan-500/30 mt-6 pt-6 space-y-2">
                 <div className="flex justify-between items-center text-slate-300">
                   <span>Subtotal:</span>
-                  <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.subtotal || 0}</span>
+                  <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.subtotal || selectedOrder.subtotal || 0}</span>
                 </div>
                 {Number(getOrderDeliveryFee(selectedOrder.originalOrder || selectedOrder)) > 0 && (
                   <div className="flex justify-between items-center text-slate-300">
@@ -1543,15 +1639,15 @@ export function RidersApp() {
                     <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {getOrderDeliveryFee(selectedOrder.originalOrder || selectedOrder)}</span>
                   </div>
                 )}
-                {Number(selectedOrder.originalOrder?.serviceCharge || 0) > 0 && Number(selectedOrder.originalOrder?.deliveryCharge || selectedOrder.originalOrder?.deliveryFee || 0) > 0 && (
+                {Number(selectedOrder.originalOrder?.serviceCharge || selectedOrder.serviceCharge || 0) > 0 && Number(selectedOrder.originalOrder?.deliveryCharge || selectedOrder.originalOrder?.deliveryFee || selectedOrder.deliveryCharge || selectedOrder.deliveryFee || 0) > 0 && (
                   <div className="flex justify-between items-center text-slate-300">
                     <span>Service Charge:</span>
-                    <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.serviceCharge || 0}</span>
+                    <span className="text-lg font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.serviceCharge || selectedOrder.serviceCharge || 0}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-xl font-bold border-t border-cyan-500/30 pt-4 mt-4">
                   <span className="text-cyan-400">Total:</span>
-                  <span className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.total || 0}</span>
+                  <span className="text-2xl bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{hotelSettings?.currency || 'PKR'} {selectedOrder.originalOrder?.total || selectedOrder.total || 0}</span>
                 </div>
               </div>
             </div>
@@ -1586,6 +1682,223 @@ export function RidersApp() {
           </div>
         </div>
       )}
+
+      {editingOrder && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-950 rounded-3xl border border-blue-500/50 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 shadow-2xl shadow-blue-500/30">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-white">Edit Order</h2>
+              <button onClick={() => { setEditingOrder(null); setEditingOrderForm({}); setEditingOrderCart([]); setEditingProductSearch(''); setEditingProductCategory('All'); }} className="text-slate-300 hover:text-white text-2xl">✕</button>
+            </div>
+            <div className="space-y-6">
+              {/* Order Details */}
+              <div className="rounded-2xl border border-blue-500/20 bg-slate-900/50 p-6">
+                <h3 className="text-lg font-bold text-white mb-4">Order Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-2">Customer Name</label>
+                    <input
+                      type="text"
+                      value={editingOrderForm.customerName || ''}
+                      onChange={(e) => handleEditFormChange('customerName', e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-2">Phone Number</label>
+                    <input
+                      type="text"
+                      value={editingOrderForm.phone || ''}
+                      onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm text-slate-300 mb-2">Delivery Address</label>
+                    <textarea
+                      value={editingOrderForm.address || ''}
+                      onChange={(e) => handleEditFormChange('address', e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white outline-none focus:border-blue-500"
+                      rows="3"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-2">Service Type</label>
+                    <select
+                      value={editingOrderForm.serviceType || ''}
+                      onChange={(e) => handleEditFormChange('serviceType', e.target.value)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white outline-none focus:border-blue-500"
+                    >
+                      <option value="">Select service type</option>
+                      {Array.from(new Set((newDeliveryOrders.concat(assignedOrders)).map(o => o.originalOrder?.serviceType || o.serviceType).filter(Boolean))).map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Products */}
+              <div className="rounded-2xl border border-blue-500/20 bg-slate-900/50 p-6">
+                <h3 className="text-lg font-bold text-white mb-4">Products</h3>
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {editingProductCategories.map((category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => setEditingProductCategory(category)}
+                          className={`rounded-full px-3 py-2 text-xs font-semibold transition ${editingProductCategory === category ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800'}`}
+                        >
+                          {category}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      value={editingProductSearch}
+                      onChange={(e) => setEditingProductSearch(e.target.value)}
+                      placeholder="Search products"
+                      className="w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="grid gap-3 max-h-72 overflow-y-auto">
+                    {filteredEditingProducts.length === 0 ? (
+                      <div className="text-center text-sm text-slate-500 py-8">No matching products</div>
+                    ) : (
+                      filteredEditingProducts.map((product) => {
+                        const selected = editingOrderCart.some((item) => String(item.productId) === String(product.id || product._id));
+                        return (
+                          <button
+                            key={product.id || product._id || product.code || product.name}
+                            type="button"
+                            onClick={() => addToEditingCart(product)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-3xl border px-4 py-3 text-left transition ${selected ? 'border-emerald-500 bg-emerald-500/10 shadow-soft' : 'border-slate-800 bg-slate-950 hover:border-emerald-600/50 hover:bg-slate-900'}`}
+                          >
+                            <div className="min-w-0">
+                              <div className={`font-semibold truncate ${selected ? 'text-emerald-200' : 'text-white'}`}>{product.name}</div>
+                              <div className="text-sm text-slate-400">{product.category || product.categoryName || product.type || product.group} · {hotelSettings?.currency || 'PKR'} {product.price}</div>
+                            </div>
+                            <div className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">{selected ? 'Added' : 'Add'}</div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-700 bg-slate-950 p-4">
+                    <h4 className="text-sm font-semibold text-white mb-3">Selected Products</h4>
+                    {editingOrderCart.length === 0 ? (
+                      <div className="text-sm text-slate-500">No products selected yet.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {editingOrderCart.map((item) => (
+                          <div key={item.itemId} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center rounded-2xl border border-slate-800 bg-slate-900 p-3">
+                            <div>
+                              <div className="font-semibold text-white">{item.name}</div>
+                              <div className="text-xs text-slate-500">{item.category}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => updateEditingCartItemQuantity(item.itemId, item.quantity - 1)} className="h-9 w-9 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700">-</button>
+                              <span className="min-w-[24px] text-center text-sm text-white">{item.quantity}</span>
+                              <button type="button" onClick={() => updateEditingCartItemQuantity(item.itemId, item.quantity + 1)} className="h-9 w-9 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700">+</button>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-cyan-300">{hotelSettings?.currency || 'PKR'} {(Number(item.price || 0) * Number(item.quantity || 1)).toFixed(2)}</div>
+                              <button type="button" onClick={() => removeEditingCartItem(item.itemId)} className="text-xs text-slate-500 hover:text-rose-400">Remove</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-slate-700">
+                <button
+                  onClick={saveOrderChanges}
+                  disabled={loading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg transition"
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={() => { setEditingOrder(null); setEditingOrderForm({}); setEditingOrderCart([]); setEditingProductSearch(''); setEditingProductCategory('All'); }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAssignModal && selectedOrderForAssign && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-950 rounded-3xl border border-purple-500/50 max-w-md w-full max-h-[80vh] overflow-y-auto p-8 shadow-2xl shadow-purple-500/30">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">Assign Rider</h2>
+              <button 
+                onClick={() => { setShowAssignModal(false); setSelectedOrderForAssign(null); }} 
+                className="text-slate-300 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-slate-300 mb-2">Order Details</h3>
+              <div className="rounded-lg bg-slate-900/50 border border-purple-500/20 p-4">
+                <p className="text-white font-semibold">Order #{getDisplayOrderNumber(selectedOrderForAssign)}</p>
+                <p className="text-sm text-slate-400 mt-1">{selectedOrderForAssign.originalOrder?.customerName || 'Customer'}</p>
+                <p className="text-xs text-slate-500 mt-1">{selectedOrderForAssign.originalOrder?.address || 'No address'}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Select Rider</h3>
+              {availableRiders.length === 0 ? (
+                <div className="rounded-lg bg-slate-900/50 border border-slate-700 p-4">
+                  <p className="text-slate-400 text-center text-sm">No riders available</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableRiders.map(riderOption => (
+                    <button
+                      key={riderOption.id}
+                      onClick={() => {
+                        assignRiderToNewOrder(selectedOrderForAssign, riderOption);
+                      }}
+                      disabled={loading}
+                      className="w-full rounded-lg border border-purple-500/30 bg-slate-900 hover:bg-purple-600/30 text-left p-4 transition disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-white group-hover:text-purple-300 transition">{riderOption.name || 'Unnamed Rider'}</p>
+                          <p className="text-xs text-slate-400">{riderOption.email || riderOption.username || 'No email'}</p>
+                          {riderOption.phone && <p className="text-xs text-slate-500 mt-1">📞 {riderOption.phone}</p>}
+                        </div>
+                        <div className="text-purple-400 group-hover:text-purple-300 transition">→</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => { setShowAssignModal(false); setSelectedOrderForAssign(null); }}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-lg font-semibold transition border border-slate-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1602,8 +1915,11 @@ function OrderCard({ order, currency = 'PKR', onViewSlip, status, actions = [], 
           <p className="text-sm text-gray-600">
             {order.originalOrder?.customerName || 'Customer'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             {order.originalOrder?.address || order.originalOrder?.deliveryAddress || 'No address'} · {order.originalOrder?.serviceType || 'No service type'}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            Rider: {order.originalOrder?.deliveryAgent || order.deliveryAgent || 'Unassigned'}
           </p>
           {deliveryFee > 0 && (
             <p className="text-xs text-gray-500 mt-1">

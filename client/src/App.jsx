@@ -624,6 +624,12 @@ function App() {
   }, [deliverySubTab, orderSearch, orderFilterRider, orderFilterPayment, orderPageSize, deliveryDateFilter, deliveryCustomDateFrom, deliveryCustomDateTo]);
 
   useEffect(() => {
+    if (deliverySubTab !== 'kitchen' && selectedOrders.length > 0) {
+      setSelectedOrders([]);
+    }
+  }, [deliverySubTab]);
+
+  useEffect(() => {
     setTakeawayPageIndex(0);
   }, [takeawaySubTab, takeawayDateFilter, takeawayCustomDateFrom, takeawayCustomDateTo, takeawayPageSize]);
 
@@ -6923,8 +6929,9 @@ function App() {
     const filteredOrders = deliveryOrders.filter((o) => {
       const status = String(o.status || '').toLowerCase();
       const hasRider = Boolean(o.deliveryAgent);
+      const isNewOrdersTab = deliverySubTab === 'kitchen';
       let matchesDeliveryTab = true;
-      if (deliverySubTab === 'kitchen') {
+      if (isNewOrdersTab) {
         matchesDeliveryTab = !hasRider || status === 'kitchen';
       } else if (deliverySubTab === 'assigned') {
         matchesDeliveryTab = hasRider || status === 'riders assigned';
@@ -6981,7 +6988,7 @@ function App() {
                 onClick={() => setDeliverySubTab(status)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliverySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                {status === 'kitchen' ? '🍳 Kitchen' : status === 'assigned' ? '👤 Assigned' : '📋 All'}
+                {status === 'kitchen' ? '🆕 New Orders' : status === 'assigned' ? '👤 Assigned' : '📋 All'}
               </button>
             ))}
           </div>
@@ -7068,7 +7075,7 @@ function App() {
           )}
         </div>
 
-        {selectedOrders.length > 0 && (
+        {deliverySubTab === 'kitchen' && selectedOrders.length > 0 && (
             <div className="flex flex-wrap items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 p-4 gap-3">
               <div className="text-sm text-slate-300">
                 {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
@@ -7086,12 +7093,14 @@ function App() {
               <thead className="border-b border-slate-800 text-slate-400">
                 <tr>
                   <th className="px-2 py-2">
-                    <input
-                      type="checkbox"
-                      checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
-                      onChange={(e) => e.target.checked ? selectAllOrders(paginatedOrders) : clearOrderSelection()}
-                      className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                    />
+                    {deliverySubTab === 'kitchen' ? (
+                      <input
+                        type="checkbox"
+                        checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
+                        onChange={(e) => e.target.checked ? selectAllOrders(paginatedOrders) : clearOrderSelection()}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                      />
+                    ) : null}
                   </th>
                   <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Order #</th>
                   <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Delivery address</th>
@@ -7109,12 +7118,14 @@ function App() {
                 {paginatedOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-950/80 transition">
                     <td className="px-2 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedOrders.includes(order.id)}
-                        onChange={() => toggleOrderSelection(order.id)}
-                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                      />
+                      {deliverySubTab === 'kitchen' ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.includes(order.id)}
+                          onChange={() => toggleOrderSelection(order.id)}
+                          className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                        />
+                      ) : null}
                     </td>
                     <td className="px-2 py-2 text-xs font-semibold text-white">{order.orderNumber || order.id}</td>
                     <td className="px-2 py-2 max-w-[150px] truncate text-slate-300 text-xs">{order.address || '-'}</td>
@@ -7152,9 +7163,11 @@ function App() {
                         <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-2 text-slate-950 transition hover:bg-emerald-500">
                           <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                         </button>
-                        <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="rounded-full border border-slate-700 bg-purple-600 px-3 py-2 text-white transition hover:bg-purple-500">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
-                        </button>
+                        {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
+                          <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="rounded-full border border-slate-700 bg-purple-600 px-3 py-2 text-white transition hover:bg-purple-500">
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -7177,20 +7190,31 @@ function App() {
                     </div>
                   )}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleOrderSelection(order.id)}
-                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <div>
-                        <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
-                        {order.customerName && (
-                          <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
-                        )}
+                    {deliverySubTab === 'kitchen' ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOrderSelection(order.id)}
+                          className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <div>
+                          <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
+                          {order.customerName && (
+                            <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
+                          {order.customerName && (
+                            <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-2 text-right">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${paidStatus === 'Paid' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>{paidStatus}</span>
@@ -7247,9 +7271,11 @@ function App() {
                       <button type="button" title="Print order" onClick={() => printReceipt(order)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-600 bg-emerald-600 text-slate-950 shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-emerald-500`}>
                         <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                       </button>
-                      <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-purple-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-purple-500">
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
-                      </button>
+                      {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
+                        <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-purple-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-purple-500">
+                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                        </button>
+                      )}
                       {renderOrderEditButton(order)}
                     </div>
                   </div>
