@@ -416,6 +416,56 @@ function App() {
       // ignore
     }
   }, [isMobileRiderRoute]);
+
+  // Version check - detect new deployments and refresh app
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const checkForNewVersion = async () => {
+      try {
+        // Fetch index.html with cache busting to check for new version
+        const response = await fetch('/index.html?t=' + Date.now(), { 
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        const html = await response.text();
+        
+        // Extract version from meta tag
+        const versionMatch = html.match(/content="([^"]+)"/);
+        const newVersion = versionMatch ? versionMatch[1] : null;
+        
+        if (newVersion) {
+          const versionKey = 'posAppVersion';
+          const storedVersion = localStorage.getItem(versionKey);
+          
+          if (storedVersion && storedVersion !== newVersion) {
+            // New version detected
+            const shouldRefresh = confirm(
+              'A new version of the POS app is available.\n\nWould you like to refresh now to get the latest updates?'
+            );
+            if (shouldRefresh) {
+              localStorage.removeItem(versionKey);
+              window.location.reload();
+            }
+          } else if (!storedVersion) {
+            // First time - store version
+            localStorage.setItem(versionKey, newVersion);
+          }
+        }
+      } catch (err) {
+        // Silently fail - network issues or CORS shouldn't break the app
+        console.debug('Version check unavailable:', err.message);
+      }
+    };
+
+    // Check on mount
+    checkForNewVersion();
+    
+    // Check every 3 minutes for new versions
+    const interval = setInterval(checkForNewVersion, 3 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [catalogueAssignedProducts, setCatalogueAssignedProducts] = useState({});
   const [catalogueAssignCategory, setCatalogueAssignCategory] = useState('');
   const [catalogueAssignSearch, setCatalogueAssignSearch] = useState('');
