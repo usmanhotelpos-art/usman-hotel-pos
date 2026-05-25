@@ -2154,7 +2154,7 @@ function App() {
     });
   }
 
-  async function savePosOrder(orderStatus = 'Pending', overrides = {}) {
+  async function savePosOrder(orderStatus = 'Pending', overrides = {}, options = { refreshOrders: true }) {
     const error = validatePosOrder();
     if (error) {
       throw new Error(error);
@@ -2200,8 +2200,9 @@ function App() {
       if (orderType === 'Delivery' && order.address) {
         syncDeliveryCustomerFromOrder(order.address, order.phone, order.orderNumber);
       }
-      // Load orders data in background to avoid blocking print
-      loadOrdersData().catch(err => console.warn('Failed to refresh orders', err));
+      if (options.refreshOrders !== false) {
+        setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
+      }
       return order;
     } catch (error) {
       throw new Error(error.message || 'Failed to save order');
@@ -2300,7 +2301,7 @@ function App() {
         : orderType === 'Delivery'
           ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
           : 'Completed';
-      const order = await savePosOrder(saveStatus);
+      const order = await savePosOrder(saveStatus, {}, { refreshOrders: false });
       if (order) {
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
@@ -2312,6 +2313,7 @@ function App() {
           setDineinPageIndex(0);
         }
         setActiveTab('orders');
+        setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 500);
       } else {
         setPopupError('Failed to save order. Please try again.');
       }
@@ -2357,7 +2359,7 @@ function App() {
         : orderType === 'Delivery'
           ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
           : 'Completed';
-      const order = await savePosOrder(saveStatus);
+      const order = await savePosOrder(saveStatus, {}, { refreshOrders: false });
       if (order) {
         // Print immediately without delay
         printReceipt(order).catch(err => console.warn('Print failed', err));
@@ -2371,6 +2373,7 @@ function App() {
           setDineinPageIndex(0);
         }
         setActiveTab('orders');
+        setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 500);
       } else {
         setPopupError('Failed to save order. Please try again.');
       }
@@ -2394,13 +2397,14 @@ function App() {
       const saveStatus = orderType === 'Delivery'
         ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
         : 'Kitchen';
-      const order = await savePosOrder(saveStatus, { paymentStatus: status });
+      const order = await savePosOrder(saveStatus, { paymentStatus: status }, { refreshOrders: false });
       if (order) {
         // Print immediately without delay
         printReceipt(order).catch(err => console.warn('Print failed', err));
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
         setActiveTab('orders');
+        setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 500);
       } else {
         setPopupError('Failed to save order. Please try again.');
       }
@@ -2428,12 +2432,13 @@ function App() {
       : orderType === 'Delivery'
         ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
         : 'Completed';
-    const order = await savePosOrder(saveStatus);
+    const order = await savePosOrder(saveStatus, {}, { refreshOrders: false });
     if (order) {
       printReceipt(order).catch(err => console.warn('Print failed', err));
       setShowCustomerDetailsPopup(false);
       setShowPaymentPopup(false);
       setActiveTab('orders');
+      setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 500);
     }
   }
 
@@ -2452,10 +2457,11 @@ function App() {
     }
     setPopupError('');
     try {
-      const order = await savePosOrder('Pay Later');
+      const order = await savePosOrder('Pay Later', {}, { refreshOrders: false });
       if (order) {
         printReceipt(order).catch(err => console.warn('Print failed', err));
         setShowPaymentPopup(false);
+        setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 500);
       }
     } catch (err) {
       setPopupError(err.message || 'Failed to save order.');
@@ -3059,15 +3065,19 @@ function App() {
       </html>
     `;
 
-    return printHtml(content)
-      .then(async () => {
-        if (settings.tokenSlipEnabled) {
-          await printTokenSlip(order);
-        }
-      })
-      .catch((err) => {
-        console.error('Print failed', err);
+    const printPromise = printHtml(content).catch((err) => {
+      console.error('Print failed', err);
+    });
+
+    if (settings.tokenSlipEnabled) {
+      printPromise.then(() => {
+        printTokenSlip(order).catch((err) => {
+          console.error('Token slip print failed', err);
+        });
       });
+    }
+
+    return printPromise;
   }
 
   const toggleOrderSelection = (orderId) => {
