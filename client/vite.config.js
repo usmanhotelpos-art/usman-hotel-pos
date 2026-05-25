@@ -19,6 +19,6 @@ export default defineConfig({
         assetFileNames: 'assets/[name].[hash][extname]'
       }
     },
-    minify: 'terser'
+    minify: true
   }
 });
