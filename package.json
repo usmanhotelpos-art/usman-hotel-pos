@@ -1,0 +1,23 @@
+{
+  "name": "usman-hotel-pos",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev": "powershell -ExecutionPolicy Bypass -File ./scripts/start-app.ps1",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "build:client": "npm --workspace client run build",
+    "start:server": "npm --workspace server start",
+    "build": "npm run build:client",
+    "serve": "npm run build:client && npm --workspace server start",
+    "start": "npm run build:client && npm --workspace server start"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}
