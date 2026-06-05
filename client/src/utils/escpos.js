@@ -656,16 +656,16 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const paperWidth = settings.receiptPaperWidth || '58';
   const mmWidth = paperWidth === '80' ? 80 : 58;
   const pxWidth = Math.round(mmWidth * 8);
-  const fontFamily = settings.btFontFamily || 'Arial';
+  const fontFamily = settings.btFontFamily || 'Noto Naskh Arabic, Segoe UI, Arial, sans-serif';
   const currency = settings.currency || 'PKR';
   const header = settings.receiptHeader || 'Usman Hotel';
   const footer = settings.receiptFooter || 'Thank you for your business';
-  const fontSize = 12;
-  const lineHeight = fontSize * 1.5;
+  const fontSize = 20;
+  const lineHeight = fontSize * 1.6;
 
   const canvas = document.createElement('canvas');
   canvas.width = pxWidth;
-  canvas.height = 4000;
+  canvas.height = 6000;
   const ctx = canvas.getContext('2d');
 
   let y = 10;
@@ -673,7 +673,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const maxTextWidth = pxWidth - margin * 2;
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, pxWidth, 4000);
+  ctx.fillRect(0, 0, pxWidth, 6000);
 
   function wrapTextCtx(text, fontSz) {
     ctx.font = `${fontSz}px ${fontFamily}`;
@@ -714,8 +714,8 @@ export function renderReceiptToCanvas(order, settings = {}) {
   if (settings._tokenOnly) {
     const slipPrefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
     const tokenNumber = settings.tokenSlipNextNumber || 1;
-    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, big: true, align: 'center', fontSize: 18 });
-    y += 10;
+    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, big: true, align: 'center', fontSize: 28 });
+    y += 15;
     const h = Math.ceil(y);
     const imgData = ctx.getImageData(0, 0, pxWidth, Math.min(h, canvas.height));
     canvas.width = pxWidth;
@@ -724,52 +724,52 @@ export function renderReceiptToCanvas(order, settings = {}) {
     return canvas;
   }
 
-  printLine(header, { bold: true, fontSize: 14, align: 'center', lineHeight: 20 });
+  printLine(header, { bold: true, fontSize: 26, align: 'center', lineHeight: 36 });
   if (settings.location) {
-    printLine(settings.location, { fontSize: 10, align: 'center' });
+    printLine(settings.location, { fontSize: 18, align: 'center' });
   }
   if (settings.receiptCounterLabel) {
-    printLine(settings.receiptCounterLabel, { fontSize: 10, align: 'center' });
+    printLine(settings.receiptCounterLabel, { fontSize: 16, align: 'center' });
   }
 
   const slipPrefix = settings.slipPrefix || 'UH';
   const invoiceNo = `${slipPrefix}-${order.orderNumber || order.id || ''}`;
   const dateText = formatDate(order.date, settings.receiptDateTimeFormat);
   if (invoiceNo || dateText) {
-    printLine(`${invoiceNo}    ${dateText}`, { fontSize: 10 });
+    printLine(`${invoiceNo}    ${dateText}`, { fontSize: 18 });
   }
 
   const orderTypeDisplay = order.orderType === 'Takeaway' ? 'Pickup' : order.orderType || '';
   const customerName = order.customerName || (order.orderType === 'Takeaway' ? 'Pickup' : '');
 
-  if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: 10 });
-  if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: 10 });
-  else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: 10 });
-  if (customerName) printLine(`Customer: ${customerName}`, { fontSize: 10 });
+  if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: 18 });
+  if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: 18 });
+  else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: 18 });
+  if (customerName) printLine(`Customer: ${customerName}`, { fontSize: 18 });
   if (order.orderType === 'Dine-In') {
-    printLine(`Table: ${order.tableNumber || '-'}`, { fontSize: 10 });
-    printLine(`Sales Person: ${order.waiter || '-'}`, { fontSize: 10 });
+    printLine(`Table: ${order.tableNumber || '-'}`, { fontSize: 18 });
+    printLine(`Sales Person: ${order.waiter || '-'}`, { fontSize: 18 });
   }
   if (order.orderType === 'Delivery') {
-    printLine(`Mobile: ${order.phone || '-'}`, { fontSize: 10 });
-    if (order.address) printLine(`Location: ${order.address}`, { fontSize: 10 });
-    printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: 10 });
+    printLine(`Mobile: ${order.phone || '-'}`, { fontSize: 18 });
+    if (order.address) printLine(`Location: ${order.address}`, { fontSize: 18 });
+    printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: 18 });
   }
 
-  y += 5;
-  printLine('--------------------------------', { fontSize: 8, align: 'center' });
-  printLine('Product  Qty  Rate  Amount', { bold: true, fontSize: 10 });
-  printLine('--------------------------------', { fontSize: 8, align: 'center' });
+  y += 8;
+  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
+  printLine('Product  Qty  Rate  Amount', { bold: true, fontSize: 18 });
+  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
 
   for (const item of (order.items || [])) {
     const qty = Number(item.quantity || 1);
     const rate = Number(item.price || item.unitPrice || 0);
     const amount = Number(item.total ?? qty * rate);
-    printLine(item.name, { fontSize: 10 });
-    printLine(`${qty}  ${rate} ${currency}  ${amount} ${currency}`, { fontSize: 10 });
+    printLine(item.name, { fontSize: 18 });
+    printLine(`${qty}  ${rate} ${currency}  ${amount} ${currency}`, { fontSize: 18 });
   }
 
-  printLine('--------------------------------', { fontSize: 8, align: 'center' });
+  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
 
   const subtotal = (order.subtotal != null && order.subtotal !== 0)
     ? Number(order.subtotal)
@@ -780,17 +780,17 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const serviceCharge = Number(order.serviceCharge || 0);
   const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount + deliveryCharge + serviceCharge);
 
-  printLine(`Total Due: ${totalAmount} Rs`, { bold: true, fontSize: 12 });
-  if (subtotal > 0) printLine(`Subtotal: ${subtotal} Rs`, { fontSize: 10 });
-  if (deliveryCharge > 0) printLine(`Delivery: ${deliveryCharge} Rs`, { fontSize: 10 });
-  if (serviceCharge > 0) printLine(`Service: ${serviceCharge} Rs`, { fontSize: 10 });
-  if (discountAmount > 0) printLine(`Discount: ${discountAmount} Rs`, { fontSize: 10 });
-  if (taxAmount > 0) printLine(`Tax: ${taxAmount} Rs`, { fontSize: 10 });
-  printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: 14, align: 'center' });
+  printLine(`Total Due: ${totalAmount} Rs`, { bold: true, fontSize: 22 });
+  if (subtotal > 0) printLine(`Subtotal: ${subtotal} Rs`, { fontSize: 18 });
+  if (deliveryCharge > 0) printLine(`Delivery: ${deliveryCharge} Rs`, { fontSize: 18 });
+  if (serviceCharge > 0) printLine(`Service: ${serviceCharge} Rs`, { fontSize: 18 });
+  if (discountAmount > 0) printLine(`Discount: ${discountAmount} Rs`, { fontSize: 18 });
+  if (taxAmount > 0) printLine(`Tax: ${taxAmount} Rs`, { fontSize: 18 });
+  printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: 26, align: 'center' });
 
-  y += 5;
-  printLine('--------------------------------', { fontSize: 8, align: 'center' });
-  printLine(footer, { fontSize: 10, align: 'center' });
+  y += 8;
+  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
+  printLine(footer, { fontSize: 18, align: 'center' });
 
   const actualHeight = Math.ceil(y + 20);
   const imageData = ctx.getImageData(0, 0, pxWidth, Math.min(actualHeight, canvas.height));

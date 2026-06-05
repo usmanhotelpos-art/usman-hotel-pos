@@ -120,7 +120,7 @@ function App() {
     btNotesFontSize: 11,
     btLogoEnabled: true,
     btLogoWidth: '80',
-    btEncoding: 'cp1256'
+    btEncoding: 'bmp'
   });
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
@@ -6671,13 +6671,10 @@ function App() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
-                <select value={settings.btEncoding || 'cp1256'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                  <option value="cp1256">Urdu/Arabic (Windows-1256) - recommended</option>
-                  <option value="utf-8">UTF-8 Direct (no code page switching)</option>
-                  <option value="cp864">Arabic only (CP864) - limited Urdu</option>
+                <select value={settings.btEncoding || 'bmp'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
                   <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
                 </select>
-                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Use Windows-1256 for best Urdu. If garbage prints, try UTF-8 Direct or Bitmap mode.</p>
+                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap mode renders exact Urdu using browser fonts with larger text for clear receipts.</p>
               </div>
             </div>
 
