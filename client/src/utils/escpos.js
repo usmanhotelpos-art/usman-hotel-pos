@@ -837,6 +837,95 @@ export function canvasToEscposRaster(canvas) {
   return new Uint8Array([...header, ...rasterData]);
 }
 
+export async function buildPdfReceipt(order, settings = {}) {
+  const canvas = renderReceiptToCanvas(order, settings);
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const rgba = imageData.data;
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const rgb = new Uint8Array(w * h * 3);
+  for (let i = 0; i < w * h; i++) {
+    const src = i * 4;
+    const dst = i * 3;
+    rgb[dst] = rgba[src];
+    rgb[dst + 1] = rgba[src + 1];
+    rgb[dst + 2] = rgba[src + 2];
+  }
+
+  const paperWidth = settings.receiptPaperWidth || '58';
+  const mmWidth = paperWidth === '80' ? 80 : 58;
+  const ptW = mmWidth / 25.4 * 72;
+  const ptH = (h / w) * ptW;
+
+  const contentStream = `q\n${ptW.toFixed(2)} 0 0 ${ptH.toFixed(2)} 0 0 cm\n/Im0 Do\nQ`;
+  const contentLen = contentStream.length;
+
+  const parts = [];
+
+  const header = '%PDF-1.4\n';
+  parts.push({ type: 'str', data: header });
+
+  const obj1 = '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n';
+  const obj2 = '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n';
+  const obj3 = `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${ptW.toFixed(2)} ${ptH.toFixed(2)}]/Contents 4 0 R/Resources<</XObject<</Im0 5 0 R>>>>>>endobj\n`;
+  const obj4 = `4 0 obj<</Length ${contentLen}>>stream\n${contentStream}\nendstream\nendobj\n`;
+  const obj5Before = `5 0 obj<</Type/XObject/Subtype/Image/Width ${w}/Height ${h}/ColorSpace/DeviceRGB/BitsPerComponent 8/Length ${rgb.length}>>stream\n`;
+  const obj5After = '\nendstream\nendobj\n';
+
+  parts.push({ type: 'str', data: obj1 });
+  parts.push({ type: 'str', data: obj2 });
+  parts.push({ type: 'str', data: obj3 });
+  parts.push({ type: 'str', data: obj4 });
+  parts.push({ type: 'str', data: obj5Before });
+  parts.push({ type: 'bin', data: rgb });
+  parts.push({ type: 'str', data: obj5After });
+
+  const encoder = new TextEncoder();
+  let offset = 0;
+  const offsets = [];
+  for (const p of parts) {
+    offsets.push(offset);
+    offset += p.type === 'str' ? encoder.encode(p.data).length : p.data.length;
+  }
+
+  const objOffsets = [0, offsets[1], offsets[2], offsets[3], offsets[4], offsets[5]];
+
+  const xrefEntries = ['xref\n', '0 6\n', '0000000000 65535 f \n'];
+  for (let i = 1; i <= 5; i++) {
+    xrefEntries.push(String(objOffsets[i]).padStart(10, '0') + ' 00000 n \n');
+  }
+  const xrefStr = xrefEntries.join('');
+
+  const trailerOffset = offset;
+  const trailer = `trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${trailerOffset}\n%%EOF\n`;
+
+  const xrefBytes = encoder.encode(xrefStr);
+  const trailerBytes = encoder.encode(trailer);
+
+  const totalLen = offset + xrefBytes.length + trailerBytes.length;
+  const result = new Uint8Array(totalLen);
+
+  let pos = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.type === 'str') {
+      const bytes = encoder.encode(p.data);
+      result.set(bytes, pos);
+      pos += bytes.length;
+    } else {
+      result.set(p.data, pos);
+      pos += p.data.length;
+    }
+  }
+  result.set(xrefBytes, pos); pos += xrefBytes.length;
+  result.set(trailerBytes, pos);
+
+  return result;
+}
+
 function formatDate(dateString, format) {
   if (!dateString || !format) return '';
   const date = new Date(dateString);

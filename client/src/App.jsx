@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import { Lock, Bluetooth, BluetoothConnected } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
-import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from './utils/escpos.js';
+import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD, buildPdfReceipt } from './utils/escpos.js';
 import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter } from './utils/btPrint.js';
 
 const envApiBase = import.meta.env.VITE_API_BASE || '';
@@ -120,7 +120,7 @@ function App() {
     btNotesFontSize: 11,
     btLogoEnabled: true,
     btLogoWidth: '80',
-    btEncoding: 'cp1256'
+    btEncoding: 'pdf'
   });
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
@@ -3245,7 +3245,10 @@ function App() {
     };
 
     try {
-      if (settings.btEncoding === 'bmp') {
+      if (settings.btEncoding === 'pdf') {
+        const pdfData = await buildPdfReceipt(order, settings);
+        await printToBluetooth(device, pdfData);
+      } else if (settings.btEncoding === 'bmp') {
         await doBitmapPrint();
       } else {
         try {
@@ -3258,7 +3261,10 @@ function App() {
       }
       if (settings.tokenSlipEnabled) {
         const tokenOrder = { ...order, items: [] };
-        if (settings.btEncoding === 'bmp') {
+        if (settings.btEncoding === 'pdf') {
+          const tokenPdf = await buildPdfReceipt(tokenOrder, { ...settings, _tokenOnly: true });
+          await printToBluetooth(device, tokenPdf);
+        } else if (settings.btEncoding === 'bmp') {
           const tokenCanvas = renderReceiptToCanvas(tokenOrder, { ...settings, _tokenOnly: true });
           const tokenRaster = canvasToEscposRaster(tokenCanvas);
           const tokenFeed = new Uint8Array(CMD.FEED_LINES(3));
@@ -6672,12 +6678,13 @@ function App() {
               <div>
                 <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
                 <select value={settings.btEncoding || 'cp1256'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                  <option value="pdf">PDF (exact Urdu rendering)</option>
                   <option value="cp1256">Urdu/Arabic (Windows-1256) - recommended</option>
                   <option value="utf-8">UTF-8 Direct (no code page switching)</option>
                   <option value="cp864">Arabic only (CP864) - limited Urdu</option>
                   <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
                 </select>
-                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Use Windows-1256 for best Urdu. If garbage prints, try UTF-8 Direct or Bitmap mode.</p>
+                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>PDF mode renders exact Urdu using browser fonts. If printer doesn't support PDF, try Bitmap mode.</p>
               </div>
             </div>
 
