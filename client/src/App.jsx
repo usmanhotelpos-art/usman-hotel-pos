@@ -109,10 +109,10 @@ function App() {
     holdShowAutoRefresh: true,
     receiptPaperWidth: '58',
     btPrintEnabled: false,
-    btFontSize: 'normal',
+    btFontSize: 20,
     btDividerStyle: 'dashed',
     btFontFamily: 'Noto Naskh Arabic, Segoe UI, Arial, sans-serif',
-    btTotalFontSize: 'large',
+    btTotalFontSize: 26,
     btProductFontSize: 'normal',
     btTitleFontSize: 18,
     btSectionFontSize: 14,
@@ -6653,12 +6653,8 @@ function App() {
                 </label>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400">Font Size</label>
-                <select value={settings.btFontSize || 'normal'} onChange={(e) => setSettings((prev) => ({ ...prev, btFontSize: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                  <option value="small">Small</option>
-                  <option value="normal">Normal</option>
-                  <option value="large">Large</option>
-                </select>
+                <label className="block text-sm font-medium text-slate-400">Font Size (px)</label>
+                <input type="number" value={settings.btFontSize || 20} onChange={(e) => setSettings((prev) => ({ ...prev, btFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Divider Style</label>
@@ -6721,12 +6717,8 @@ function App() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-400">Total Font Size</label>
-                  <select value={settings.btTotalFontSize || 'large'} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalFontSize: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                    <option value="normal">Normal</option>
-                    <option value="large">Large</option>
-                    <option value="xlarge">Extra Large</option>
-                  </select>
+                  <label className="block text-sm font-medium text-slate-400">Total Font Size (px)</label>
+                  <input type="number" value={settings.btTotalFontSize || 26} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400">Product Font Size</label>

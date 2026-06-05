@@ -660,7 +660,8 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const currency = settings.currency || 'PKR';
   const header = settings.receiptHeader || 'Usman Hotel';
   const footer = settings.receiptFooter || 'Thank you for your business';
-  const fontSize = 20;
+  const fontSize = Number(settings.btFontSize) || 20;
+  const totalFontSize = Number(settings.btTotalFontSize) || 26;
   const lineHeight = fontSize * 1.6;
 
   const canvas = document.createElement('canvas');
@@ -714,7 +715,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   if (settings._tokenOnly) {
     const slipPrefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
     const tokenNumber = settings.tokenSlipNextNumber || 1;
-    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, big: true, align: 'center', fontSize: 28 });
+    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, big: true, align: 'center', fontSize: Math.round(fontSize * 1.4) });
     y += 15;
     const h = Math.ceil(y);
     const imgData = ctx.getImageData(0, 0, pxWidth, Math.min(h, canvas.height));
@@ -724,52 +725,56 @@ export function renderReceiptToCanvas(order, settings = {}) {
     return canvas;
   }
 
-  printLine(header, { bold: true, fontSize: 26, align: 'center', lineHeight: 36 });
+  const titleSz = Number(settings.btTitleFontSize) || Math.round(fontSize * 1.3);
+  const infoSz = Math.round(fontSize * 0.9);
+  const dividerSz = Math.round(fontSize * 0.7);
+
+  printLine(header, { bold: true, fontSize: titleSz, align: 'center', lineHeight: Math.round(titleSz * 1.5) });
   if (settings.location) {
-    printLine(settings.location, { fontSize: 18, align: 'center' });
+    printLine(settings.location, { fontSize: infoSz, align: 'center' });
   }
   if (settings.receiptCounterLabel) {
-    printLine(settings.receiptCounterLabel, { fontSize: 16, align: 'center' });
+    printLine(settings.receiptCounterLabel, { fontSize: infoSz, align: 'center' });
   }
 
   const slipPrefix = settings.slipPrefix || 'UH';
   const invoiceNo = `${slipPrefix}-${order.orderNumber || order.id || ''}`;
   const dateText = formatDate(order.date, settings.receiptDateTimeFormat);
   if (invoiceNo || dateText) {
-    printLine(`${invoiceNo}    ${dateText}`, { fontSize: 18 });
+    printLine(`${invoiceNo}    ${dateText}`, { fontSize: infoSz });
   }
 
   const orderTypeDisplay = order.orderType === 'Takeaway' ? 'Pickup' : order.orderType || '';
   const customerName = order.customerName || (order.orderType === 'Takeaway' ? 'Pickup' : '');
 
-  if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: 18 });
-  if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: 18 });
-  else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: 18 });
-  if (customerName) printLine(`Customer: ${customerName}`, { fontSize: 18 });
+  if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: infoSz });
+  if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: infoSz });
+  else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: infoSz });
+  if (customerName) printLine(`Customer: ${customerName}`, { fontSize: infoSz });
   if (order.orderType === 'Dine-In') {
-    printLine(`Table: ${order.tableNumber || '-'}`, { fontSize: 18 });
-    printLine(`Sales Person: ${order.waiter || '-'}`, { fontSize: 18 });
+    printLine(`Table: ${order.tableNumber || '-'}`, { fontSize: infoSz });
+    printLine(`Sales Person: ${order.waiter || '-'}`, { fontSize: infoSz });
   }
   if (order.orderType === 'Delivery') {
-    printLine(`Mobile: ${order.phone || '-'}`, { fontSize: 18 });
-    if (order.address) printLine(`Location: ${order.address}`, { fontSize: 18 });
-    printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: 18 });
+    printLine(`Mobile: ${order.phone || '-'}`, { fontSize: infoSz });
+    if (order.address) printLine(`Location: ${order.address}`, { fontSize: infoSz });
+    printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
   }
 
   y += 8;
-  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
-  printLine('Product  Qty  Rate  Amount', { bold: true, fontSize: 18 });
-  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
+  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
+  printLine('Product  Qty  Rate  Amount', { bold: true, fontSize: fontSize });
+  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
 
   for (const item of (order.items || [])) {
     const qty = Number(item.quantity || 1);
     const rate = Number(item.price || item.unitPrice || 0);
     const amount = Number(item.total ?? qty * rate);
-    printLine(item.name, { fontSize: 18 });
-    printLine(`${qty}  ${rate} ${currency}  ${amount} ${currency}`, { fontSize: 18 });
+    printLine(item.name, { fontSize: fontSize });
+    printLine(`${qty}  ${rate} ${currency}  ${amount} ${currency}`, { fontSize: fontSize });
   }
 
-  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
+  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
 
   const subtotal = (order.subtotal != null && order.subtotal !== 0)
     ? Number(order.subtotal)
@@ -780,17 +785,17 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const serviceCharge = Number(order.serviceCharge || 0);
   const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount + deliveryCharge + serviceCharge);
 
-  printLine(`Total Due: ${totalAmount} Rs`, { bold: true, fontSize: 22 });
-  if (subtotal > 0) printLine(`Subtotal: ${subtotal} Rs`, { fontSize: 18 });
-  if (deliveryCharge > 0) printLine(`Delivery: ${deliveryCharge} Rs`, { fontSize: 18 });
-  if (serviceCharge > 0) printLine(`Service: ${serviceCharge} Rs`, { fontSize: 18 });
-  if (discountAmount > 0) printLine(`Discount: ${discountAmount} Rs`, { fontSize: 18 });
-  if (taxAmount > 0) printLine(`Tax: ${taxAmount} Rs`, { fontSize: 18 });
-  printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: 26, align: 'center' });
+  printLine(`Total Due: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(totalFontSize * 0.85) });
+  if (subtotal > 0) printLine(`Subtotal: ${subtotal} Rs`, { fontSize: infoSz });
+  if (deliveryCharge > 0) printLine(`Delivery: ${deliveryCharge} Rs`, { fontSize: infoSz });
+  if (serviceCharge > 0) printLine(`Service: ${serviceCharge} Rs`, { fontSize: infoSz });
+  if (discountAmount > 0) printLine(`Discount: ${discountAmount} Rs`, { fontSize: infoSz });
+  if (taxAmount > 0) printLine(`Tax: ${taxAmount} Rs`, { fontSize: infoSz });
+  printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: totalFontSize, align: 'center' });
 
   y += 8;
-  printLine('----------------------------------------', { fontSize: 14, align: 'center' });
-  printLine(footer, { fontSize: 18, align: 'center' });
+  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
+  printLine(footer, { fontSize: infoSz, align: 'center' });
 
   const actualHeight = Math.ceil(y + 20);
   const imageData = ctx.getImageData(0, 0, pxWidth, Math.min(actualHeight, canvas.height));
