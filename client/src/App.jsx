@@ -6720,34 +6720,7 @@ function App() {
                   <label className="block text-sm font-medium text-slate-400">Total Font Size (px)</label>
                   <input type="number" value={settings.btTotalFontSize || 26} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400">Product Font Size</label>
-                  <select value={settings.btProductFontSize || 'normal'} onChange={(e) => setSettings((prev) => ({ ...prev, btProductFontSize: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                    <option value="small">Small</option>
-                    <option value="normal">Normal</option>
-                    <option value="large">Large</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400">Title Font Size (px)</label>
-                  <input type="number" value={settings.btTitleFontSize || 18} onChange={(e) => setSettings((prev) => ({ ...prev, btTitleFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400">Section Font Size (px)</label>
-                  <input type="number" value={settings.btSectionFontSize || 14} onChange={(e) => setSettings((prev) => ({ ...prev, btSectionFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400">Customer Font Size (px)</label>
-                  <input type="number" value={settings.btCustomerFontSize || 12} onChange={(e) => setSettings((prev) => ({ ...prev, btCustomerFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400">Notes Font Size (px)</label>
-                  <input type="number" value={settings.btNotesFontSize || 11} onChange={(e) => setSettings((prev) => ({ ...prev, btNotesFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400">Logo Width (px)</label>
-                  <input type="number" value={settings.btLogoWidth || 80} onChange={(e) => setSettings((prev) => ({ ...prev, btLogoWidth: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
+
                 <div className="flex items-end">
                   <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
                     <input type="checkbox" checked={settings.btLogoEnabled !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btLogoEnabled: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
