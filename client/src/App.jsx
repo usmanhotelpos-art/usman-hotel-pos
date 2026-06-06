@@ -120,7 +120,16 @@ function App() {
     btNotesFontSize: 11,
     btLogoEnabled: true,
     btLogoWidth: '80',
-    btEncoding: 'bmp'
+    btEncoding: 'bmp',
+    btProductFontSize: 20,
+    btOrderTypeFontSize: 18,
+    btServiceTypeFontSize: 16,
+    btTokenFontSize: 44,
+    btTextAlign: 'left',
+    btMarginTop: 10,
+    btMarginBottom: 10,
+    btMarginCustom: false,
+    btTokenLabelFontSize: 14
   });
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
@@ -3330,6 +3339,8 @@ function App() {
     const fontFamily = settings.receiptFontFamily || settings.receiptFontStyle || 'Arial';
     const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 8px;" /></div>` : '';
 
+    const tokenLabelSz = settings.btTokenLabelFontSize || 14;
+    const tokenNumSz = settings.btTokenFontSize || 44;
     const content = `
       <html>
         <head>
@@ -3338,8 +3349,8 @@ function App() {
             .receipt { width: 220px; max-width: 220px; margin: auto; }
             .header { text-align: center; margin-bottom: 10px; }
             .header h2 { font-size: 18px; margin: 0; }
-            .token-label { font-size: 14px; font-weight: 700; letter-spacing: 1px; margin-top: 4px; }
-            .token-number { font-size: 44px; font-weight: 900; margin: 10px 0; text-align: center; letter-spacing: 2px; }
+            .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; letter-spacing: 1px; margin-top: 4px; }
+            .token-number { font-size: ${tokenNumSz}px; font-weight: 900; margin: 10px 0; text-align: center; letter-spacing: 2px; }
             .sub { font-size: 12px; text-align: center; margin-top: 8px; }
             .footer { text-align: center; font-size: 12px; margin-top: 12px; }
             .logo img { display: block; margin: 0 auto 8px; }
@@ -3386,7 +3397,9 @@ function App() {
     const customerSize = `${settings.receiptFontSizes?.customer || 12}px`;
     const notesSize = `${settings.receiptFontSizes?.notes || 11}px`;
     const receiptTokenText = settings.tokenSlipEnabled ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}` : '';
-    const tokenHtml = receiptTokenText ? `<div class="receipt-token"><div class="token-label">Token</div><div class="token-number">${receiptTokenText}</div></div>` : '';
+    const tokenLabelSz = settings.btTokenLabelFontSize || 14;
+    const tokenNumSz = settings.btTokenFontSize || 44;
+    const tokenHtml = receiptTokenText ? `<div class="receipt-token"><div class="token-label" style="font-size:${tokenLabelSz}px;">Token</div><div class="token-number" style="font-size:${tokenNumSz}px;">${receiptTokenText}</div></div>` : '';
     const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: ${settings.receiptLogoWidth || 120}px; max-height: 100px; width: auto; height: auto; display: block;" /></div>` : '<div class="logo empty"></div>';
     const counterLabelHtml = settings.receiptCounterLabel ? `<div class="counter">${settings.receiptCounterLabel}</div>` : '';
 
@@ -3469,8 +3482,8 @@ function App() {
             .header h2 { font-size: ${titleSize}; margin: 0 0 4px; text-align: center; }
             .header .location { font-size: ${sectionSize}; margin-top: 4px; text-align: center; }
             .receipt-token { text-align: left; }
-            .receipt-token .token-label { font-size: ${sectionSize}; font-weight: 700; margin-bottom: 4px; }
-            .receipt-token .token-number { font-size: 40px; font-weight: 900; line-height: 1; }
+            .receipt-token .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; margin-bottom: 4px; }
+            .receipt-token .token-number { font-size: ${tokenNumSz}px; font-weight: 900; line-height: 1; }
             .logo img { max-width: 100px; max-height: 100px; width: auto; height: auto; display: block; margin: 0 auto; }
             .logo.empty { width: 100px; }
             .top-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: ${customerSize}; }
@@ -6653,8 +6666,32 @@ function App() {
                 </label>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400">Font Size (px)</label>
-                <input type="number" value={settings.btFontSize || 20} onChange={(e) => setSettings((prev) => ({ ...prev, btFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                <label className="block text-sm font-medium text-slate-400">Font Family</label>
+                <select value={settings.btFontFamily || 'Noto Naskh Arabic, Segoe UI, Arial, sans-serif'} onChange={(e) => setSettings((prev) => ({ ...prev, btFontFamily: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                  <option value="Noto Naskh Arabic, Segoe UI, Arial, sans-serif">Auto (Urdu Support)</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Helvetica">Helvetica</option>
+                  <option value="Tahoma">Tahoma</option>
+                  <option value="Courier New">Courier New</option>
+                  <option value="Nastaliq">Nastaliq</option>
+                  <option value="Nafees">Nafees</option>
+                  <option value="Jameel Noori Nastaleeq">Jameel Noori Nastaleeq</option>
+                  <option value="Alvi Nastaleeq">Alvi Nastaleeq</option>
+                  <option value="Urdu Naskh">Urdu Naskh</option>
+                  <option value="Noto Nastaliq Urdu">Noto Nastaliq Urdu</option>
+                  <option value="Arial Unicode MS">Arial Unicode MS</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Verdana">Verdana</option>
+                  <option value="Trebuchet MS">Trebuchet MS</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
+                <select value={settings.btEncoding || 'bmp'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                  <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
+                </select>
+                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap mode renders exact Urdu using browser fonts with larger text for clear receipts.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Divider Style</label>
@@ -6666,11 +6703,12 @@ function App() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
-                <select value={settings.btEncoding || 'bmp'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                  <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
+                <label className="block text-sm font-medium text-slate-400">Text Alignment</label>
+                <select value={settings.btTextAlign || 'left'} onChange={(e) => setSettings((prev) => ({ ...prev, btTextAlign: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
                 </select>
-                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap mode renders exact Urdu using browser fonts with larger text for clear receipts.</p>
               </div>
             </div>
 
@@ -6692,39 +6730,66 @@ function App() {
             </div>
 
             <div className="mt-8 border-t border-slate-700 pt-8">
-              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Typography</h4>
-              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Font and size settings for Bluetooth printed receipts.</p>
-              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Font Sizes</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Customize font sizes for different receipt elements.</p>
+              <div className="mt-6 grid gap-6 lg:grid-cols-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-400">Font Family</label>
-                  <select value={settings.btFontFamily || 'Noto Naskh Arabic, Segoe UI, Arial, sans-serif'} onChange={(e) => setSettings((prev) => ({ ...prev, btFontFamily: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                    <option value="Noto Naskh Arabic, Segoe UI, Arial, sans-serif">Auto (Urdu Support)</option>
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Tahoma">Tahoma</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Nastaliq">Nastaliq</option>
-                    <option value="Nafees">Nafees</option>
-                    <option value="Jameel Noori Nastaleeq">Jameel Noori Nastaleeq</option>
-                    <option value="Alvi Nastaleeq">Alvi Nastaleeq</option>
-                    <option value="Urdu Naskh">Urdu Naskh</option>
-                    <option value="Noto Nastaliq Urdu">Noto Nastaliq Urdu</option>
-                    <option value="Arial Unicode MS">Arial Unicode MS</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Trebuchet MS">Trebuchet MS</option>
-                  </select>
+                  <label className="block text-sm font-medium text-slate-400">Base Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btFontSize || 20} onChange={(e) => setSettings((prev) => ({ ...prev, btFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-400">Total Font Size (px)</label>
-                  <input type="number" value={settings.btTotalFontSize || 26} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                  <label className="block text-sm font-medium text-slate-400">Product Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btProductFontSize || 20} onChange={(e) => setSettings((prev) => ({ ...prev, btProductFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
-
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Total Amount Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btTotalFontSize || 26} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Order Type Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btOrderTypeFontSize || 18} onChange={(e) => setSettings((prev) => ({ ...prev, btOrderTypeFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Service Type Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btServiceTypeFontSize || 16} onChange={(e) => setSettings((prev) => ({ ...prev, btServiceTypeFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
                     <input type="checkbox" checked={settings.btLogoEnabled !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btLogoEnabled: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
                     Show Logo on receipt
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-slate-700 pt-8">
+              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Margin Settings</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Adjust top and bottom margins for the receipt.</p>
+              <div className="mt-6 grid gap-6 lg:grid-cols-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Top Margin (px) — Min: 0, Max: 50</label>
+                  <input type="range" min="0" max="50" value={settings.btMarginTop ?? 10} onChange={(e) => setSettings((prev) => ({ ...prev, btMarginTop: Number(e.target.value) }))} className="mt-2 w-full accent-emerald-500" />
+                  <div className="flex justify-between text-xs text-slate-500 mt-1">
+                    <span>0</span>
+                    <span className="font-semibold text-emerald-400">{settings.btMarginTop ?? 10}px</span>
+                    <span>50</span>
+                  </div>
+                  <input type="number" min="0" max="50" value={settings.btMarginTop ?? 10} onChange={(e) => setSettings((prev) => ({ ...prev, btMarginTop: Number(e.target.value) }))} className="mt-1 w-full rounded-3xl border px-3 py-2 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Bottom Margin (px) — Min: 0, Max: 50</label>
+                  <input type="range" min="0" max="50" value={settings.btMarginBottom ?? 10} onChange={(e) => setSettings((prev) => ({ ...prev, btMarginBottom: Number(e.target.value) }))} className="mt-2 w-full accent-emerald-500" />
+                  <div className="flex justify-between text-xs text-slate-500 mt-1">
+                    <span>0</span>
+                    <span className="font-semibold text-emerald-400">{settings.btMarginBottom ?? 10}px</span>
+                    <span>50</span>
+                  </div>
+                  <input type="number" min="0" max="50" value={settings.btMarginBottom ?? 10} onChange={(e) => setSettings((prev) => ({ ...prev, btMarginBottom: Number(e.target.value) }))} className="mt-1 w-full rounded-3xl border px-3 py-2 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}" />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btMarginCustom} onChange={(e) => setSettings((prev) => ({ ...prev, btMarginCustom: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Use custom margins
                   </label>
                 </div>
               </div>
@@ -6776,6 +6841,21 @@ function App() {
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">Token Slip Font Settings</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Customize font sizes for the token slip so the token printout looks clean.</p>
+              <div className="mt-4 grid gap-6 lg:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Token Label Font Size (px)</label>
+                  <input type="number" min="8" max="48" value={settings.btTokenLabelFontSize || 14} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenLabelFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Token Number Font Size (px)</label>
+                  <input type="number" min="12" max="96" value={settings.btTokenFontSize || 44} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
               <h4 className="text-base font-semibold text-slate-100">Token slip settings</h4>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 <div>{receiptField('Enable token slip', 'tokenSlipEnabled')}</div>
@@ -6800,6 +6880,39 @@ function App() {
                     Reset token number to 1
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">Receipt Preview</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>See how your receipt will look with current settings.</p>
+              <div className="mt-4">
+                <button type="button" onClick={() => {
+                  const previewOrder = {
+                    orderType: 'Dine-In',
+                    orderNumber: '1234',
+                    customerName: 'Guest',
+                    tableNumber: '5',
+                    waiter: 'Staff',
+                    items: [
+                      { name: 'Chicken Karahi', quantity: 1, price: 650 },
+                      { name: 'Naan', quantity: 3, price: 30 },
+                      { name: 'Salad', quantity: 1, price: 120 }
+                    ],
+                    subtotal: 860,
+                    discount: 0,
+                    tax: 0,
+                    total: 860,
+                    date: new Date().toISOString(),
+                    status: 'Completed'
+                  };
+                  const canvas = renderReceiptToCanvas(previewOrder, settings);
+                  const previewUrl = canvas.toDataURL();
+                  const win = window.open('');
+                  win.document.write('<img src="' + previewUrl + '" style="max-width:100%;" />');
+                }} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">
+                  Open Receipt Preview
+                </button>
               </div>
             </div>
           </div>
