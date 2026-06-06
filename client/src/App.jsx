@@ -113,7 +113,7 @@ function App() {
     btDividerStyle: 'dashed',
     btFontFamily: 'Noto Naskh Arabic, Segoe UI, Arial, sans-serif',
     btTotalFontSize: 26,
-    btProductFontSize: 'normal',
+    btProductFontSize: 20,
     btTitleFontSize: 18,
     btSectionFontSize: 14,
     btCustomerFontSize: 12,
@@ -121,7 +121,6 @@ function App() {
     btLogoEnabled: true,
     btLogoWidth: '80',
     btEncoding: 'bmp',
-    btProductFontSize: 20,
     btOrderTypeFontSize: 18,
     btServiceTypeFontSize: 16,
     btTokenFontSize: 44,
@@ -129,7 +128,12 @@ function App() {
     btMarginTop: 10,
     btMarginBottom: 10,
     btMarginCustom: false,
-    btTokenLabelFontSize: 14
+    btTokenLabelFontSize: 14,
+    btReceiptHeader: '',
+    btReceiptFooter: '',
+    btShowTokenOnReceipt: true,
+    btShowTotalOnToken: true,
+    btTokenOnReceipt: true
   });
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
@@ -6759,6 +6763,40 @@ function App() {
                     Show Logo on receipt
                   </label>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-slate-700 pt-8">
+              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Header / Footer / Logo</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Custom header, footer and logo for Bluetooth receipt.</p>
+              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">BT Receipt Header</label>
+                  <input value={settings.btReceiptHeader ?? settings.receiptHeader ?? 'Usman Hotel'} onChange={(e) => setSettings((prev) => ({ ...prev, btReceiptHeader: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Usman Hotel" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">BT Receipt Footer</label>
+                  <input value={settings.btReceiptFooter ?? settings.receiptFooter ?? 'Thank you for your business'} onChange={(e) => setSettings((prev) => ({ ...prev, btReceiptFooter: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Thank you for your business" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Receipt Logo</label>
+                  <input type="file" accept="image/png,image/jpeg" onChange={handleSettingsLogoChange} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                  {settings.logo && <img src={settings.logo} alt="Logo preview" className="mt-3 h-16 w-full object-contain rounded-2xl border border-slate-700" />}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Logo Width (px)</label>
+                  <input type="number" value={settings.receiptLogoWidth || 80} onChange={(e) => setSettings((prev) => ({ ...prev, receiptLogoWidth: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenOnReceipt !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenOnReceipt: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show token number on receipt
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btShowTotalOnToken !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowTotalOnToken: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show total amount on token slip
+                </label>
               </div>
             </div>
 

@@ -658,8 +658,8 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const pxWidth = Math.round(mmWidth * 8);
   const fontFamily = settings.btFontFamily || 'Noto Naskh Arabic, Segoe UI, Arial, sans-serif';
   const currency = settings.currency || 'PKR';
-  const header = settings.receiptHeader || 'Usman Hotel';
-  const footer = settings.receiptFooter || 'Thank you for your business';
+  const header = settings.btReceiptHeader || settings.receiptHeader || 'Usman Hotel';
+  const footer = settings.btReceiptFooter || settings.receiptFooter || 'Thank you for your business';
   const fontSize = Number(settings.btFontSize) || 20;
   const totalFontSize = Number(settings.btTotalFontSize) || 26;
   const productFontSize = Number(settings.btProductFontSize) || fontSize;
@@ -671,36 +671,21 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const marginTop = settings.btMarginCustom ? (Number(settings.btMarginTop) || 10) : 10;
   const marginBottom = settings.btMarginCustom ? (Number(settings.btMarginBottom) || 10) : 10;
   const lineHeight = fontSize * 1.6;
+  const logoEnabled = settings.btLogoEnabled !== false;
+  const tokenOnReceipt = settings.btTokenOnReceipt !== false;
+  const showTotalOnToken = settings.btShowTotalOnToken !== false;
 
   const canvas = document.createElement('canvas');
   canvas.width = pxWidth;
-  canvas.height = 6000;
+  canvas.height = 9000;
   const ctx = canvas.getContext('2d');
 
   let y = marginTop;
-  const margin = 10;
+  const margin = 4;
   const maxTextWidth = pxWidth - margin * 2;
 
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, pxWidth, 6000);
-
-  function wrapTextCtx(text, fontSz) {
-    ctx.font = `${fontSz}px ${fontFamily}`;
-    const words = String(text || '').split(' ');
-    const lines = [];
-    let current = '';
-    for (const word of words) {
-      const test = current ? current + ' ' + word : word;
-      if (ctx.measureText(test).width > maxTextWidth && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = test;
-      }
-    }
-    if (current) lines.push(current);
-    return lines;
-  }
+  ctx.fillRect(0, 0, pxWidth, 9000);
 
   function printLine(text, opts = {}) {
     const sz = opts.fontSize || fontSize;
@@ -708,26 +693,51 @@ export function renderReceiptToCanvas(order, settings = {}) {
     ctx.fillStyle = '#000000';
     const align = opts.align || textAlign;
     ctx.textAlign = align;
-    const x = align === 'center' ? pxWidth / 2 : align === 'right' ? pxWidth - margin : margin;
-
-    if (opts.big) {
-      ctx.font = `bold ${sz * 2}px ${fontFamily}`;
+    let x;
+    if (opts.x != null) {
+      x = opts.x;
+    } else {
+      x = align === 'center' ? pxWidth / 2 : align === 'right' ? pxWidth - margin : margin;
     }
-
-    const lines = wrapTextCtx(text, opts.fontSize || fontSize);
-    for (const line of lines) {
-      ctx.fillText(line, x, y);
-      y += opts.lineHeight || lineHeight;
-    }
+    ctx.fillText(String(text), x, y);
+    if (opts.noAdvance) return;
+    y += opts.lineHeight || lineHeight;
   }
+
+  function printDivider(ch, opts = {}) {
+    const sz = opts.fontSize || fontSize * 0.7;
+    ctx.font = `${sz}px ${fontFamily}`;
+    ctx.fillStyle = '#000000';
+    ctx.textAlign = 'center';
+    const count = Math.floor(maxTextWidth / (ctx.measureText(ch || '-').width || 6));
+    ctx.fillText((ch || '-').repeat(Math.max(count, 8)), pxWidth / 2, y);
+    y += opts.lineHeight || sz * 1.6;
+  }
+
+  const totalAmount = (() => {
+    if (settings._tokenOnly) return 0;
+    const subtotal = (order.subtotal != null && order.subtotal !== 0)
+      ? Number(order.subtotal)
+      : (order.items || []).reduce((s, it) => s + ((Number(it.price || 0) * Number(it.quantity || 0)) || Number(it.total) || 0), 0);
+    const discountAmount = Number(order.discount || 0);
+    const taxAmount = Number(order.tax || 0);
+    const deliveryCharge = order.orderType === 'Delivery' ? Number(order.deliveryFee || order.deliveryCharge || 0) : 0;
+    const serviceCharge = Number(order.serviceCharge || 0);
+    return Math.max(0, subtotal - discountAmount + taxAmount + deliveryCharge + serviceCharge);
+  })();
 
   if (settings._tokenOnly) {
     const slipPrefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
     const tokenNumber = settings.tokenSlipNextNumber || 1;
     printLine('Token Slip', { bold: true, fontSize: tokenLabelFontSize, align: 'center' });
     y += 4;
-    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, big: true, align: 'center', fontSize: tokenFontSize });
-    y += 15;
+    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, fontSize: tokenFontSize, align: 'center', lineHeight: tokenFontSize * 1.2 });
+    if (showTotalOnToken && totalAmount > 0) {
+      y += 6;
+      printDivider('-', { fontSize: 10 });
+      printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(tokenLabelFontSize * 1.2), align: 'center' });
+    }
+    y += 10;
     const h = Math.ceil(y);
     const imgData = ctx.getImageData(0, 0, pxWidth, Math.min(h, canvas.height));
     canvas.width = pxWidth;
@@ -739,6 +749,60 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const titleSz = Number(settings.btTitleFontSize) || Math.round(fontSize * 1.3);
   const infoSz = Math.round(fontSize * 0.9);
   const dividerSz = Math.round(fontSize * 0.7);
+
+  const logoUrl = settings.logo;
+  const logoW = Math.min(Number(settings.receiptLogoWidth) || 80, pxWidth * 0.4);
+
+  const receiptTokenText = tokenOnReceipt && settings.tokenSlipEnabled
+    ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}`
+    : '';
+
+  if (logoUrl && logoEnabled) {
+    const img = new Image();
+    img.src = logoUrl;
+    const aspect = img.width ? img.height / img.width : 1;
+    const logoH = logoW * aspect;
+    if (receiptTokenText) {
+      const tokenLabelSz = tokenLabelFontSize;
+      ctx.font = `bold ${tokenLabelSz}px ${fontFamily}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#000000';
+      ctx.fillText('Token', margin, y + tokenLabelSz);
+      const labelW = ctx.measureText('Token').width;
+      ctx.font = `bold ${tokenFontSize}px ${fontFamily}`;
+      ctx.fillText(receiptTokenText, margin, y + tokenLabelSz + 6 + tokenFontSize);
+
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, pxWidth - margin - logoW, y, logoW, logoH);
+      } else {
+        ctx.font = `${infoSz}px ${fontFamily}`;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#999';
+        ctx.fillText('[Logo]', pxWidth - margin, y + infoSz);
+      }
+      y += Math.max(tokenLabelSz + 6 + tokenFontSize + 4, logoH + 4);
+    } else {
+      if (img.complete && img.naturalWidth > 0) {
+        const cx = (pxWidth - logoW) / 2;
+        ctx.drawImage(img, cx, y, logoW, logoH);
+        y += logoH + 4;
+      } else {
+        ctx.font = `${infoSz}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#999';
+        ctx.fillText('[Logo]', pxWidth / 2, y + infoSz);
+        y += infoSz + 6;
+      }
+    }
+  } else if (receiptTokenText) {
+    ctx.font = `bold ${tokenLabelFontSize}px ${fontFamily}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#000000';
+    ctx.fillText('Token', margin, y + tokenLabelFontSize);
+    ctx.font = `bold ${tokenFontSize}px ${fontFamily}`;
+    ctx.fillText(receiptTokenText, margin, y + tokenLabelFontSize + 6 + tokenFontSize);
+    y += tokenLabelFontSize + 6 + tokenFontSize + 4;
+  }
 
   printLine(header, { bold: true, fontSize: titleSz, align: 'center', lineHeight: Math.round(titleSz * 1.5) });
   if (settings.location) {
@@ -773,20 +837,69 @@ export function renderReceiptToCanvas(order, settings = {}) {
     printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
   }
 
-  y += 8;
-  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
-  printLine('Product  Qty  Rate  Amount', { bold: true, fontSize: productFontSize });
-  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
+  y += 6;
+  printDivider('-', { fontSize: dividerSz });
 
-  for (const item of (order.items || [])) {
+  const prodSz = productFontSize;
+  ctx.font = `bold ${prodSz}px ${fontFamily}`;
+  const rightColX = pxWidth - margin;
+  const qtyLabelW = ctx.measureText('999').width;
+  const rateLabelW = ctx.measureText('999 Rs').width;
+  const amtLabelW = ctx.measureText('9999 Rs').width;
+  const colGap = 6;
+  const amtX = rightColX;
+  const rateX = amtX - colGap - amtLabelW;
+  const qtyX = rateX - colGap - rateLabelW;
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#000000';
+  ctx.fillText('Product', margin, y);
+  ctx.textAlign = 'right';
+  ctx.fillText('Qty', qtyX + qtyLabelW, y);
+  ctx.fillText('Rate', rateX + rateLabelW, y);
+  ctx.fillText('Amt', amtX, y);
+  y += prodSz * 1.6;
+
+  printDivider('-', { fontSize: dividerSz });
+
+  const itemLines = (order.items || []).map((item) => {
     const qty = Number(item.quantity || 1);
     const rate = Number(item.price || item.unitPrice || 0);
     const amount = Number(item.total ?? qty * rate);
-    printLine(item.name, { fontSize: productFontSize });
-    printLine(`${qty}  ${rate} ${currency}  ${amount} ${currency}`, { fontSize: productFontSize });
+    const name = String(item.name || '').trim();
+    return { name, qty, rate, amount, qtyStr: String(qty), rateStr: `${rate}`, amtStr: `${amount}` };
+  });
+
+  for (const line of itemLines) {
+    ctx.font = `${prodSz}px ${fontFamily}`;
+
+    const qtyW = ctx.measureText(line.qtyStr).width;
+    const rateW = ctx.measureText(line.rateStr).width;
+    const amtW = ctx.measureText(line.amtStr).width;
+    const riX = rightColX;
+    const raX = riX - colGap - amtW;
+    const quX = raX - colGap - rateW;
+    const maxNameW = Math.max(20, quX - colGap - margin);
+
+    let nameDisplay = line.name;
+    ctx.font = `${prodSz}px ${fontFamily}`;
+    while (ctx.measureText(nameDisplay).width > maxNameW && nameDisplay.length > 1) {
+      nameDisplay = nameDisplay.slice(0, -1);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#000000';
+    ctx.fillText(nameDisplay, margin, y);
+
+    ctx.textAlign = 'right';
+    ctx.fillText(line.qtyStr, quX + qtyW, y);
+    ctx.fillText(line.rateStr, raX + rateW, y);
+    ctx.fillText(line.amtStr, riX, y);
+
+    y += prodSz * 1.6;
   }
 
-  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
+  printDivider('-', { fontSize: dividerSz });
 
   const subtotal = (order.subtotal != null && order.subtotal !== 0)
     ? Number(order.subtotal)
@@ -795,7 +908,6 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const taxAmount = Number(order.tax || 0);
   const deliveryCharge = order.orderType === 'Delivery' ? Number(order.deliveryFee || order.deliveryCharge || 0) : 0;
   const serviceCharge = Number(order.serviceCharge || 0);
-  const totalAmount = Math.max(0, subtotal - discountAmount + taxAmount + deliveryCharge + serviceCharge);
 
   printLine(`Total Due: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(totalFontSize * 0.85) });
   if (subtotal > 0) printLine(`Subtotal: ${subtotal} Rs`, { fontSize: infoSz });
@@ -805,8 +917,8 @@ export function renderReceiptToCanvas(order, settings = {}) {
   if (taxAmount > 0) printLine(`Tax: ${taxAmount} Rs`, { fontSize: infoSz });
   printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: totalFontSize, align: 'center' });
 
-  y += 8;
-  printLine('-'.repeat(40), { fontSize: dividerSz, align: 'center' });
+  y += 6;
+  printDivider('-', { fontSize: dividerSz });
   printLine(footer, { fontSize: infoSz, align: 'center' });
 
   const actualHeight = Math.ceil(y + marginBottom);
