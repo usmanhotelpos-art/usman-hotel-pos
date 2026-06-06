@@ -6669,13 +6669,8 @@ function App() {
                 <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
                 <select value={settings.btEncoding || 'bmp'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
                   <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
-                  <option value="cp1256">CP1256 (Arabic / Urdu single-byte text)</option>
-                  <option value="cp864">CP864 (DOS Arabic alternative)</option>
-                  <option value="utf-8">UTF-8 (if your printer supports UTF-8)</option>
                 </select>
-                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Choose `Bitmap` for perfect Urdu rendering. Use `CP1256` or `CP864` when your thermal printer expects a single-byte Arabic codepage. Choose `UTF-8` only if your printer explicitly supports UTF-8.
-                </p>
+                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap mode renders exact Urdu using browser fonts with larger text for clear receipts.</p>
               </div>
             </div>
 

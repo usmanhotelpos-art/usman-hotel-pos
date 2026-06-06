@@ -9,22 +9,12 @@ server/node_modules/
 client/node_modules/
 server/data/*.bak
 server/data/*.bak.*
-server/data/db.json.backup-*
-server/data/db.json.backup*
-server/data/db.json.restore-*
-server/data/db.json.corrupt-*
 client/build.log
 client/vite.config.js.timestamp-*
 .vscode/
-.vscode/*
 temp-rider-approve.ps1
 scripts/*.js
 server/debug-route*.js
 server/tmp-*.js
 client/src/test-write.txt
-ROLE_*.md
-temp-rider-approve.ps1
-scripts/*.js
-server/debug-route*.js
-server/tmp-*.js
 
