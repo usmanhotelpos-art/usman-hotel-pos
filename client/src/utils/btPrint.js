@@ -136,16 +136,24 @@ async function connectGatt(device) {
 export async function printToBluetooth(device, data) {
   const { server, characteristic } = await connectGatt(device);
 
-  const initCmd = new Uint8Array(CMD.INIT);
-  await characteristic.writeValue(initCmd);
-  await new Promise((r) => setTimeout(r, 50));
+  const write = async (buf) => {
+    if (characteristic.writeValueWithoutResponse) {
+      await characteristic.writeValueWithoutResponse(buf);
+    } else {
+      await characteristic.writeValue(buf);
+    }
+  };
 
-  const chunkSize = 128;
+  const initCmd = new Uint8Array(CMD.INIT);
+  await write(initCmd);
+  await new Promise((r) => setTimeout(r, 200));
+
+  const chunkSize = 64;
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
-    await characteristic.writeValue(chunk);
+    await write(chunk);
     if (i + chunkSize < data.length) {
-      await new Promise((r) => setTimeout(r, 20));
+      await new Promise((r) => setTimeout(r, 30));
     }
   }
 

@@ -6730,8 +6730,10 @@ function App() {
                 <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
                 <select value={settings.btEncoding || 'bmp'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
                   <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
+                  <option value="cp1256">Text CP1256 (Arabic/Urdu)</option>
+                  <option value="cp864">Text CP864 (Arabic/Urdu)</option>
                 </select>
-                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap mode renders exact Urdu using browser fonts with larger text for clear receipts.</p>
+                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap works on most thermal printers. If garbage prints, try Text CP1256 or CP864 mode.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Divider Style</label>
