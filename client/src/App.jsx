@@ -129,6 +129,8 @@ function App() {
     btMarginBottom: 10,
     btMarginCustom: false,
     btTokenLabelFontSize: 14,
+    btTokenSlipLogoEnabled: true,
+    btTokenMargin: 8,
     btReceiptHeader: '',
     btReceiptFooter: '',
     btShowTokenOnReceipt: true,
@@ -3341,23 +3343,25 @@ function App() {
     const tokenText = `${prefix}-${tokenNumber}`;
     const dateText = formatReceiptDate(order.date || new Date().toISOString(), settings.receiptDateTimeFormat || 'DD/MM/YYYY HH:mm');
     const fontFamily = settings.receiptFontFamily || settings.receiptFontStyle || 'Arial';
-    const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 8px;" /></div>` : '';
+    const showLogo = settings.btTokenSlipLogoEnabled !== false;
+    const logoHtml = settings.logo && showLogo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 4px;" /></div>` : '';
+    const tokenMargin = Number(settings.btTokenMargin ?? 8);
 
-    const tokenLabelSz = settings.btTokenLabelFontSize || 14;
-    const tokenNumSz = Math.min(settings.btTokenFontSize || 44, 300);
+    const tokenLabelSz = Number(settings.btTokenLabelFontSize ?? 14);
+    const tokenNumSz = Math.min(Number(settings.btTokenFontSize ?? 44), 300);
     const content = `
       <html>
         <head>
           <style>
-            body { font-family: ${fontFamily}, Arial, sans-serif; margin: 0; padding: 2px; color: #000; }
+            body { font-family: ${fontFamily}, Arial, sans-serif; margin: ${tokenMargin}px 0; padding: 0 2px; color: #000; }
             .receipt { width: 100%; max-width: 100%; margin: 0; text-align: center; }
-            .header { text-align: center; margin-bottom: 4px; }
+            .header { text-align: center; margin-bottom: 2px; }
             .header h2 { font-size: 18px; margin: 0; }
-            .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
-            .token-number { font-size: ${tokenNumSz}px; font-weight: 900; margin: 2px 0; text-align: center; letter-spacing: 2px; line-height: 1; word-break: break-all; }
-            .sub { font-size: 12px; text-align: center; margin-top: 4px; }
-            .footer { text-align: center; font-size: 12px; margin-top: 4px; }
-            .logo img { display: block; margin: 0 auto 4px; }
+            .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; letter-spacing: 1px; margin: ${Math.round(tokenNumSz * 0.2)}px 0 2px; }
+            .token-number { font-size: ${tokenNumSz}px; font-weight: 900; margin: ${Math.round(tokenNumSz * 0.35)}px 0; text-align: center; letter-spacing: 2px; line-height: 1.1; word-break: break-all; }
+            .sub { font-size: 12px; text-align: center; margin-top: ${Math.round(tokenNumSz * 0.15)}px; }
+            .footer { text-align: center; font-size: 12px; margin-top: ${Math.round(tokenNumSz * 0.15)}px; }
+            .logo img { display: block; margin: 0 auto 4px; max-width: 90px; }
           </style>
         </head>
         <body>
@@ -6880,17 +6884,31 @@ function App() {
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
-              <h4 className="text-base font-semibold text-slate-100">Token Slip Font Settings</h4>
-              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Customize font sizes for the token slip so the token printout looks clean.</p>
-              <div className="mt-4 grid gap-6 lg:grid-cols-2">
+              <h4 className="text-base font-semibold text-slate-100">Token Slip Font & Layout</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Font sizes, spacing, and logo for the Bluetooth token slip print.</p>
+              <div className="mt-4 grid gap-6 lg:grid-cols-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-400">Token Label Font Size (px)</label>
-                  <input type="number" min="8" max="48" value={settings.btTokenLabelFontSize || 14} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenLabelFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                  <label className="block text-sm font-medium text-slate-400">Label Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btTokenLabelFontSize ?? 14} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenLabelFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-400">Token Number Font Size (px)</label>
-                  <input type="number" min="20" max="300" value={settings.btTokenFontSize || 44} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                  <label className="block text-sm font-medium text-slate-400">Number Font Size (px)</label>
+                  <input type="number" min="20" max="300" value={settings.btTokenFontSize ?? 44} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Margin (px)</label>
+                  <input type="number" min="0" max="100" value={settings.btTokenMargin ?? 8} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenMargin: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-6">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenSlipLogoEnabled !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenSlipLogoEnabled: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show logo on token slip
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btShowTotalOnToken !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowTotalOnToken: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show total on token slip
+                </label>
               </div>
             </div>
 
