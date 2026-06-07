@@ -909,17 +909,31 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const qtyColW = ctx.measureText('999').width + 4;
   const rateColW = ctx.measureText('9999').width + 4;
   const amtColW = colW;
-  const totalsColsW = qtyColW + rateColW + amtColW + 8;
-  const nameMaxW = Math.max(60, pxWidth - margin * 2 - totalsColsW - 4);
-  const nameRightX = rightEdge - totalsColsW - 8;
+  const totalsColsW = qtyColW + rateColW + amtColW;
+  const nameMaxW = Math.max(60, pxWidth - margin * 2 - totalsColsW - 12);
+
+  let nameX, qtyX, rateX, amtX;
+  if (isRightAlign) {
+    const blockW = nameMaxW + 4 + qtyColW + 4 + rateColW + 4 + amtColW;
+    const blockLeft = rightEdge - blockW;
+    nameX = blockLeft + nameMaxW;
+    qtyX = blockLeft + nameMaxW + 4 + qtyColW;
+    rateX = blockLeft + nameMaxW + 4 + qtyColW + 4 + rateColW;
+    amtX = rightEdge;
+  } else {
+    nameX = margin;
+    qtyX = rightEdge - amtColW - rateColW - 4;
+    rateX = rightEdge - amtColW;
+    amtX = rightEdge;
+  }
 
   ctx.textAlign = isRightAlign ? 'right' : 'left';
   ctx.fillStyle = '#000000';
-  ctx.fillText('Product', isRightAlign ? nameRightX : margin, y);
+  ctx.fillText('Product', nameX, y);
   ctx.textAlign = 'right';
-  ctx.fillText('Qty', rightEdge - amtColW - rateColW - 4, y);
-  ctx.fillText('Rate', rightEdge - amtColW, y);
-  ctx.fillText('Amt', rightEdge, y);
+  ctx.fillText('Qty', qtyX, y);
+  ctx.fillText('Rate', rateX, y);
+  ctx.fillText('Amt', amtX, y);
   y += lh;
 
   printDivider('-', { fontSize: dividerSz });
@@ -947,12 +961,12 @@ export function renderReceiptToCanvas(order, settings = {}) {
     nameLines.forEach((line, idx) => {
       ctx.textAlign = isRightAlign ? 'right' : 'left';
       ctx.fillStyle = '#000000';
-      ctx.fillText(line, isRightAlign ? nameRightX : margin, y);
+      ctx.fillText(line, nameX, y);
       ctx.textAlign = 'right';
       if (idx === 0) {
-        ctx.fillText(String(qty), rightEdge - amtColW - rateColW - 4, y);
-        ctx.fillText(String(rate), rightEdge - amtColW, y);
-        ctx.fillText(String(amount), rightEdge, y);
+        ctx.fillText(String(qty), qtyX, y);
+        ctx.fillText(String(rate), rateX, y);
+        ctx.fillText(String(amount), amtX, y);
       }
       y += lh;
     });
