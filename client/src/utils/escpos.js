@@ -813,7 +813,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const titleSz = Math.round(fontSize * 1.1);
   const infoSz = Math.round(fontSize * 0.85);
   const dividerSz = Math.round(fontSize * 0.65);
-  const logoW = Math.min(Number(settings.receiptLogoWidth) || 70, pxWidth * 0.35);
+  const logoW = Math.min(Number(settings.receiptLogoWidth) || 100, pxWidth * 0.55);
 
   const showTokenForOrderType = (
     (order.orderType === 'Dine-In' && settings.btTokenOnDineIn !== false) ||
@@ -827,29 +827,29 @@ export function renderReceiptToCanvas(order, settings = {}) {
 
   const logoUrl = settings.logo;
 
-  if (receiptTokenText || (logoUrl && logoEnabled)) {
-    const lineH = Math.max(infoSz + 4, logoW * 0.3 + 4);
-    if (receiptTokenText) {
-      ctx.font = `bold ${infoSz}px ${fontFamily}`;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#000000';
-      ctx.fillText(`#${receiptTokenText}`, margin, y + infoSz);
+  if (logoUrl && logoEnabled) {
+    const img = new Image();
+    img.src = logoUrl;
+    const aspect = img.width ? img.height / img.width : 0.3;
+    const logoH = Math.min(logoW * aspect, logoW * 0.5);
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, (pxWidth - logoW) / 2, y, logoW, logoH);
+    } else {
+      ctx.font = `${titleSz}px ${fontFamily}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#000';
+      ctx.fillText('[Logo]', pxWidth / 2, y + titleSz);
     }
-    if (logoUrl && logoEnabled) {
-      const img = new Image();
-      img.src = logoUrl;
-      const aspect = img.width ? img.height / img.width : 0.3;
-      const logoH = Math.min(logoW * aspect, logoW * 0.4);
-      if (img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, pxWidth - margin - logoW, y, logoW, logoH);
-      } else {
-        ctx.font = `${infoSz}px ${fontFamily}`;
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#999';
-        ctx.fillText('[Logo]', pxWidth - margin, y + infoSz);
-      }
-    }
-    y += Math.max(infoSz + 6, Math.round(logoW * 0.3) + 4);
+    y += Math.round(logoH) + 6;
+  }
+  if (receiptTokenText) {
+    const tokenSz = Math.round(titleSz * 1.2);
+    y += Math.round(tokenSz * 0.4);
+    ctx.font = `bold ${tokenSz}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000000';
+    ctx.fillText(`#${receiptTokenText}`, pxWidth / 2, y + tokenSz);
+    y += Math.round(tokenSz * 1.4);
   }
 
   printLine(header, { bold: true, fontSize: titleSz, align: 'center', lineHeight: Math.round(titleSz * 1.4) });
@@ -891,6 +891,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const prodSz = productFontSize;
   const lh = Math.round(prodSz * 1.5);
   const rightEdge = pxWidth - margin;
+  const isRightAlign = textAlign === 'right';
 
   ctx.font = `bold ${prodSz}px ${fontFamily}`;
   const colW = ctx.measureText('9999').width + 6;
@@ -898,11 +899,15 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const rateColW = ctx.measureText('9999').width + 4;
   const amtColW = colW;
   const totalsColsW = qtyColW + rateColW + amtColW + 8;
-  const nameMaxW = Math.max(40, pxWidth - margin * 2 - totalsColsW - 4);
+  const nameMaxW = Math.max(60, pxWidth - margin * 2 - totalsColsW - 4);
 
-  ctx.textAlign = 'left';
+  ctx.textAlign = isRightAlign ? 'right' : 'left';
   ctx.fillStyle = '#000000';
-  ctx.fillText('Product', margin, y);
+  if (isRightAlign) {
+    ctx.fillText('Product', rightEdge, y);
+  } else {
+    ctx.fillText('Product', margin, y);
+  }
   ctx.textAlign = 'right';
   ctx.fillText('Qty', rightEdge - amtColW - rateColW - 4, y);
   ctx.fillText('Rate', rightEdge - amtColW, y);
@@ -932,9 +937,9 @@ export function renderReceiptToCanvas(order, settings = {}) {
     if (currentLine) nameLines.push(currentLine);
     if (nameLines.length === 0) nameLines.push('');
     nameLines.forEach((line, idx) => {
-      ctx.textAlign = 'left';
+      ctx.textAlign = isRightAlign ? 'right' : 'left';
       ctx.fillStyle = '#000000';
-      ctx.fillText(line, margin, y);
+      ctx.fillText(line, isRightAlign ? rightEdge : margin, y);
       ctx.textAlign = 'right';
       if (idx === 0) {
         ctx.fillText(String(qty), rightEdge - amtColW - rateColW - 4, y);
