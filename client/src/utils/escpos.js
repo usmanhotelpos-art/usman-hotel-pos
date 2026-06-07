@@ -345,8 +345,8 @@ export function buildEscposReceipt(order, settings = {}) {
   const lines = [];
 
   if (settings._tokenOnly) {
-    const tokenMarginTop = Number(settings.btTokenMarginTop ?? 4);
-    const tokenMarginBottom = Number(settings.btTokenMarginBottom ?? 4);
+    const tokenMarginTop = Number(settings.btTokenMarginTop) ?? 4;
+    const tokenMarginBottom = Number(settings.btTokenMarginBottom) ?? 4;
     const tokenLabelSz = Number(settings.btTokenLabelFontSize) || 14;
     const tokenNumSz = Number(settings.btTokenFontSize) || 44;
 
@@ -356,7 +356,7 @@ export function buildEscposReceipt(order, settings = {}) {
     if (_encCP >= 0) lines.push(CMD.CODE_PAGE(_encCP));
     lines.push(CMD.LINE_SPACING_DEFAULT);
 
-    if (tokenMarginTop > 0) lines.push(CMD.FEED_LINES(Math.min(tokenMarginTop, 10)));
+    lines.push(CMD.FEED_LINES(Math.min(tokenMarginTop, 10)));
 
     lines.push(CMD.BOLD_ON);
     lines.push(_enc(header));
@@ -744,9 +744,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   }
 
   const totalAmount = (() => {
-    if (settings._tokenOnly) {
-      return Math.max(0, Number(order.total || order.grandTotal || 0));
-    }
+    if (settings._tokenOnly) return 0;
     const subtotal = (order.subtotal != null && order.subtotal !== 0)
       ? Number(order.subtotal)
       : (order.items || []).reduce((s, it) => s + ((Number(it.price || 0) * Number(it.quantity || 0)) || Number(it.total) || 0), 0);
@@ -761,41 +759,25 @@ export function renderReceiptToCanvas(order, settings = {}) {
     const slipPrefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
     const tokenNumber = settings.tokenSlipNextNumber || 1;
     const tokenSlipLogoEnabled = settings.btTokenSlipLogoEnabled !== false;
-    const tokenMarginTop = Number(settings.btTokenMarginTop ?? 4);
-    const tokenMarginBottom = Number(settings.btTokenMarginBottom ?? 4);
+    const tokenMarginTop = Number(settings.btTokenMarginTop) ?? 4;
+    const tokenMarginBottom = Number(settings.btTokenMarginBottom) ?? 4;
     y = tokenMarginTop;
 
     const logoUrl = settings.logo;
     if (logoUrl && tokenSlipLogoEnabled) {
       const logoW = Math.min(Number(settings.btLogoWidth) || 70, pxWidth * 0.35);
-      const img = document.createElement('img');
-      img.crossOrigin = 'anonymous';
+      const img = new Image();
       img.src = logoUrl;
-      if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
-        const aspect = img.naturalHeight / img.naturalWidth;
-        const logoH = logoW * aspect;
+      const aspect = img.width ? img.height / img.width : 0.3;
+      const logoH = logoW * aspect;
+      if (img.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, (pxWidth - logoW) / 2, y, logoW, logoH);
         y += logoH + 4;
-      } else if (logoUrl.startsWith('data:')) {
-        const img2 = new Image();
-        img2.src = logoUrl;
-        if (img2.complete && img2.naturalWidth > 0) {
-          const aspect = img2.naturalHeight / img2.naturalWidth;
-          const logoH = logoW * aspect;
-          ctx.drawImage(img2, (pxWidth - logoW) / 2, y, logoW, logoH);
-          y += logoH + 4;
-        } else {
-          ctx.font = `${tokenLabelFontSize}px ${fontFamily}`;
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#000';
-          ctx.fillText('[Logo]', pxWidth / 2, y + tokenLabelFontSize);
-          y += tokenLabelFontSize + 6;
-        }
       } else {
         ctx.font = `${tokenLabelFontSize}px ${fontFamily}`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#000';
-        ctx.fillText('[' + (settings.receiptHeader || 'Hotel') + ']', pxWidth / 2, y + tokenLabelFontSize);
+        ctx.fillStyle = '#999';
+        ctx.fillText('[Logo]', pxWidth / 2, y + tokenLabelFontSize);
         y += tokenLabelFontSize + 6;
       }
     }
@@ -839,18 +821,17 @@ export function renderReceiptToCanvas(order, settings = {}) {
       ctx.fillText(`#${receiptTokenText}`, margin, y + infoSz);
     }
     if (logoUrl && logoEnabled) {
-      const img = document.createElement('img');
-      img.crossOrigin = 'anonymous';
+      const img = new Image();
       img.src = logoUrl;
-      const aspect = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.3;
+      const aspect = img.width ? img.height / img.width : 0.3;
       const logoH = Math.min(logoW * aspect, logoW * 0.4);
       if (img.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, pxWidth - margin - logoW, y, logoW, logoH);
       } else {
         ctx.font = `${infoSz}px ${fontFamily}`;
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#000';
-        ctx.fillText('[' + (settings.receiptHeader || 'Logo') + ']', pxWidth - margin, y + infoSz);
+        ctx.fillStyle = '#999';
+        ctx.fillText('[Logo]', pxWidth - margin, y + infoSz);
       }
     }
     y += Math.max(infoSz + 6, Math.round(logoW * 0.3) + 4);
