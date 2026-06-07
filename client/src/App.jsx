@@ -135,7 +135,14 @@ function App() {
     btReceiptFooter: '',
     btShowTokenOnReceipt: true,
     btShowTotalOnToken: true,
-    btTokenOnReceipt: true
+    btTokenOnReceipt: true,
+    btTokenOnDineIn: true,
+    btTokenOnTakeaway: true,
+    btTokenOnDelivery: true,
+    btTokenSlipDineIn: true,
+    btTokenSlipTakeaway: true,
+    btTokenSlipDelivery: true,
+    btShowPaidWatermark: true
   });
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
@@ -3271,7 +3278,13 @@ function App() {
           await doBitmapPrint();
         }
       }
-      if (settings.tokenSlipEnabled) {
+      const shouldPrintTokenSlip = settings.tokenSlipEnabled && (
+        (order.orderType === 'Dine-In' && settings.btTokenSlipDineIn !== false) ||
+        (order.orderType === 'Takeaway' && settings.btTokenSlipTakeaway !== false) ||
+        (order.orderType === 'Delivery' && settings.btTokenSlipDelivery !== false) ||
+        (!order.orderType && settings.btTokenSlipDineIn !== false)
+      );
+      if (shouldPrintTokenSlip) {
         const tokenOrder = { ...order, items: [] };
         if (settings.btEncoding === 'bmp') {
           const tokenCanvas = renderReceiptToCanvas(tokenOrder, { ...settings, _tokenOnly: true });
@@ -3404,7 +3417,13 @@ function App() {
     const productSize = `${settings.receiptFontSizes?.product || 12}px`;
     const customerSize = `${settings.receiptFontSizes?.customer || 12}px`;
     const notesSize = `${settings.receiptFontSizes?.notes || 11}px`;
-    const receiptTokenText = settings.tokenSlipEnabled ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}` : '';
+    const showTokenForOrderType = (
+      (order.orderType === 'Dine-In' && settings.btTokenOnDineIn !== false) ||
+      (order.orderType === 'Takeaway' && settings.btTokenOnTakeaway !== false) ||
+      (order.orderType === 'Delivery' && settings.btTokenOnDelivery !== false) ||
+      (!order.orderType && settings.btTokenOnDineIn !== false)
+    );
+    const receiptTokenText = settings.tokenSlipEnabled && showTokenForOrderType ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}` : '';
     const tokenLabelSz = settings.btTokenLabelFontSize || 14;
     const tokenNumSz = settings.btTokenFontSize || 44;
     const tokenHtml = receiptTokenText ? `<div class="receipt-token"><div class="token-label" style="font-size:${tokenLabelSz}px;">Token</div><div class="token-number" style="font-size:${tokenNumSz}px;">${receiptTokenText}</div></div>` : '';
@@ -3578,7 +3597,13 @@ function App() {
       console.error('Print failed', err);
     });
 
-    if (settings.tokenSlipEnabled) {
+    const shouldPrintTokenSlip = settings.tokenSlipEnabled && (
+      (order.orderType === 'Dine-In' && settings.btTokenSlipDineIn !== false) ||
+      (order.orderType === 'Takeaway' && settings.btTokenSlipTakeaway !== false) ||
+      (order.orderType === 'Delivery' && settings.btTokenSlipDelivery !== false) ||
+      (!order.orderType && settings.btTokenSlipDineIn !== false)
+    );
+    if (shouldPrintTokenSlip) {
       printPromise.then(() => {
         printTokenSlip(order).catch((err) => {
           console.error('Token slip print failed', err);
@@ -6937,6 +6962,55 @@ function App() {
                     Reset token number to 1
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">Token on Receipt — Per Order Type</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Choose which order types show the token number on the receipt.</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenOnDineIn !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenOnDineIn: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Dine-In
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenOnTakeaway !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenOnTakeaway: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Takeaway / Pickup
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenOnDelivery !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenOnDelivery: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Delivery
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">Token Slip Print — Per Order Type</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Choose which order types get a separate token slip printed.</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenSlipDineIn !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenSlipDineIn: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Dine-In
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenSlipTakeaway !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenSlipTakeaway: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Takeaway / Pickup
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btTokenSlipDelivery !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenSlipDelivery: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Delivery
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">PAID Watermark</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Show a large faded PAID stamp on the receipt when order is paid.</p>
+              <div className="mt-4">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btShowPaidWatermark !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowPaidWatermark: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show PAID watermark on paid orders
+                </label>
               </div>
             </div>
 

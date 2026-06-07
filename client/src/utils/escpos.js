@@ -430,7 +430,13 @@ export function buildEscposReceipt(order, settings = {}) {
     lines.push(CMD.LF);
   }
 
-  const receiptTokenText = settings.tokenSlipEnabled
+  const showTokenForOrderType = (
+    (order.orderType === 'Dine-In' && settings.btTokenOnDineIn !== false) ||
+    (order.orderType === 'Takeaway' && settings.btTokenOnTakeaway !== false) ||
+    (order.orderType === 'Delivery' && settings.btTokenOnDelivery !== false) ||
+    (!order.orderType && settings.btTokenOnDineIn !== false)
+  );
+  const receiptTokenText = settings.tokenSlipEnabled && showTokenForOrderType
     ? `${tokenPrefix}-${tokenNumber}`
     : '';
   if (receiptTokenText) {
@@ -809,7 +815,13 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const dividerSz = Math.round(fontSize * 0.65);
   const logoW = Math.min(Number(settings.receiptLogoWidth) || 70, pxWidth * 0.35);
 
-  const receiptTokenText = tokenOnReceipt && settings.tokenSlipEnabled
+  const showTokenForOrderType = (
+    (order.orderType === 'Dine-In' && settings.btTokenOnDineIn !== false) ||
+    (order.orderType === 'Takeaway' && settings.btTokenOnTakeaway !== false) ||
+    (order.orderType === 'Delivery' && settings.btTokenOnDelivery !== false) ||
+    (!order.orderType && settings.btTokenOnDineIn !== false)
+  );
+  const receiptTokenText = tokenOnReceipt && settings.tokenSlipEnabled && showTokenForOrderType
     ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}`
     : '';
 
@@ -956,6 +968,37 @@ export function renderReceiptToCanvas(order, settings = {}) {
   printLine(footer, { fontSize: infoSz, align: 'center' });
 
   const actualHeight = Math.ceil(y + marginBottom);
+
+  const isPaid = order.status === 'Completed' || order.paymentStatus === 'Paid' || order.status === 'Paid';
+  if (isPaid && settings.btShowPaidWatermark !== false) {
+    const cx = pxWidth / 2;
+    const cy = actualHeight / 2;
+    const maxDim = Math.min(pxWidth, Math.max(actualHeight, 200)) * 0.5;
+    const r = Math.max(maxDim, 50);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-Math.PI / 6);
+
+    ctx.font = `bold ${Math.round(r * 0.35)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.fillText('PAID', 0, Math.round(-r * 0.08));
+
+    ctx.font = `bold ${Math.round(r * 0.13)}px Arial`;
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillText('Usman Hotel', 0, Math.round(r * 0.16));
+
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(0,180,0,0.12)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   const imageData = ctx.getImageData(0, 0, pxWidth, Math.min(actualHeight, canvas.height));
   canvas.width = pxWidth;
   canvas.height = actualHeight;
