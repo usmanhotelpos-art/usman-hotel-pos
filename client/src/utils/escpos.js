@@ -813,7 +813,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const titleSz = Math.round(fontSize * 1.1);
   const infoSz = Math.round(fontSize * 0.85);
   const dividerSz = Math.round(fontSize * 0.65);
-  const logoW = Math.min(Number(settings.receiptLogoWidth) || 100, pxWidth * 0.55);
+  const logoW = Math.min(Number(settings.receiptLogoWidth) || 80, pxWidth * 0.35);
 
   const showTokenForOrderType = (
     (order.orderType === 'Dine-In' && settings.btTokenOnDineIn !== false) ||
@@ -826,30 +826,41 @@ export function renderReceiptToCanvas(order, settings = {}) {
     : '';
 
   const logoUrl = settings.logo;
+  const hasLogo = logoUrl && logoEnabled;
+  const hasToken = !!receiptTokenText;
 
-  if (logoUrl && logoEnabled) {
-    const img = new Image();
-    img.src = logoUrl;
-    const aspect = img.width ? img.height / img.width : 0.3;
-    const logoH = Math.min(logoW * aspect, logoW * 0.5);
-    if (img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, (pxWidth - logoW) / 2, y, logoW, logoH);
-    } else {
-      ctx.font = `${titleSz}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#000';
-      ctx.fillText('[Logo]', pxWidth / 2, y + titleSz);
+  if (hasLogo || hasToken) {
+    const tokenSz = Math.round(infoSz * 1.4);
+    let logoH = 0;
+    if (hasLogo) {
+      const img = new Image();
+      img.src = logoUrl;
+      const aspect = img.width ? img.height / img.width : 0.3;
+      logoH = Math.min(logoW * aspect, logoW * 0.45);
     }
-    y += Math.round(logoH) + 6;
-  }
-  if (receiptTokenText) {
-    const tokenSz = Math.round(titleSz * 1.2);
-    y += Math.round(tokenSz * 0.4);
-    ctx.font = `bold ${tokenSz}px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#000000';
-    ctx.fillText(`#${receiptTokenText}`, pxWidth / 2, y + tokenSz);
-    y += Math.round(tokenSz * 1.4);
+    const lineHeight = Math.max(logoH, tokenSz + 4);
+    if (hasToken) {
+      ctx.font = `bold ${tokenSz}px ${fontFamily}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#000000';
+      ctx.fillText(`#${receiptTokenText}`, margin, y + tokenSz);
+    }
+    if (hasLogo) {
+      const img = new Image();
+      img.src = logoUrl;
+      const aspect = img.width ? img.height / img.width : 0.3;
+      logoH = Math.min(logoW * aspect, logoW * 0.45);
+      if (img.complete && img.naturalWidth > 0) {
+        const logoY = y + (lineHeight - logoH) / 2;
+        ctx.drawImage(img, pxWidth - margin - logoW, logoY, logoW, logoH);
+      } else {
+        ctx.font = `${infoSz}px ${fontFamily}`;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#999';
+        ctx.fillText('[Logo]', pxWidth - margin, y + infoSz);
+      }
+    }
+    y += lineHeight + 6;
   }
 
   printLine(header, { bold: true, fontSize: titleSz, align: 'center', lineHeight: Math.round(titleSz * 1.4) });
@@ -900,14 +911,11 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const amtColW = colW;
   const totalsColsW = qtyColW + rateColW + amtColW + 8;
   const nameMaxW = Math.max(60, pxWidth - margin * 2 - totalsColsW - 4);
+  const nameRightX = rightEdge - totalsColsW - 8;
 
   ctx.textAlign = isRightAlign ? 'right' : 'left';
   ctx.fillStyle = '#000000';
-  if (isRightAlign) {
-    ctx.fillText('Product', rightEdge, y);
-  } else {
-    ctx.fillText('Product', margin, y);
-  }
+  ctx.fillText('Product', isRightAlign ? nameRightX : margin, y);
   ctx.textAlign = 'right';
   ctx.fillText('Qty', rightEdge - amtColW - rateColW - 4, y);
   ctx.fillText('Rate', rightEdge - amtColW, y);
@@ -939,7 +947,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
     nameLines.forEach((line, idx) => {
       ctx.textAlign = isRightAlign ? 'right' : 'left';
       ctx.fillStyle = '#000000';
-      ctx.fillText(line, isRightAlign ? rightEdge : margin, y);
+      ctx.fillText(line, isRightAlign ? nameRightX : margin, y);
       ctx.textAlign = 'right';
       if (idx === 0) {
         ctx.fillText(String(qty), rightEdge - amtColW - rateColW - 4, y);
