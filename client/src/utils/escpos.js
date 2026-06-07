@@ -794,12 +794,12 @@ export function renderReceiptToCanvas(order, settings = {}) {
 
     printLine(header, { bold: true, fontSize: Math.round(tokenLabelFontSize * 1.3), align: 'center', lineHeight: Math.round(tokenLabelFontSize * 1.6) });
     printLine('Token Slip', { bold: true, fontSize: tokenLabelFontSize, align: 'center', lineHeight: Math.round(tokenLabelFontSize * 1.5) });
-    y += Math.round(tokenFontSize * 0.3);
-    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, fontSize: tokenFontSize, align: 'center', lineHeight: Math.round(tokenFontSize * 1.3) });
+    y += Math.round(tokenFontSize * 0.7);
+    printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, fontSize: tokenFontSize, align: 'center', lineHeight: Math.round(tokenFontSize * 1.4) });
     if (showTotalOnToken && totalAmount > 0) {
-      y += Math.round(tokenFontSize * 0.15);
+      y += Math.round(tokenFontSize * 0.4);
       printDivider('-', { fontSize: Math.round(tokenLabelFontSize * 0.7) });
-      printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(tokenLabelFontSize * 1.3), align: 'center' });
+      printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(tokenLabelFontSize * 2), align: 'center', lineHeight: Math.round(tokenLabelFontSize * 2.5) });
     }
     y += 8 + tokenMargin;
     const h = Math.max(Math.ceil(y), 80);
