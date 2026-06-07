@@ -120,7 +120,7 @@ function App() {
     btNotesFontSize: 11,
     btLogoEnabled: true,
     btLogoWidth: '80',
-    btEncoding: 'bmp',
+    btEncoding: 'cp1256',
     btOrderTypeFontSize: 18,
     btServiceTypeFontSize: 16,
     btTokenFontSize: 44,
@@ -6728,12 +6728,12 @@ function App() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Text Encoding</label>
-                <select value={settings.btEncoding || 'bmp'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                  <option value="bmp">Bitmap/Raster (100% Urdu support)</option>
-                  <option value="cp1256">Text CP1256 (Arabic/Urdu)</option>
+                <select value={settings.btEncoding || 'cp1256'} onChange={(e) => setSettings((prev) => ({ ...prev, btEncoding: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                  <option value="cp1256">Text CP1256 (Recommended - most printers)</option>
                   <option value="cp864">Text CP864 (Arabic/Urdu)</option>
+                  <option value="bmp">Bitmap/Raster (GS v 0)</option>
                 </select>
-                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Bitmap works on most thermal printers. If garbage prints, try Text CP1256 or CP864 mode.</p>
+                <p className={`mt-1 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Text modes (CP1256/CP864) work on all thermal printers. Bitmap raster only if printer supports GS v 0.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Divider Style</label>
