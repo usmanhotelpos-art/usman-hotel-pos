@@ -345,11 +345,40 @@ export function buildEscposReceipt(order, settings = {}) {
   const lines = [];
 
   if (settings._tokenOnly) {
-    lines.push(CMD.INIT, CMD.ALIGN_CENTER, CMD.BOLD_ON, isLarge ? CMD.DOUBLE_WH : CMD.DOUBLE_HEIGHT);
+    const tokenMarginTop = Number(settings.btTokenMarginTop) ?? 4;
+    const tokenMarginBottom = Number(settings.btTokenMarginBottom) ?? 4;
+    const tokenLabelSz = Number(settings.btTokenLabelFontSize) || 14;
+    const tokenNumSz = Number(settings.btTokenFontSize) || 44;
+
+    lines.push(CMD.INIT);
+    lines.push(CMD.ALIGN_CENTER);
+
+    if (_encCP >= 0) lines.push(CMD.CODE_PAGE(_encCP));
+    lines.push(CMD.LINE_SPACING_DEFAULT);
+
+    lines.push(CMD.FEED_LINES(Math.min(tokenMarginTop, 10)));
+
+    lines.push(CMD.BOLD_ON);
+    lines.push(_enc(header));
+    lines.push(CMD.LF);
+    lines.push(CMD.BOLD_OFF);
+
+    lines.push(CMD.FONT_B);
+    lines.push(_enc('Token Slip'));
+    lines.push(CMD.LF);
+
+    lines.push(CMD.BOLD_ON);
+    if (tokenNumSz >= 48) {
+      lines.push(CMD.DOUBLE_WH);
+    } else if (tokenNumSz >= 28) {
+      lines.push(CMD.DOUBLE_HEIGHT);
+    }
     lines.push(_enc(`${tokenPrefix}-${tokenNumber}`));
     lines.push(CMD.LF, CMD.BOLD_OFF);
     lines.push(useSmallFont ? CMD.FONT_B : CMD.FONT_A);
-    lines.push(CMD.FEED_LINES(4), CMD.CUT);
+
+    lines.push(CMD.FEED_LINES(Math.min(tokenMarginBottom, 10)));
+    lines.push(CMD.CUT);
 
     const totalLen = lines.reduce((sum, l) => sum + l.length, 0);
     const result = new Uint8Array(totalLen);
@@ -729,16 +758,42 @@ export function renderReceiptToCanvas(order, settings = {}) {
   if (settings._tokenOnly) {
     const slipPrefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
     const tokenNumber = settings.tokenSlipNextNumber || 1;
-    printLine('Token Slip', { bold: true, fontSize: tokenLabelFontSize, align: 'center' });
-    y += 4;
+    const tokenSlipLogoEnabled = settings.btTokenSlipLogoEnabled !== false;
+    const tokenMarginTop = Number(settings.btTokenMarginTop) ?? 4;
+    const tokenMarginBottom = Number(settings.btTokenMarginBottom) ?? 4;
+    y = tokenMarginTop;
+
+    const logoUrl = settings.logo;
+    if (logoUrl && tokenSlipLogoEnabled) {
+      const logoW = Math.min(Number(settings.btLogoWidth) || 70, pxWidth * 0.35);
+      const img = new Image();
+      img.src = logoUrl;
+      const aspect = img.width ? img.height / img.width : 0.3;
+      const logoH = logoW * aspect;
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, (pxWidth - logoW) / 2, y, logoW, logoH);
+        y += logoH + 4;
+      } else {
+        ctx.font = `${tokenLabelFontSize}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#999';
+        ctx.fillText('[Logo]', pxWidth / 2, y + tokenLabelFontSize);
+        y += tokenLabelFontSize + 6;
+      }
+    }
+
+    printLine(header, { bold: true, fontSize: Math.round(tokenLabelFontSize * 1.3), align: 'center', lineHeight: Math.round(tokenLabelFontSize * 1.8) });
+    y += Math.round(tokenNumSz * 0.15);
+    printLine('Token Slip', { bold: true, fontSize: tokenLabelFontSize, align: 'center', lineHeight: Math.round(tokenLabelFontSize * 1.6) });
+    y += Math.round(tokenNumSz * 0.25);
     printLine(`${slipPrefix}-${tokenNumber}`, { bold: true, fontSize: tokenFontSize, align: 'center', lineHeight: Math.round(tokenFontSize * 1.3) });
     if (showTotalOnToken && totalAmount > 0) {
-      y += 6;
-      printDivider('-', { fontSize: 10 });
+      y += Math.round(tokenNumSz * 0.15);
+      printDivider('-', { fontSize: Math.round(tokenLabelFontSize * 0.7) });
       printLine(`Total: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(tokenLabelFontSize * 1.3), align: 'center' });
     }
-    y += 12;
-    const h = Math.ceil(y);
+    y += 8 + tokenMarginBottom;
+    const h = Math.max(Math.ceil(y), 100);
     const imgData = ctx.getImageData(0, 0, pxWidth, Math.min(h, canvas.height));
     canvas.width = pxWidth;
     canvas.height = h;
