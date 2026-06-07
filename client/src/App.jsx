@@ -7018,6 +7018,7 @@ function App() {
               <h4 className="text-base font-semibold text-slate-100">Receipt Preview</h4>
               <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>See how your receipt will look with current settings.</p>
               <div className="mt-4">
+                <div className="flex flex-wrap gap-3">
                 <button type="button" onClick={() => {
                   const previewOrder = {
                     orderType: 'Dine-In',
@@ -7044,6 +7045,24 @@ function App() {
                 }} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">
                   Open Receipt Preview
                 </button>
+                <button type="button" onClick={() => {
+                  const previewOrder = {
+                    orderType: 'Dine-In',
+                    orderNumber: '1234',
+                    customerName: 'Guest',
+                    tableNumber: '5',
+                    items: [],
+                    total: 860,
+                    date: new Date().toISOString()
+                  };
+                  const canvas = renderReceiptToCanvas(previewOrder, { ...settings, _tokenOnly: true });
+                  const previewUrl = canvas.toDataURL();
+                  const win = window.open('');
+                  win.document.write('<img src="' + previewUrl + '" style="max-width:100%;" />');
+                }} className="rounded-3xl bg-amber-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-500 transition">
+                  Open Token Slip Preview
+                </button>
+                </div>
               </div>
             </div>
           </div>
