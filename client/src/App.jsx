@@ -3257,12 +3257,15 @@ function App() {
     const doBitmapPrint = async () => {
       const canvas = renderReceiptToCanvas(order, settings);
       const rasterData = canvasToEscposRaster(canvas);
+      const initCmd = new Uint8Array(CMD.INIT);
       const cutCmd = new Uint8Array(CMD.CUT);
-      const feedCmd = new Uint8Array(CMD.FEED_LINES(3));
-      const finalData = new Uint8Array(rasterData.length + feedCmd.length + cutCmd.length);
-      finalData.set(rasterData, 0);
-      finalData.set(feedCmd, rasterData.length);
-      finalData.set(cutCmd, rasterData.length + feedCmd.length);
+      const feedCmd = new Uint8Array(CMD.FEED_LINES(4));
+      const finalData = new Uint8Array(initCmd.length + rasterData.length + feedCmd.length + cutCmd.length);
+      let offset = 0;
+      finalData.set(initCmd, offset); offset += initCmd.length;
+      finalData.set(rasterData, offset); offset += rasterData.length;
+      finalData.set(feedCmd, offset); offset += feedCmd.length;
+      finalData.set(cutCmd, offset);
       await printToBluetooth(device, finalData);
     };
 
@@ -3289,12 +3292,15 @@ function App() {
         if (settings.btEncoding === 'bmp') {
           const tokenCanvas = renderReceiptToCanvas(tokenOrder, { ...settings, _tokenOnly: true });
           const tokenRaster = canvasToEscposRaster(tokenCanvas);
-          const tokenFeed = new Uint8Array(CMD.FEED_LINES(3));
+          const tokenInit = new Uint8Array(CMD.INIT);
+          const tokenFeed = new Uint8Array(CMD.FEED_LINES(4));
           const tokenCut = new Uint8Array(CMD.CUT);
-          const tokenFinal = new Uint8Array(tokenRaster.length + tokenFeed.length + tokenCut.length);
-          tokenFinal.set(tokenRaster, 0);
-          tokenFinal.set(tokenFeed, tokenRaster.length);
-          tokenFinal.set(tokenCut, tokenRaster.length + tokenFeed.length);
+          const tokenFinal = new Uint8Array(tokenInit.length + tokenRaster.length + tokenFeed.length + tokenCut.length);
+          let to = 0;
+          tokenFinal.set(tokenInit, to); to += tokenInit.length;
+          tokenFinal.set(tokenRaster, to); to += tokenRaster.length;
+          tokenFinal.set(tokenFeed, to); to += tokenFeed.length;
+          tokenFinal.set(tokenCut, to);
           await printToBluetooth(device, tokenFinal);
         } else {
           const tokenData = buildEscposReceipt(tokenOrder, { ...settings, _tokenOnly: true });

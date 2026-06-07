@@ -1,4 +1,4 @@
-import { buildEscposReceipt } from './escpos.js';
+import { buildEscposReceipt, CMD } from './escpos.js';
 
 const BT_PRINTER_KEY = 'bt_printer_info';
 
@@ -136,10 +136,17 @@ async function connectGatt(device) {
 export async function printToBluetooth(device, data) {
   const { server, characteristic } = await connectGatt(device);
 
-  const chunkSize = 512;
+  const initCmd = new Uint8Array(CMD.INIT);
+  await characteristic.writeValue(initCmd);
+  await new Promise((r) => setTimeout(r, 50));
+
+  const chunkSize = 128;
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
     await characteristic.writeValue(chunk);
+    if (i + chunkSize < data.length) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
   }
 
   return true;
