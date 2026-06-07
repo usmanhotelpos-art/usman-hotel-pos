@@ -146,14 +146,14 @@ export async function printToBluetooth(device, data) {
 
   const initCmd = new Uint8Array(CMD.INIT);
   await write(initCmd);
-  await new Promise((r) => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 80));
 
-  const chunkSize = 64;
+  const chunkSize = 512;
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
     await write(chunk);
     if (i + chunkSize < data.length) {
-      await new Promise((r) => setTimeout(r, 30));
+      await new Promise((r) => setTimeout(r, 5));
     }
   }
 
