@@ -3344,20 +3344,20 @@ function App() {
     const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 8px;" /></div>` : '';
 
     const tokenLabelSz = settings.btTokenLabelFontSize || 14;
-    const tokenNumSz = settings.btTokenFontSize || 44;
+    const tokenNumSz = Math.min(settings.btTokenFontSize || 44, 300);
     const content = `
       <html>
         <head>
           <style>
-            body { font-family: ${fontFamily}, Arial, sans-serif; margin: 0; padding: 10px; color: #000; }
-            .receipt { width: 220px; max-width: 220px; margin: auto; }
-            .header { text-align: center; margin-bottom: 10px; }
+            body { font-family: ${fontFamily}, Arial, sans-serif; margin: 0; padding: 2px; color: #000; }
+            .receipt { width: 100%; max-width: 100%; margin: 0; text-align: center; }
+            .header { text-align: center; margin-bottom: 4px; }
             .header h2 { font-size: 18px; margin: 0; }
-            .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; letter-spacing: 1px; margin-top: 4px; }
-            .token-number { font-size: ${tokenNumSz}px; font-weight: 900; margin: 10px 0; text-align: center; letter-spacing: 2px; }
-            .sub { font-size: 12px; text-align: center; margin-top: 8px; }
-            .footer { text-align: center; font-size: 12px; margin-top: 12px; }
-            .logo img { display: block; margin: 0 auto 8px; }
+            .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
+            .token-number { font-size: ${tokenNumSz}px; font-weight: 900; margin: 2px 0; text-align: center; letter-spacing: 2px; line-height: 1; word-break: break-all; }
+            .sub { font-size: 12px; text-align: center; margin-top: 4px; }
+            .footer { text-align: center; font-size: 12px; margin-top: 4px; }
+            .logo img { display: block; margin: 0 auto 4px; }
           </style>
         </head>
         <body>
@@ -3479,29 +3479,30 @@ function App() {
       <html>
         <head>
           <style>
-            body { font-family: ${fontFamily}, Arial, sans-serif; padding: 10px; color: #000; background:#fff; }
-            .receipt { max-width: 320px; margin: auto; }
-            .header { margin-bottom: 8px; }
-            .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 12px; }
-            .header h2 { font-size: ${titleSize}; margin: 0 0 4px; text-align: center; }
-            .header .location { font-size: ${sectionSize}; margin-top: 4px; text-align: center; }
+            body { font-family: ${fontFamily}, Arial, sans-serif; padding: 2px; color: #000; background:#fff; margin:0; }
+            .receipt { width: 100%; max-width: 100%; }
+            .header { border: 1px solid #000; padding: 4px; margin-bottom: 4px; }
+            .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 4px; }
+            .header h2 { font-size: ${titleSize}; margin: 0 0 2px; text-align: center; }
+            .header .location { font-size: ${sectionSize}; margin-top: 2px; text-align: center; }
             .receipt-token { text-align: left; }
             .receipt-token .token-label { font-size: ${tokenLabelSz}px; font-weight: 700; margin-bottom: 4px; }
             .receipt-token .token-number { font-size: ${tokenNumSz}px; font-weight: 900; line-height: 1; }
             .logo img { max-width: 100px; max-height: 100px; width: auto; height: auto; display: block; margin: 0 auto; }
             .logo.empty { width: 100px; }
-            .top-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: ${customerSize}; }
-            .box { border: 1px solid #000; padding: 8px; margin-bottom: 10px; }
-            .box .meta-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: ${customerSize}; }
+            .top-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: ${customerSize}; border: 1px solid #000; padding: 4px; }
+            .box { border: 1px solid #000; padding: 4px; margin-bottom: 4px; }
+            .box .meta-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: ${customerSize}; }
             .table { width: 100%; border-collapse: collapse; font-size: ${productSize}; }
-            .table th, .table td { border: 1px solid #000; padding: 4px; }
+            .table th, .table td { border: 1px solid #000; padding: 2px; word-break: break-word; }
             .table th { background: #f5f5f5; }
-            .summary { display: flex; gap: 8px; margin-top: 10px; }
-            .summary .left, .summary .right { flex: 1; border: 1px solid #000; padding: 8px; font-size: ${customerSize}; }
-            .summary .left div, .summary .right div { display: flex; justify-content: space-between; margin-bottom: 4px; }
-            .total-line { font-weight: bold; margin-top: 6px; display: flex; justify-content: space-between; }
-            .footer { text-align: center; margin-top: 12px; font-size: ${sectionSize}; }
-            .counter { font-size: ${sectionSize}; margin-top: 4px; color: #000; }
+            .summary { display: flex; gap: 4px; margin-top: 4px; }
+            .summary .left, .summary .right { flex: 1; border: 1px solid #000; padding: 4px; font-size: ${customerSize}; }
+            .summary .left div, .summary .right div { display: flex; justify-content: space-between; margin-bottom: 2px; }
+            .total-line { font-weight: bold; margin-top: 4px; display: flex; justify-content: space-between; }
+            .footer { text-align: center; margin-top: 4px; font-size: ${sectionSize}; border: 1px solid #000; padding: 4px; }
+            .counter { font-size: ${sectionSize}; margin-top: 2px; color: #000; }
+            .notes { border: 1px solid #000; padding: 4px; margin-top: 4px; word-break: break-word; }
           </style>
         </head>
         <body>
@@ -6888,7 +6889,7 @@ function App() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400">Token Number Font Size (px)</label>
-                  <input type="number" min="12" max="96" value={settings.btTokenFontSize || 44} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                  <input type="number" min="20" max="300" value={settings.btTokenFontSize || 44} onChange={(e) => setSettings((prev) => ({ ...prev, btTokenFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
               </div>
             </div>

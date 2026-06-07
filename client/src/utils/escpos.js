@@ -680,7 +680,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const ctx = canvas.getContext('2d');
 
   let y = marginTop;
-  const margin = 4;
+  const margin = 2;
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, pxWidth, 12000);
@@ -845,23 +845,34 @@ export function renderReceiptToCanvas(order, settings = {}) {
     const qty = Number(item.quantity || 1);
     const rate = Number(item.price || item.unitPrice || 0);
     const amount = Number(item.total ?? qty * rate);
-    let name = String(item.name || '').trim();
+    const name = String(item.name || '').trim();
     ctx.font = `${prodSz}px ${fontFamily}`;
-    const nameW = ctx.measureText(name).width;
-    let nameDisplay = name;
-    if (nameW > nameMaxW) {
-      while (ctx.measureText(nameDisplay).width > nameMaxW && nameDisplay.length > 1) {
-        nameDisplay = nameDisplay.slice(0, -1);
+    const words = name.split(' ').filter(Boolean);
+    const nameLines = [];
+    let currentLine = '';
+    for (const word of words) {
+      const testLine = currentLine ? currentLine + ' ' + word : word;
+      if (ctx.measureText(testLine).width > nameMaxW && currentLine) {
+        nameLines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
       }
     }
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#000000';
-    ctx.fillText(nameDisplay, margin, y);
-    ctx.textAlign = 'right';
-    ctx.fillText(String(qty), rightEdge - amtColW - rateColW - 4, y);
-    ctx.fillText(String(rate), rightEdge - amtColW, y);
-    ctx.fillText(String(amount), rightEdge, y);
-    y += lh;
+    if (currentLine) nameLines.push(currentLine);
+    if (nameLines.length === 0) nameLines.push('');
+    nameLines.forEach((line, idx) => {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#000000';
+      ctx.fillText(line, margin, y);
+      ctx.textAlign = 'right';
+      if (idx === 0) {
+        ctx.fillText(String(qty), rightEdge - amtColW - rateColW - 4, y);
+        ctx.fillText(String(rate), rightEdge - amtColW, y);
+        ctx.fillText(String(amount), rightEdge, y);
+      }
+      y += lh;
+    });
   }
 
   printDivider('-', { fontSize: dividerSz });
