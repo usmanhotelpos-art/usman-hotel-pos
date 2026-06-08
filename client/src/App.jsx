@@ -124,6 +124,9 @@ function App() {
     btEncoding: 'cp1256',
     btOrderTypeFontSize: 18,
     btServiceTypeFontSize: 16,
+    btServiceTypeBold: false,
+    btLocationFontSize: 14,
+    btLocationBold: false,
     btTokenFontSize: 44,
     tokenSlipFontSize: 44,
     tokenSlipLabelFontSize: 14,
@@ -6854,6 +6857,22 @@ function App() {
                 <div>
                   <label className="block text-sm font-medium text-slate-400">Service Type Font Size (px)</label>
                   <input type="number" min="8" max="72" value={settings.btServiceTypeFontSize || 16} onChange={(e) => setSettings((prev) => ({ ...prev, btServiceTypeFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btServiceTypeBold === true} onChange={(e) => setSettings((prev) => ({ ...prev, btServiceTypeBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold Service Type
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Location Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btLocationFontSize || 14} onChange={(e) => setSettings((prev) => ({ ...prev, btLocationFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btLocationBold === true} onChange={(e) => setSettings((prev) => ({ ...prev, btLocationBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold Location
+                  </label>
                 </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">

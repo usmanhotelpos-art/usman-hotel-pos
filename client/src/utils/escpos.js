@@ -728,6 +728,9 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const productFontSize = Number(settings.btProductFontSize) || fontSize;
   const orderTypeFontSize = Number(settings.btOrderTypeFontSize) || 18;
   const serviceTypeFontSize = Number(settings.btServiceTypeFontSize) || 16;
+  const serviceTypeBold = settings.btServiceTypeBold === true;
+  const locationFontSize = Number(settings.btLocationFontSize) || 14;
+  const locationBold = settings.btLocationBold === true;
   const tokenFontSize = Number(settings.btTokenFontSize) || 44;
   const tokenLabelFontSize = Number(settings.btTokenLabelFontSize) || 14;
   const textAlign = settings.btTextAlign || 'left';
@@ -890,7 +893,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
 
   printLine(header, { bold: true, fontSize: titleSz, align: 'center', lineHeight: Math.round(titleSz * 1.4) });
   if (settings.location) {
-    printLine(settings.location, { fontSize: infoSz, align: 'center' });
+    printLine(settings.location, { fontSize: locationFontSize, bold: locationBold, align: 'center' });
   }
   if (settings.receiptCounterLabel) {
     printLine(settings.receiptCounterLabel, { fontSize: infoSz, align: 'center' });
@@ -917,7 +920,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   if (order.orderType === 'Delivery') {
     printLine(`Mobile: ${order.phone || '-'}`, { fontSize: infoSz });
     if (order.address) printLine(`Location: ${order.address}`, { fontSize: infoSz });
-    printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize });
+    printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize, bold: serviceTypeBold });
     printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
   }
 
