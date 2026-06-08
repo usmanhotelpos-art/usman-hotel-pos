@@ -741,7 +741,7 @@ function App() {
   });
   const formatTabName = (tab) => tabLabels[tab] || tab.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   
-  // Category icons mapping
+  // Category icons mapping — auto-match by name
   const categoryIcons = {
     'All': '🎯',
     'Chicken': '🍗',
@@ -753,8 +753,67 @@ function App() {
     'Burger': '🍔',
     'Pizza': '🍕',
     'Soup': '🍜',
-    'Biryani': '🍚'
+    'Biryani': '🍚',
+    'Mutton': '🐑',
+    'Beef': '🥩',
+    'BBQ': '🔥',
+    'Grill': '🥩',
+    'Chinese': '🥟',
+    'Rice': '🍚',
+    'Roll': '🌯',
+    'Wrap': '🌯',
+    'Tea': '☕',
+    'Coffee': '☕',
+    'Breakfast': '🍳',
+    'Sandwich': '🥪',
+    'Pasta': '🍝',
+    'Noodles': '🍜',
+    'Ice Cream': '🍨',
+    'Smoothie': '🥤',
+    'Combo': '🎯',
+    'Special': '⭐',
+    'Tikka': '🥘',
+    'Karhai': '🍲',
+    'Drinks': '🥤',
+    'Beverage': '🥤',
+    'Shawarma': '🌯',
+    'Fries': '🍟',
+    'Mandi': '🍛',
+    'Handi': '🍲',
+    'Kebab': '🥙',
+    'Nihari': '🍲',
+    'Haleem': '🥣',
+    'Dosa': '🥞',
+    'Curry': '🍛',
+    'Dal': '🥣',
+    'Paratha': '🫓',
+    'Roti': '🫓',
+    'Bread': '🍞',
+    'Seafood': '🦐',
+    'Platter': '🍽️',
+    'Family': '👨‍👩‍👧‍👦',
+    'Deal': '💥',
+    'Addon': '➕',
+    'Extra': '➕',
+    'Dips': '🥫',
+    'Sauce': '🥫',
+    'Topping': '🧀',
+    'Cheese': '🧀',
+    'Mashallah': '🌟'
   };
+  function getCategoryIcon(name) {
+    if (!name) return '📁';
+    const clean = name.trim();
+    if (categoryIcons[clean]) return categoryIcons[clean];
+    const lower = clean.toLowerCase();
+    for (const [key, icon] of Object.entries(categoryIcons)) {
+      if (key.toLowerCase() === lower) return icon;
+    }
+    for (const [key, icon] of Object.entries(categoryIcons)) {
+      if (lower.includes(key.toLowerCase())) return icon;
+    }
+    return '📁';
+  }
 
   const [editingRoleTabs, setEditingRoleTabs] = useState(null);
   const [newTabKey, setNewTabKey] = useState('');
@@ -6068,41 +6127,44 @@ function App() {
 
         <section className="grid gap-4 lg:grid-cols-[1.5fr_0.65fr] xl:grid-cols-[1.55fr_0.6fr]">
           <div className={`w-full min-w-0 rounded-[32px] border p-4 shadow-soft mt-5 ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-            {/* Categories - only above catalog, max 3 lines */}
+            {/* Categories — square cards with icon on top, text below */}
             {posTopSettings.showCategories && (
-              <div className="flex flex-wrap items-center gap-2 mb-4 max-h-[100px] overflow-y-auto">
-                <button onClick={() => setSelectedCategory('All')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+              <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 gap-1.5 mb-4">
+                <button onClick={() => setSelectedCategory('All')} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
                   selectedCategory === 'All'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : `${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
+                    ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50 scale-105'
+                    : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
                 }`}>
-                  <span className="text-sm">🎯</span> All
+                  <span className="text-3xl mb-0.5 drop-shadow-md">🎯</span>
+                  <span className="text-[10px] leading-tight text-center font-semibold">All</span>
                 </button>
-                <button onClick={() => setSelectedCategory(MASHALLAH_CATEGORY)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                <button onClick={() => setSelectedCategory(MASHALLAH_CATEGORY)} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
                   selectedCategory === MASHALLAH_CATEGORY
-                    ? 'bg-amber-600 text-white shadow-md'
-                    : `${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
+                    ? 'bg-amber-600 text-white shadow-lg ring-2 ring-amber-400/50 scale-105'
+                    : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
                 }`}>
-                  <span className="text-sm">🌟</span> Mashallah
+                  <span className="text-3xl mb-0.5 drop-shadow-md">🌟</span>
+                  <span className="text-[10px] leading-tight text-center font-semibold">Mashallah</span>
                 </button>
                 {posCategories.map((category) => (
-                  <button key={category.id || category.name} onClick={() => setSelectedCategory(category.name)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                  <button key={category.id || category.name} onClick={() => setSelectedCategory(category.name)} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
                     selectedCategory === category.name
-                      ? 'bg-violet-600 text-white shadow-md'
-                      : `${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
+                      ? 'bg-violet-600 text-white shadow-lg ring-2 ring-violet-400/50 scale-105'
+                      : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
                   }`}>
                     {category.icon ? (
-                      <img src={category.icon} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      <img src={category.icon} alt="" className="w-7 h-7 rounded-full object-cover mb-0.5 shadow-sm" />
                     ) : (
-                      <span className="text-sm">📁</span>
+                      <span className="text-3xl mb-0.5 drop-shadow-md">{getCategoryIcon(category.name)}</span>
                     )}
-                    {category.name}
+                    <span className="text-[10px] leading-tight text-center truncate w-full font-semibold">{category.name}</span>
                   </button>
                 ))}
-                <button onClick={() => { setEditingCategory(null); setForm({ name: '' }); setInventorySubTab('categories'); }} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border border-dashed transition ${
-                  darkMode ? 'border-slate-600 text-slate-400 hover:bg-slate-800' : 'border-slate-300 text-slate-400 hover:bg-slate-50'
+                <button onClick={() => { setEditingCategory(null); setForm({ name: '' }); setInventorySubTab('categories'); }} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium border-2 border-dashed transition-all duration-200 min-h-[72px] active:scale-95 ${
+                  darkMode ? 'border-slate-600 text-slate-400 hover:bg-slate-800 hover:border-slate-500' : 'border-slate-300 text-slate-400 hover:bg-slate-50 hover:border-slate-400'
                 }`}>
-                  + Add
+                  <span className="text-2xl mb-0.5">+</span>
+                  <span className="text-[10px] leading-tight text-center font-semibold">Add</span>
                 </button>
               </div>
             )}
