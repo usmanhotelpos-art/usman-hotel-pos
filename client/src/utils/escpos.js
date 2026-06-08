@@ -909,6 +909,10 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const orderTypeDisplay = order.orderType === 'Takeaway' ? 'Pickup' : order.orderType || '';
   const customerName = order.customerName || (order.orderType === 'Takeaway' ? 'Pickup' : '');
 
+  const ps = String(order.paymentStatus || '').toLowerCase();
+  const os = String(order.status || '').toLowerCase();
+  const isPaid = os === 'completed' || os === 'paid' || ps === 'paid' || ps === 'paid to cash on counter' || ps.includes('paid');
+
   if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: orderTypeFontSize });
   if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: infoSz });
   else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: infoSz });
@@ -922,6 +926,17 @@ export function renderReceiptToCanvas(order, settings = {}) {
     if (order.address) printLine(`Location: ${order.address}`, { fontSize: infoSz });
     printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize, bold: serviceTypeBold });
     printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
+  }
+
+  if (isPaid && settings.btShowPaidWatermark !== false) {
+    ctx.save();
+    ctx.translate(margin + 6, y);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = `bold ${serviceTypeFontSize}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillText('PAID', 0, 0);
+    ctx.restore();
   }
 
   y += 6;
@@ -1066,40 +1081,6 @@ export function renderReceiptToCanvas(order, settings = {}) {
   printLine(footer, { fontSize: infoSz, align: 'center' });
 
   const actualHeight = Math.ceil(y + marginBottom);
-
-  const ps = String(order.paymentStatus || '').toLowerCase();
-  const os = String(order.status || '').toLowerCase();
-  const isPaid = os === 'completed' || os === 'paid' || ps === 'paid' || ps === 'paid to cash on counter' || ps.includes('paid');
-  if (isPaid && settings.btShowPaidWatermark !== false) {
-    const cx = pxWidth / 2;
-    const cy = actualHeight / 2;
-    const maxDim = Math.min(pxWidth, Math.max(actualHeight, 200)) * 0.5;
-    const r = Math.max(maxDim, 50);
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(-Math.PI / 6);
-
-    ctx.font = `bold ${Math.round(r * 0.38)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillText('PAID', 0, Math.round(-r * 0.08));
-
-    ctx.font = `bold ${Math.round(r * 0.14)}px Arial`;
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillText('Usman Hotel', 0, Math.round(r * 0.16));
-
-    ctx.restore();
-
-    ctx.save();
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
 
   const imageData = ctx.getImageData(0, 0, pxWidth, Math.min(actualHeight, canvas.height));
   canvas.width = pxWidth;
