@@ -731,6 +731,14 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const serviceTypeBold = settings.btServiceTypeBold === true;
   const locationFontSize = Number(settings.btLocationFontSize) || 14;
   const locationBold = settings.btLocationBold === true;
+  const productBold = settings.btProductBold === true;
+  const qtyBold = settings.btQtyBold === true;
+  const totalDueFontSize = Number(settings.btTotalDueFontSize) || 22;
+  const totalDueBold = settings.btTotalDueBold !== false;
+  const deliveryAddressFontSize = Number(settings.btDeliveryAddressFontSize) || 14;
+  const deliveryAddressBold = settings.btDeliveryAddressBold === true;
+  const paidFontSize = Number(settings.btPaidFontSize) || 12;
+  const paidBold = settings.btPaidBold !== false;
   const tokenFontSize = Number(settings.btTokenFontSize) || 44;
   const tokenLabelFontSize = Number(settings.btTokenLabelFontSize) || 14;
   const textAlign = settings.btTextAlign || 'left';
@@ -923,7 +931,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   }
   if (order.orderType === 'Delivery') {
     printLine(`Mobile: ${order.phone || '-'}`, { fontSize: infoSz });
-    if (order.address) printLine(`Location: ${order.address}`, { fontSize: infoSz });
+    if (order.address) printLine(`Location: ${order.address}`, { fontSize: deliveryAddressFontSize, bold: deliveryAddressBold });
     printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize, bold: serviceTypeBold });
     printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
   }
@@ -932,9 +940,9 @@ export function renderReceiptToCanvas(order, settings = {}) {
     ctx.save();
     ctx.translate(margin + 6, y);
     ctx.rotate(-Math.PI / 2);
-    ctx.font = `bold ${serviceTypeFontSize}px Arial`;
+    ctx.font = `${paidBold ? 'bold ' : ''}${paidFontSize}px Arial`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillStyle = '#000000';
     ctx.fillText('PAID', 0, 0);
     ctx.restore();
   }
@@ -1021,7 +1029,13 @@ export function renderReceiptToCanvas(order, settings = {}) {
       ctx.fillText(line, nameX, y);
       ctx.textAlign = 'right';
       if (idx === 0) {
+        if (qtyBold) {
+          ctx.font = `bold ${prodSz}px ${fontFamily}`;
+        }
         ctx.fillText(String(qty), qtyX, y);
+        if (qtyBold) {
+          ctx.font = `${productBold ? 'bold ' : ''}${prodSz}px ${fontFamily}`;
+        }
         ctx.fillText(String(rate), rateX, y);
         ctx.fillText(String(amount), amtX, y);
       }
@@ -1054,7 +1068,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
         ctx.fillText(vLine, nameX, y);
         y += vLh;
       });
-      ctx.font = `${prodSz}px ${fontFamily}`;
+    ctx.font = `${productBold ? 'bold ' : ''}${prodSz}px ${fontFamily}`;
     }
   }
 
@@ -1068,7 +1082,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const deliveryCharge = order.orderType === 'Delivery' ? Number(order.deliveryFee || order.deliveryCharge || 0) : 0;
   const serviceCharge = Number(order.serviceCharge || 0);
 
-  printLine(`Total Due: ${totalAmount} Rs`, { bold: true, fontSize: Math.round(totalFontSize * 0.85) });
+  printLine(`Total Due: ${totalAmount} Rs`, { bold: totalDueBold, fontSize: totalDueFontSize });
   if (subtotal > 0) printLine(`Subtotal: ${subtotal} Rs`, { fontSize: infoSz });
   if (deliveryCharge > 0) printLine(`Delivery: ${deliveryCharge} Rs`, { fontSize: infoSz });
   if (serviceCharge > 0) printLine(`Service: ${serviceCharge} Rs`, { fontSize: infoSz });

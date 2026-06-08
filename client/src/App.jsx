@@ -127,6 +127,14 @@ function App() {
     btServiceTypeBold: false,
     btLocationFontSize: 14,
     btLocationBold: false,
+    btProductBold: false,
+    btQtyBold: false,
+    btTotalDueFontSize: 22,
+    btTotalDueBold: true,
+    btDeliveryAddressFontSize: 12,
+    btDeliveryAddressBold: false,
+    btPaidFontSize: 12,
+    btPaidBold: true,
     btTokenFontSize: 44,
     tokenSlipFontSize: 44,
     tokenSlipLabelFontSize: 14,
@@ -6872,6 +6880,48 @@ function App() {
                   <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
                     <input type="checkbox" checked={settings.btLocationBold === true} onChange={(e) => setSettings((prev) => ({ ...prev, btLocationBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
                     Bold Location
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Delivery Address Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btDeliveryAddressFontSize || 12} onChange={(e) => setSettings((prev) => ({ ...prev, btDeliveryAddressFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btDeliveryAddressBold === true} onChange={(e) => setSettings((prev) => ({ ...prev, btDeliveryAddressBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold Address
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Total Due Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btTotalDueFontSize || 22} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalDueFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btTotalDueBold !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btTotalDueBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold Total Due
+                  </label>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btProductBold === true} onChange={(e) => setSettings((prev) => ({ ...prev, btProductBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold Product Name
+                  </label>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btQtyBold === true} onChange={(e) => setSettings((prev) => ({ ...prev, btQtyBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold Qty
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">PAID Stamp Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.btPaidFontSize || 12} onChange={(e) => setSettings((prev) => ({ ...prev, btPaidFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings.btPaidBold !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btPaidBold: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    Bold PAID Stamp
                   </label>
                 </div>
                 <div className="flex items-end">
