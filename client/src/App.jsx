@@ -157,6 +157,9 @@ function App() {
     btTokenSlipTakeaway: true,
     btTokenSlipDelivery: true,
     btShowPaidWatermark: true,
+    btShowOrderType: true,
+    btShowDeliveryLocation: true,
+    btShowServiceType: true,
     notificationsEnabled: false
   });
   const [form, setForm] = useState({});
@@ -6930,6 +6933,25 @@ function App() {
                     Show Logo on receipt
                   </label>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-slate-700 pt-8">
+              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Customer Details Sections</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Show/hide customer detail fields on the Bluetooth receipt.</p>
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btShowOrderType !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowOrderType: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show Order Type
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btShowDeliveryLocation !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowDeliveryLocation: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show Location (Delivery)
+                </label>
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btShowServiceType !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowServiceType: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show Service Type (Delivery)
+                </label>
               </div>
             </div>
 

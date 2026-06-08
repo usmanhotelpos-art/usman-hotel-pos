@@ -923,7 +923,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
 
   const customerStartY = y;
 
-  if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: orderTypeFontSize });
+  if (settings.btShowOrderType !== false && orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: orderTypeFontSize });
   if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: infoSz });
   else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: infoSz });
   if (customerName) printLine(`Customer: ${customerName}`, { fontSize: infoSz });
@@ -933,8 +933,8 @@ export function renderReceiptToCanvas(order, settings = {}) {
   }
   if (order.orderType === 'Delivery') {
     printLine(`Mobile: ${order.phone || '-'}`, { fontSize: infoSz });
-    if (order.address) printLine(`Location: ${order.address}`, { fontSize: deliveryAddressFontSize, bold: deliveryAddressBold });
-    printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize, bold: serviceTypeBold });
+    if (settings.btShowDeliveryLocation !== false && order.address) printLine(`Location: ${order.address}`, { fontSize: deliveryAddressFontSize, bold: deliveryAddressBold });
+    if (settings.btShowServiceType !== false) printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize, bold: serviceTypeBold });
     printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
   }
 
