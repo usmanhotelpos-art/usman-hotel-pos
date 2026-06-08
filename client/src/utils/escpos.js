@@ -289,11 +289,22 @@ function formatLine(left, right, width) {
 }
 
 function wrapText(text, width) {
+  const w = Math.max(width, 8);
   const words = String(text || '').split(' ').filter(Boolean);
   const lines = [];
   let current = '';
-  for (const word of words) {
-    if ((current + word).length + (current ? 1 : 0) > width) {
+  for (let word of words) {
+    while (word.length > w) {
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      lines.push(word.slice(0, w));
+      word = word.slice(w);
+    }
+    if (!word) continue;
+    const testLen = current.length + word.length + (current ? 1 : 0);
+    if (testLen > w) {
       if (current) lines.push(current);
       current = word;
     } else {
@@ -961,7 +972,21 @@ export function renderReceiptToCanvas(order, settings = {}) {
     const words = name.split(' ').filter(Boolean);
     const nameLines = [];
     let currentLine = '';
-    for (const word of words) {
+    for (let word of words) {
+      while (ctx.measureText(word).width > nameMaxW) {
+        if (currentLine) {
+          nameLines.push(currentLine);
+          currentLine = '';
+        }
+        let breakIdx = word.length;
+        while (breakIdx > 0 && ctx.measureText(word.slice(0, breakIdx)).width > nameMaxW) {
+          breakIdx--;
+        }
+        if (breakIdx <= 0) breakIdx = 1;
+        nameLines.push(word.slice(0, breakIdx));
+        word = word.slice(breakIdx);
+      }
+      if (!word) continue;
       const testLine = currentLine ? currentLine + ' ' + word : word;
       if (ctx.measureText(testLine).width > nameMaxW && currentLine) {
         nameLines.push(currentLine);
