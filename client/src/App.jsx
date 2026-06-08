@@ -20,7 +20,9 @@ function App() {
     if (typeof window === 'undefined') return defaultTabs;
     try {
       const saved = window.localStorage.getItem('posTabs');
-      return saved ? JSON.parse(saved) : defaultTabs;
+      const base = saved ? JSON.parse(saved) : defaultTabs;
+      if (!base.includes('restore')) base.push('restore');
+      return base;
     } catch {
       return defaultTabs;
     }
@@ -732,7 +734,9 @@ function App() {
     if (typeof window === 'undefined') return defaultTabIcons;
     try {
       const saved = window.localStorage.getItem('posTabIcons');
-      return saved ? JSON.parse(saved) : defaultTabIcons;
+      const base = saved ? JSON.parse(saved) : defaultTabIcons;
+      if (!base.restore) base.restore = '♻️';
+      return base;
     } catch {
       return defaultTabIcons;
     }
@@ -741,7 +745,9 @@ function App() {
     if (typeof window === 'undefined') return defaultTabLabels;
     try {
       const saved = window.localStorage.getItem('posTabLabels');
-      return saved ? JSON.parse(saved) : defaultTabLabels;
+      const base = saved ? JSON.parse(saved) : defaultTabLabels;
+      if (!base.restore) base.restore = 'Restore';
+      return base;
     } catch {
       return defaultTabLabels;
     }
@@ -1054,7 +1060,15 @@ function App() {
     if (typeof window === 'undefined') return defaultRoles;
     try {
       const saved = window.localStorage.getItem('posRoles');
-      return saved ? JSON.parse(saved) : defaultRoles;
+      if (!saved) return defaultRoles;
+      const parsed = JSON.parse(saved);
+      // Ensure 'restore' permission exists for admin-type roles in saved data
+      return parsed.map((r) => {
+        if (!r.permissions.restore && (r.name.toLowerCase().includes('admin') || r.permissions.settings)) {
+          return { ...r, permissions: { ...r.permissions, restore: true } };
+        }
+        return r;
+      });
     } catch {
       return defaultRoles;
     }
