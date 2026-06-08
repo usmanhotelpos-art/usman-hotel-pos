@@ -2,7 +2,8 @@
 import { Lock, Bluetooth, BluetoothConnected } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
 import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from './utils/escpos.js';
-import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter } from './utils/btPrint.js';
+import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter, disconnectDevice } from './utils/btPrint.js';
+import { showOrderNotification, requestNotificationPermission, resetNotificationCount, isNotificationSupported, getNotificationPermission } from './utils/notifications.js';
 
 const envApiBase = import.meta.env.VITE_API_BASE || '';
 const apiBase = envApiBase
@@ -142,7 +143,8 @@ function App() {
     btTokenSlipDineIn: true,
     btTokenSlipTakeaway: true,
     btTokenSlipDelivery: true,
-    btShowPaidWatermark: true
+    btShowPaidWatermark: true,
+    notificationsEnabled: false
   });
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
@@ -1552,6 +1554,22 @@ function App() {
       }
     };
   }, [token]);
+
+  // Track known order IDs for new-order notifications
+  const knownOrderIdsRef = useRef(new Set());
+  useEffect(() => {
+    if (!settings.notificationsEnabled || !Array.isArray(posOrders) || posOrders.length === 0) return;
+    if (knownOrderIdsRef.current.size === 0) {
+      posOrders.forEach(o => knownOrderIdsRef.current.add(o.id));
+      return;
+    }
+    const newOrders = posOrders.filter(o => !knownOrderIdsRef.current.has(o.id));
+    for (const order of newOrders) {
+      knownOrderIdsRef.current.add(order.id);
+      if (document.visibilityState === 'visible' && document.hasFocus()) continue;
+      showOrderNotification(order);
+    }
+  }, [posOrders, settings.notificationsEnabled]);
 
   async function approveRiderRequest(requestId) {
     if (!confirm('Approve this rider request?')) return;
@@ -3188,9 +3206,7 @@ function App() {
 
   async function handleBtConnect() {
     if (btConnected && btDevice) {
-      try {
-        btDevice.gatt.disconnect();
-      } catch {}
+      await disconnectDevice(btDevice);
       setBtDevice(null);
       setBtConnected(false);
       setBtInfo(null);
@@ -3243,8 +3259,17 @@ function App() {
         setBtDevice(device);
         setBtConnected(true);
       } catch (err) {
-        console.warn('Cannot auto-reconnect printer:', err.message);
-        return null;
+        console.warn('Auto-reconnect failed, requesting printer pairing:', err.message);
+        try {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          setBtDevice(device);
+          setBtConnected(true);
+          setBtInfo(result.info);
+        } catch (pairErr) {
+          console.warn('Printer pairing cancelled or failed:', pairErr.message);
+          return null;
+        }
       }
     }
 
@@ -3269,7 +3294,7 @@ function App() {
       await printToBluetooth(device, finalData);
     };
 
-    try {
+    const attemptPrint = async () => {
       if (settings.btEncoding === 'bmp') {
         await doBitmapPrint();
       } else {
@@ -3281,6 +3306,7 @@ function App() {
           await doBitmapPrint();
         }
       }
+
       const shouldPrintTokenSlip = settings.tokenSlipEnabled && (
         (order.orderType === 'Dine-In' && settings.btTokenSlipDineIn !== false) ||
         (order.orderType === 'Takeaway' && settings.btTokenSlipTakeaway !== false) ||
@@ -3307,10 +3333,35 @@ function App() {
           await printToBluetooth(device, tokenData);
         }
       }
+    };
+
+    try {
+      await attemptPrint();
       return true;
     } catch (err) {
-      console.warn('BT print failed:', err.message);
-      throw err;
+      console.warn('BT print attempt failed, reconnecting and retrying:', err.message);
+      // Try one full reconnect then retry the print
+      try {
+        await disconnectDevice(device);
+      } catch {}
+      try {
+        const result = await autoConnectSavedPrinter();
+        device = result.device;
+        setBtDevice(device);
+        setBtConnected(true);
+      } catch {
+        try {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          setBtDevice(device);
+          setBtConnected(true);
+          setBtInfo(result.info);
+        } catch {
+          throw err;
+        }
+      }
+      await attemptPrint();
+      return true;
     }
   }
 
@@ -7323,6 +7374,31 @@ function App() {
               <label className="block text-sm font-medium text-slate-400">Rider App Avatar URL</label>
               <input value={settings.riderAppAvatar} onChange={(e) => setSettings((prev) => ({ ...prev, riderAppAvatar: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="Avatar image URL" />
             </div>
+          </div>
+        </div>
+
+        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Notifications</h3>
+          <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Get browser notifications when new orders arrive.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+              <input type="checkbox" checked={settings.notificationsEnabled} onChange={async (e) => {
+                const enabled = e.target.checked;
+                setSettings((prev) => ({ ...prev, notificationsEnabled: enabled }));
+                if (enabled) {
+                  const perm = await requestNotificationPermission();
+                  if (perm !== 'granted') {
+                    setSettings((prev) => ({ ...prev, notificationsEnabled: false }));
+                  }
+                }
+              }} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+              Enable order notifications
+            </label>
+            <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              {isNotificationSupported()
+                ? `Permission: ${getNotificationPermission()}`
+                : 'Notifications not supported in this browser'}
+            </span>
           </div>
         </div>
       </div>

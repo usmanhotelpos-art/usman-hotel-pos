@@ -35,7 +35,6 @@ export async function requestBluetoothPrinter() {
   const info = {
     id: device.id,
     name: device.name || 'Unknown Printer',
-    gatt: device.gatt,
   };
 
   savePrinterInfo({ id: device.id, name: device.name || 'Unknown Printer' });
@@ -43,81 +42,33 @@ export async function requestBluetoothPrinter() {
   return { device, info };
 }
 
-async function connectGatt(device) {
-  if (device.gatt.connected) {
-    const server = device.gatt;
-
-    let service = null;
-    let characteristic = null;
-
-    try {
-      service = await server.getPrimaryService(SPP_SERVICE_UUID);
-    } catch {}
-
-    if (!service) {
-      try {
-        service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-      } catch {}
-    }
-
-    if (!service) {
-      const services = await server.getPrimaryServices();
-      if (services && services.length > 0) {
-        service = services[0];
-      }
-    }
-
-    if (!service) {
-      throw new Error('Could not find a suitable service on the printer');
-    }
-
-    const characteristics = await service.getCharacteristics();
-    for (const char of characteristics) {
-      if (char.properties.write || char.properties.writeWithoutResponse) {
-        characteristic = char;
-        break;
-      }
-    }
-
-    if (!characteristic) {
-      throw new Error('No writable characteristic found on the printer');
-    }
-
-    return { server, characteristic };
-  }
-
-  const server = await device.gatt.connect();
-
+async function findServiceAndChar(server) {
   let service = null;
   let characteristic = null;
 
-  // Try SPP service first
   try {
     service = await server.getPrimaryService(SPP_SERVICE_UUID);
-  } catch {
-    // SPP not found, try generic printer service
-  }
+  } catch {}
 
   if (!service) {
     try {
       service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-    } catch {
-      // try any available service
-    }
+    } catch {}
   }
 
   if (!service) {
-    const services = await server.getPrimaryServices();
-    if (services && services.length > 0) {
-      service = services[0];
-    }
+    try {
+      const services = await server.getPrimaryServices();
+      if (services && services.length > 0) {
+        service = services[0];
+      }
+    } catch {}
   }
 
   if (!service) {
     throw new Error('Could not find a suitable service on the printer');
   }
 
-  // Find a writable characteristic
   const characteristics = await service.getCharacteristics();
   for (const char of characteristics) {
     if (char.properties.write || char.properties.writeWithoutResponse) {
@@ -130,30 +81,79 @@ async function connectGatt(device) {
     throw new Error('No writable characteristic found on the printer');
   }
 
-  return { server, service, characteristic };
+  return { service, characteristic };
+}
+
+async function connectGatt(device) {
+  // If already connected, try to reuse the connection
+  if (device.gatt.connected) {
+    try {
+      return await findServiceAndChar(device.gatt);
+    } catch (err) {
+      console.warn('Reusing existing GATT connection failed, reconnecting:', err.message);
+      try { device.gatt.disconnect(); } catch {}
+    }
+  }
+
+  const server = await device.gatt.connect();
+  return await findServiceAndChar(server);
+}
+
+async function writeWithRetry(characteristic, buf, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (characteristic.writeValueWithoutResponse) {
+        await characteristic.writeValueWithoutResponse(buf);
+      } else {
+        await characteristic.writeValue(buf);
+      }
+      return;
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 20));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+export async function disconnectDevice(device) {
+  try {
+    if (device && device.gatt) {
+      if (device.gatt.connected) {
+        await device.gatt.disconnect();
+      }
+    }
+  } catch (err) {
+    console.warn('Bluetooth disconnect error:', err.message);
+  }
 }
 
 export async function printToBluetooth(device, data) {
-  const { server, characteristic } = await connectGatt(device);
+  let characteristic;
 
-  const write = async (buf) => {
-    if (characteristic.writeValueWithoutResponse) {
-      await characteristic.writeValueWithoutResponse(buf);
-    } else {
-      await characteristic.writeValue(buf);
-    }
-  };
+  try {
+    const result = await connectGatt(device);
+    characteristic = result.characteristic;
+  } catch (err) {
+    // If connection fails, try one full reconnect: disconnect and re-connect
+    console.warn('BT connect failed, retrying with full reconnect:', err.message);
+    try { await disconnectDevice(device); } catch {}
+    const result = await connectGatt(device);
+    characteristic = result.characteristic;
+  }
 
   const initCmd = new Uint8Array(CMD.INIT);
-  await write(initCmd);
-  await new Promise((r) => setTimeout(r, 80));
+  await writeWithRetry(characteristic, initCmd);
+  await new Promise((r) => setTimeout(r, 100));
 
   const chunkSize = 512;
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
-    await write(chunk);
+    await writeWithRetry(characteristic, chunk);
     if (i + chunkSize < data.length) {
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 8));
     }
   }
 
