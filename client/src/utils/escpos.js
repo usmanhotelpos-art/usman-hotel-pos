@@ -921,6 +921,8 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const os = String(order.status || '').toLowerCase();
   const isPaid = os === 'completed' || os === 'paid' || ps === 'paid' || ps === 'paid to cash on counter' || ps.includes('paid');
 
+  const customerStartY = y;
+
   if (orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: orderTypeFontSize });
   if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: infoSz });
   else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: infoSz });
@@ -937,13 +939,22 @@ export function renderReceiptToCanvas(order, settings = {}) {
   }
 
   if (isPaid && settings.btShowPaidWatermark !== false) {
+    const stampR = 32;
+    const stampCx = margin + stampR + 6;
+    const stampCy = Math.round((customerStartY + y) / 2);
     ctx.save();
-    ctx.translate(margin + 6, y);
-    ctx.rotate(-Math.PI / 2);
-    ctx.font = `${paidBold ? 'bold ' : ''}${paidFontSize}px Arial`;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(stampCx, stampCy, stampR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.font = `bold ${paidFontSize}px Arial`;
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = '#000000';
-    ctx.fillText('PAID', 0, 0);
+    ctx.fillText('PAID', stampCx, stampCy - Math.round(paidFontSize * 0.45));
+    ctx.font = `bold ${Math.round(paidFontSize * 0.55)}px Arial`;
+    ctx.fillText('Usman Hotel', stampCx, stampCy + Math.round(paidFontSize * 0.5));
     ctx.restore();
   }
 
