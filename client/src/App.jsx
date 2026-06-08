@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import { Lock, Bluetooth, BluetoothConnected } from 'lucide-react';
+import { Lock, Bluetooth, BluetoothConnected, RefreshCw } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
 import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from './utils/escpos.js';
 import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter, disconnectDevice } from './utils/btPrint.js';
@@ -170,9 +170,11 @@ function App() {
   const [form, setForm] = useState({});
   const [message, setMessage] = useState('');
   const [authMessage, setAuthMessage] = useState('');
-  // Require manual login on app open — don't auto-use stored token
-  const [token, setToken] = useState('');
+  // Auto-login from stored token on refresh
+  const initialToken = typeof window !== 'undefined' ? window.localStorage.getItem('posToken') || '' : '';
+  const [token, setToken] = useState(initialToken);
   const [user, setUser] = useState(null);
+  const [syncState, setSyncState] = useState({ syncing: false, lastSync: Date.now() });
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
 
   const copyAppLink = async () => {
@@ -1234,6 +1236,7 @@ function App() {
     try {
       const data = await fetchJson(`${apiBase}/auth/me`);
       setUser(data);
+      setActiveTab('pos');
       setAuthMessage('');
       // reload any persisted roles/tabs in case they were modified
       try {
@@ -1280,7 +1283,7 @@ function App() {
         const savedTabIcons = window.localStorage.getItem('posTabIcons');
         if (savedTabIcons) setTabIcons(JSON.parse(savedTabIcons));
       } catch (e) {}
-      setActiveTab(getDefaultTabForRole(data.user.role));
+      setActiveTab('pos');
       setMessage('Logged in successfully');
     } catch (error) {
       setAuthMessage(error.message);
@@ -1510,6 +1513,19 @@ function App() {
     }
   }
 
+  async function handleManualSync() {
+    setSyncState((prev) => ({ ...prev, syncing: true }));
+    try {
+      await Promise.all([
+        loadPosData().catch(() => {}),
+        loadOrdersData().catch(() => {}),
+      ]);
+      setSyncState({ syncing: false, lastSync: Date.now() });
+    } catch {
+      setSyncState((prev) => ({ ...prev, syncing: false }));
+    }
+  }
+
   async function loadStaffMembers() {
     try {
       const staffData = await fetchJson(`${apiBase}/staff`);
@@ -1559,7 +1575,7 @@ function App() {
     startSse();
 
     // polling fallback to ensure updates even if SSE unsupported
-    const intervalMs = 7000;
+    const intervalMs = 1000;
     pollingRef.current = setInterval(() => {
       loadOrdersData();
     }, intervalMs);
@@ -2721,16 +2737,6 @@ function App() {
       if (order) {
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
-        startTransition(() => {
-          const targetTab = orderType === 'Dine-In' ? 'dinein' : orderType === 'Delivery' ? 'delivery' : 'takeaway';
-          setOrdersMainTab(targetTab);
-          if (orderType === 'Dine-In') {
-            setDineinSubTab('tables');
-            setDineinOrderStatusFilter('all');
-            setDineinPageIndex(0);
-          }
-          setActiveTab('orders');
-        });
         setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
       } else {
         setPopupError('Failed to save order. Please try again.');
@@ -2782,16 +2788,6 @@ function App() {
       const order = await savePosOrder(saveStatus, {}, { refreshOrders: false });
       if (order) {
         printReceipt(order).catch(err => console.warn('Print failed', err));
-        const targetTab = orderType === 'Dine-In' ? 'dinein' : orderType === 'Delivery' ? 'delivery' : 'takeaway';
-        startTransition(() => {
-          setOrdersMainTab(targetTab);
-          if (orderType === 'Dine-In') {
-            setDineinSubTab('tables');
-            setDineinOrderStatusFilter('all');
-            setDineinPageIndex(0);
-          }
-          setActiveTab('orders');
-        });
         setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
       } else {
         setPopupError('Failed to save order. Please try again.');
@@ -2821,9 +2817,6 @@ function App() {
       const order = await savePosOrder(saveStatus, { paymentStatus: status }, { refreshOrders: false });
       if (order) {
         printReceipt(order).catch(err => console.warn('Print failed', err));
-        startTransition(() => {
-          setActiveTab('orders');
-        });
         setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
       } else {
         setPopupError('Failed to save order. Please try again.');
@@ -6055,6 +6048,13 @@ function App() {
                 🕐
               </button>
               <div className="w-px h-5 bg-slate-600/30 mx-1" />
+              <button onClick={() => { handleManualSync(); }} disabled={syncState.syncing} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${syncState.syncing ? 'sync-blinking' : ''} ${
+                darkMode
+                  ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800 text-slate-200'
+                  : 'bg-gradient-to-br from-slate-200 via-slate-100 to-white text-slate-600'
+              }`} title={syncState.syncing ? 'Syncing...' : `Sync (${new Date(syncState.lastSync).toLocaleTimeString()})`}>
+                <RefreshCw size={12} className={syncState.syncing ? 'animate-spin' : ''} />
+              </button>
               <button onClick={() => setDarkMode((prev) => !prev)} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${
                 darkMode
                   ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800 text-slate-200'
@@ -10088,11 +10088,12 @@ function App() {
         </div>
       </aside>
       )}
-      <div className="mx-auto flex min-h-screen flex-col gap-2 px-3 py-2 pb-28 sm:px-6 lg:px-8"
-        style={{
-          marginLeft: isSidebarOpen ? '280px' : '80px',
-          transition: 'margin-left 0.3s ease'
-        }}>
+        <div className="mx-auto flex min-h-screen flex-col gap-2 px-3 py-2 pb-28 sm:px-6 lg:px-8"
+          style={{
+            marginLeft: isSidebarOpen ? '280px' : '80px',
+            transition: 'margin-left 0.3s ease'
+          }}>
+          <style>{`@keyframes syncBlink { 0%,100% { opacity:1 } 50% { opacity:0.3 } } .sync-blinking { animation:syncBlink 0.8s ease-in-out infinite }`}</style>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {!isSidebarOpen && !isMobile && (
