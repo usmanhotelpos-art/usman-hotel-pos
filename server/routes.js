@@ -852,6 +852,80 @@ router.delete('/pos/orders/:id', (req, res) => {
   res.send({ success: true, message: 'Order deleted successfully' });
 });
 
+// ---- Order Backups (manual CRUD - not in auto collections) ----
+router.get('/order_backups', (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  if (userRole !== 'admin' && userRole !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden' });
+  }
+  res.send(getCollection('order_backups'));
+});
+
+router.post('/order_backups', (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  if (userRole !== 'admin' && userRole !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden' });
+  }
+  const db = readDb();
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dateStr = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const backup = {
+    name: `Previous_orders_data_${dateStr}.json`,
+    createdAt: now.toISOString(),
+    data: {
+      pos_orders: db.pos_orders || [],
+      rider_orders: db.rider_orders || [],
+      rider_order_requests: db.rider_order_requests || [],
+      pos_payments: db.pos_payments || []
+    }
+  };
+  const created = createRecord('order_backups', backup);
+  res.status(201).send(created);
+});
+
+router.delete('/order_backups/:id', (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  if (userRole !== 'admin' && userRole !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden' });
+  }
+  const removed = removeRecord('order_backups', req.params.id);
+  if (!removed) return res.status(404).send({ error: 'Backup not found' });
+  res.send({ success: true });
+});
+
+router.post('/order_backups/:id/restore', (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  if (userRole !== 'admin' && userRole !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden' });
+  }
+  const db = readDb();
+  const backups = db.order_backups || [];
+  const backup = backups.find((b) => b.id === req.params.id);
+  if (!backup) return res.status(404).send({ error: 'Backup not found' });
+  db.pos_orders = backup.data.pos_orders || [];
+  db.rider_orders = backup.data.rider_orders || [];
+  db.rider_order_requests = backup.data.rider_order_requests || [];
+  db.pos_payments = backup.data.pos_payments || [];
+  writeDb(db);
+  res.send({ success: true, count: db.pos_orders.length });
+});
+
+// Batch delete all orders (admin only)
+router.delete('/pos/orders', (req, res) => {
+  const userRole = (req.user.role || '').toLowerCase();
+  if (userRole !== 'admin' && userRole !== 'admin rider') {
+    return res.status(403).send({ error: 'Forbidden: Only admin can clear all orders' });
+  }
+  const db = readDb();
+  db.pos_orders = [];
+  db.rider_orders = [];
+  db.rider_order_requests = [];
+  db.pos_payments = [];
+  writeDb(db);
+  res.send({ success: true, message: 'All orders cleared' });
+});
+
 router.post('/admin/clear-rider-app', authenticate, (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'admin rider') {
     return res.status(403).send({ error: 'Forbidden' });

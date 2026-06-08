@@ -15,7 +15,7 @@ function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
   const isHelperRoute = initialPath.startsWith('/helper');
-  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'settings'];
+  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'catalogue-qr', 'customers', 'riders-app', 'restore', 'settings'];
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
     try {
@@ -355,6 +355,11 @@ function App() {
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const [popupError, setPopupError] = useState('');
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [showResetPinPopup, setShowResetPinPopup] = useState(false);
+  const [resetPinInput, setResetPinInput] = useState('');
+  const [backups, setBackups] = useState([]);
+  const [restoreMessage, setRestoreMessage] = useState('');
+  const RESET_PIN = '8387';
 
   const addressSearchResults = useMemo(() => {
     const query = normalizeText(orderDetails.address);
@@ -705,6 +710,7 @@ function App() {
     'catalogue-qr': 'Catalogue QR',
     'rider-book': 'Rider Book',
     'rider-order-requests': 'Rider Order Requests',
+    restore: 'Restore',
     settings: 'Settings'
   };
   const defaultTabIcons = {
@@ -719,6 +725,7 @@ function App() {
     orders: '🧾',
     'rider-book': '🚴',
     'rider-order-requests': '📋',
+    restore: '♻️',
     settings: '⚙️'
   };
   const [tabIcons, setTabIcons] = useState(() => {
@@ -1033,10 +1040,10 @@ function App() {
     loginEnabled: true
   });
   const defaultRoles = [
-    { name: 'Admin', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
-    { name: 'Admin Rider', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, settings: true, login: true } },
+    { name: 'Admin', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, restore: true, settings: true, login: true } },
+    { name: 'Admin Rider', permissions: { dashboard: true, tables: true, inventory: true, staff: true, sales: true, pos: true, orders: true, restore: true, settings: true, login: true } },
     { name: 'Cashier', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, settings: false, login: true } },
-    { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, settings: true, login: true } },
+    { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, restore: true, settings: true, login: true } },
     { name: 'Biker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
     { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
     { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'rider-book': true, 'rider-order-requests': true, settings: false, login: true } },
@@ -1599,6 +1606,10 @@ function App() {
       loadStaffMembers();
     }
   }, [activeTab, riderOrderRequestsMainTab]);
+
+  useEffect(() => {
+    if (activeTab === 'restore') { loadBackups(); }
+  }, [activeTab]);
 
   // Realtime: try Server-Sent Events (SSE) and fallback to polling every 7s
   useEffect(() => {
@@ -3145,6 +3156,88 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // ---- Order Backup / Restore / Reset ----
+  async function loadBackups() {
+    try {
+      const data = await fetchJson(`${apiBase}/order_backups`);
+      setBackups(Array.isArray(data) ? data : []);
+    } catch { setBackups([]); }
+  }
+
+  async function handleResetOrders() {
+    setLoading(true);
+    setRestoreMessage('');
+    try {
+      await fetchJson(`${apiBase}/order_backups`, { method: 'POST' });
+      await fetchJson(`${apiBase}/pos/orders`, { method: 'DELETE' });
+      setMessage('All orders backed up and cleared successfully.');
+      setShowResetPinPopup(false);
+      setResetPinInput('');
+      await Promise.all([loadOrdersData(), loadPosData(), loadBackups()]);
+    } catch (error) {
+      setMessage(error.message);
+    } finally { setLoading(false); }
+  }
+
+  async function handleRestoreBackup(backupId) {
+    if (!confirm('Restore this backup? Current orders will be replaced.')) return;
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/order_backups/${backupId}/restore`, { method: 'POST' });
+      setMessage('Orders restored successfully.');
+      await Promise.all([loadOrdersData(), loadPosData()]);
+    } catch (error) {
+      setMessage(error.message);
+    } finally { setLoading(false); }
+  }
+
+  async function handleDeleteBackup(backupId) {
+    if (!confirm('Delete this backup file?')) return;
+    try {
+      await fetchJson(`${apiBase}/order_backups/${backupId}`, { method: 'DELETE' });
+      await loadBackups();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  function renderRestore() {
+    return (
+      <div className={`mx-auto max-w-3xl rounded-[32px] border p-6 shadow-soft mt-5 ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className={`text-xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>♻️ Order Backups</h2>
+            <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Restore previous order data from backup files.</p>
+          </div>
+          <button onClick={loadBackups} className="rounded-3xl bg-slate-700 px-4 py-2 text-xs text-slate-200 hover:bg-slate-600 transition">Refresh</button>
+        </div>
+        {backups.length === 0 ? (
+          <div className={`rounded-3xl border border-dashed p-8 text-center ${darkMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+            <p className="text-lg mb-1">No backup files</p>
+            <p className="text-xs">Use the Reset button in Settings to create a backup of current orders.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {backups.map((b) => (
+              <div key={b.id} className={`flex items-center justify-between rounded-3xl border px-5 py-4 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-semibold truncate ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{b.name}</p>
+                  <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {new Date(b.createdAt).toLocaleString()} &middot; {(b.data?.pos_orders?.length || 0)} orders
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0 ml-4">
+                  <button onClick={() => handleRestoreBackup(b.id)} className="rounded-3xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition">Restore</button>
+                  <button onClick={() => handleDeleteBackup(b.id)} className="rounded-3xl bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-600 transition">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   function confirmMarkPaid(order) {
@@ -6553,6 +6646,38 @@ function App() {
           </div>
         )}
 
+        {showResetPinPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+            <div className="w-full max-w-sm rounded-[32px] border border-red-800/50 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]">
+              <div className="text-center mb-6">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Confirm Reset</p>
+                <h3 className="mt-2 text-lg font-bold text-red-400">⚠️ Reset All Orders</h3>
+                <p className={`mt-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Enter security PIN to confirm. A backup file will be created automatically.</p>
+              </div>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={resetPinInput}
+                onChange={(e) => setResetPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="Enter PIN"
+                className={`w-full rounded-3xl border px-4 py-3 text-center text-lg font-bold tracking-[0.3em] outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && resetPinInput === RESET_PIN) handleResetOrders();
+                  else if (e.key === 'Enter' && resetPinInput !== RESET_PIN) setMessage('Wrong PIN');
+                }}
+              />
+              <div className="mt-6 flex gap-3">
+                <button onClick={() => { setShowResetPinPopup(false); setResetPinInput(''); }} className="flex-1 rounded-3xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition">Cancel</button>
+                <button onClick={() => {
+                  if (resetPinInput === RESET_PIN) handleResetOrders();
+                  else setMessage('Wrong PIN');
+                }} disabled={resetPinInput.length !== 4} className="flex-1 rounded-3xl bg-red-700 px-4 py-3 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-40 transition">Reset All</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showRecentOrdersPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
             <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[32px] border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]">
@@ -7571,9 +7696,21 @@ function App() {
             </span>
           </div>
         </div>
+        {/* Reset Orders Data */}
+        <div className="mt-8 border-t border-red-800/40 pt-6">
+          <h3 className={`text-lg font-semibold text-red-400`}>Danger Zone</h3>
+          <p className={`mt-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Reset all orders data. A backup file will be created automatically before clearing.</p>
+          <div className="mt-4">
+            <button onClick={() => setShowResetPinPopup(true)} className="rounded-3xl bg-red-700 px-6 py-3 text-sm font-bold text-white shadow-lg hover:bg-red-600 active:scale-95 transition-all">
+              🔄 Reset Orders Data
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
+
+  // ---- PIN Reset Popup ----
 
   function renderCatalogueQrModule() {
     const catalogueUrl = getCatalogueUrl();
@@ -10574,6 +10711,7 @@ function App() {
             {activeTab === 'pos' && renderPos()}
             {activeTab === 'catalogue-qr' && renderCatalogueQrModule()}
             {activeTab === 'customers' && renderCustomers()}
+            {activeTab === 'restore' && renderRestore()}
             {activeTab === 'riders-app' && <RidersApp />}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'orders' && renderOrders()}
