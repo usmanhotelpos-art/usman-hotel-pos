@@ -158,8 +158,13 @@ function App() {
     btTokenSlipDelivery: true,
     btShowPaidWatermark: true,
     btShowOrderType: true,
+    btShowCustomerName: true,
+    btShowTable: true,
+    btShowSalesPerson: true,
+    btShowMobile: true,
     btShowDeliveryLocation: true,
     btShowServiceType: true,
+    btShowRider: true,
     notificationsEnabled: false
   });
   const [form, setForm] = useState({});
@@ -6937,21 +6942,24 @@ function App() {
             </div>
 
             <div className="mt-8 border-t border-slate-700 pt-8">
-              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Customer Details Sections</h4>
-              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Show/hide customer detail fields on the Bluetooth receipt.</p>
-              <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
-                  <input type="checkbox" checked={settings.btShowOrderType !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowOrderType: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
-                  Show Order Type
-                </label>
-                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
-                  <input type="checkbox" checked={settings.btShowDeliveryLocation !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowDeliveryLocation: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
-                  Show Location (Delivery)
-                </label>
-                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
-                  <input type="checkbox" checked={settings.btShowServiceType !== false} onChange={(e) => setSettings((prev) => ({ ...prev, btShowServiceType: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
-                  Show Service Type (Delivery)
-                </label>
+              <h4 className={`text-base font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Customer Details Labels</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Show/hide individual text labels on the Bluetooth receipt.</p>
+              <div className="mt-4 grid gap-3 lg:grid-cols-4">
+                {[ 
+                  { key: 'btShowOrderType', label: 'Order Type' },
+                  { key: 'btShowCustomerName', label: 'Customer' },
+                  { key: 'btShowTable', label: 'Table No.' },
+                  { key: 'btShowSalesPerson', label: 'Sales Person' },
+                  { key: 'btShowMobile', label: 'Mobile' },
+                  { key: 'btShowDeliveryLocation', label: 'Location' },
+                  { key: 'btShowServiceType', label: 'Service Type' },
+                  { key: 'btShowRider', label: 'Rider' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                    <input type="checkbox" checked={settings[key] !== false} onChange={(e) => setSettings((prev) => ({ ...prev, [key]: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    {label}
+                  </label>
+                ))}
               </div>
             </div>
 

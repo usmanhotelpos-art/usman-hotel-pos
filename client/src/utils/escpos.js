@@ -926,16 +926,16 @@ export function renderReceiptToCanvas(order, settings = {}) {
   if (settings.btShowOrderType !== false && orderTypeDisplay) printLine(`Order Type: ${orderTypeDisplay}`, { fontSize: orderTypeFontSize });
   if (order.status === 'Completed') printLine('Payment: Paid', { fontSize: infoSz });
   else if (order.status === 'Pay Later') printLine('Payment: Pay Later', { fontSize: infoSz });
-  if (customerName) printLine(`Customer: ${customerName}`, { fontSize: infoSz });
+  if (settings.btShowCustomerName !== false && customerName) printLine(`Customer: ${customerName}`, { fontSize: infoSz });
   if (order.orderType === 'Dine-In') {
-    printLine(`Table: ${order.tableNumber || '-'}`, { fontSize: infoSz });
-    printLine(`Sales Person: ${order.waiter || '-'}`, { fontSize: infoSz });
+    if (settings.btShowTable !== false) printLine(`Table: ${order.tableNumber || '-'}`, { fontSize: infoSz });
+    if (settings.btShowSalesPerson !== false) printLine(`Sales Person: ${order.waiter || '-'}`, { fontSize: infoSz });
   }
   if (order.orderType === 'Delivery') {
-    printLine(`Mobile: ${order.phone || '-'}`, { fontSize: infoSz });
+    if (settings.btShowMobile !== false) printLine(`Mobile: ${order.phone || '-'}`, { fontSize: infoSz });
     if (settings.btShowDeliveryLocation !== false && order.address) printLine(`Location: ${order.address}`, { fontSize: deliveryAddressFontSize, bold: deliveryAddressBold });
     if (settings.btShowServiceType !== false) printLine(`Service Type: ${order.serviceType || '-'}`, { fontSize: serviceTypeFontSize, bold: serviceTypeBold });
-    printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
+    if (settings.btShowRider !== false) printLine(`Rider: ${order.deliveryAgent || '-'}`, { fontSize: infoSz });
   }
 
   if (isPaid && settings.btShowPaidWatermark !== false) {
