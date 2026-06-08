@@ -17,4 +17,8 @@ scripts/*.js
 server/debug-route*.js
 server/tmp-*.js
 client/src/test-write.txt
+fe_err.txt
+fe_out.txt
+server_err.txt
+server_out.txt
 
