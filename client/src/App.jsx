@@ -125,6 +125,8 @@ function App() {
     btOrderTypeFontSize: 18,
     btServiceTypeFontSize: 16,
     btTokenFontSize: 44,
+    tokenSlipFontSize: 44,
+    tokenSlipLabelFontSize: 14,
     btTextAlign: 'left',
     btMarginTop: 10,
     btMarginBottom: 10,
@@ -3415,8 +3417,8 @@ function App() {
     const logoHtml = settings.logo && showLogo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 4px;" /></div>` : '';
     const tokenMargin = Number(settings.btTokenMargin ?? 8);
 
-    const tokenLabelSz = Number(settings.btTokenLabelFontSize ?? 14);
-    const tokenNumSz = Math.min(Number(settings.btTokenFontSize ?? 44), 300);
+    const tokenLabelSz = Number(settings.tokenSlipLabelFontSize ?? settings.btTokenLabelFontSize ?? 14);
+    const tokenNumSz = Math.min(Number(settings.tokenSlipFontSize ?? settings.btTokenFontSize ?? 44), 300);
     const content = `
       <html>
         <head>
@@ -3479,8 +3481,8 @@ function App() {
       (!order.orderType && settings.btTokenOnDineIn !== false)
     );
     const receiptTokenText = settings.tokenSlipEnabled && showTokenForOrderType ? `${settings.tokenSlipPrefix || settings.slipPrefix || 'TS'}-${settings.tokenSlipNextNumber || 1}` : '';
-    const tokenLabelSz = settings.btTokenLabelFontSize || 14;
-    const tokenNumSz = settings.btTokenFontSize || 44;
+    const tokenLabelSz = settings.tokenSlipLabelFontSize ?? settings.btTokenLabelFontSize ?? 14;
+    const tokenNumSz = settings.tokenSlipFontSize ?? settings.btTokenFontSize ?? 44;
     const tokenHtml = receiptTokenText ? `<div class="receipt-token"><div class="token-label" style="font-size:${tokenLabelSz}px;">Token</div><div class="token-number" style="font-size:${tokenNumSz}px;">${receiptTokenText}</div></div>` : '';
     const logoHtml = settings.logo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: ${settings.receiptLogoWidth || 120}px; max-height: 100px; width: auto; height: auto; display: block;" /></div>` : '<div class="logo empty"></div>';
     const counterLabelHtml = settings.receiptCounterLabel ? `<div class="counter">${settings.receiptCounterLabel}</div>` : '';
@@ -6709,11 +6711,20 @@ function App() {
 
             <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
               <h4 className="text-base font-semibold text-slate-100">Token slip settings</h4>
+              <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Font sizes for the HTML/receipt token slip (separate from Bluetooth token slip fonts).</p>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 <div>{receiptField('Enable token slip', 'tokenSlipEnabled')}</div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400">Token slip prefix</label>
                   <input value={settings.tokenSlipPrefix} onChange={(e) => setSettings((prev) => ({ ...prev, tokenSlipPrefix: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} placeholder="TS" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Token Label Font Size (px)</label>
+                  <input type="number" min="8" max="72" value={settings.tokenSlipLabelFontSize ?? settings.btTokenLabelFontSize ?? 14} onChange={(e) => setSettings((prev) => ({ ...prev, tokenSlipLabelFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400">Token Number Font Size (px)</label>
+                  <input type="number" min="20" max="300" value={settings.tokenSlipFontSize ?? settings.btTokenFontSize ?? 44} onChange={(e) => setSettings((prev) => ({ ...prev, tokenSlipFontSize: Number(e.target.value) }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400">Next token number</label>
