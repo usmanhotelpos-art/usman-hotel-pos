@@ -1009,6 +1009,35 @@ export function renderReceiptToCanvas(order, settings = {}) {
       }
       y += lh;
     });
+    ctx.font = `${infoSz}px ${fontFamily}`;
+    const variantItems = [];
+    if (item.weight) variantItems.push(`Weight: ${item.weight}`);
+    if (item.flavor) variantItems.push(`Flavor: ${item.flavor}`);
+    if (variantItems.length) {
+      const variantText = variantItems.join('  ');
+      const vWords = variantText.split(' ').filter(Boolean);
+      const vLines = [];
+      let vCurr = '';
+      for (let vw of vWords) {
+        const testLine = vCurr ? vCurr + ' ' + vw : vw;
+        if (ctx.measureText(testLine).width > nameMaxW && vCurr) {
+          vLines.push(vCurr);
+          vCurr = vw;
+        } else {
+          vCurr = testLine;
+        }
+      }
+      if (vCurr) vLines.push(vCurr);
+      if (!vLines.length) vLines.push(variantText);
+      const vLh = Math.round(lh * 0.75);
+      vLines.forEach((vLine) => {
+        ctx.textAlign = isRightAlign ? 'right' : 'left';
+        ctx.fillStyle = '#666666';
+        ctx.fillText(vLine, nameX, y);
+        y += vLh;
+      });
+      ctx.font = `${prodSz}px ${fontFamily}`;
+    }
   }
 
   printDivider('-', { fontSize: dividerSz });
