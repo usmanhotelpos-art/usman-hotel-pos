@@ -130,14 +130,13 @@ export async function disconnectDevice(device) {
   }
 }
 
-export async function printToBluetooth(device, data) {
+export async function printToBluetooth(device, data, { chunkSize = 128 } = {}) {
   let characteristic;
 
   try {
     const result = await connectGatt(device);
     characteristic = result.characteristic;
   } catch (err) {
-    // If connection fails, try one full reconnect: disconnect and re-connect
     console.warn('BT connect failed, retrying with full reconnect:', err.message);
     try { await disconnectDevice(device); } catch {}
     const result = await connectGatt(device);
@@ -146,14 +145,13 @@ export async function printToBluetooth(device, data) {
 
   const initCmd = new Uint8Array(CMD.INIT);
   await writeWithRetry(characteristic, initCmd);
-  await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 120));
 
-  const chunkSize = 512;
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
     await writeWithRetry(characteristic, chunk);
     if (i + chunkSize < data.length) {
-      await new Promise((r) => setTimeout(r, 8));
+      await new Promise((r) => setTimeout(r, 15));
     }
   }
 

@@ -1060,32 +1060,37 @@ export function canvasToEscposRaster(canvas) {
   const data = imageData.data;
 
   const bytesPerLine = Math.ceil(width / 8);
-  const rasterData = [];
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x += 8) {
-      let byte = 0;
-      for (let b = 0; b < 8; b++) {
-        const px = x + b;
-        if (px < width) {
-          const idx = (y * width + px) * 4;
-          const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-          if (brightness < 128) {
-            byte |= (1 << (7 - b));
-          }
-        }
-      }
-      rasterData.push(byte);
-    }
-  }
-
   const xL = bytesPerLine & 0xFF;
   const xH = (bytesPerLine >> 8) & 0xFF;
   const yL = height & 0xFF;
   const yH = (height >> 8) & 0xFF;
 
   const header = CMD.GS_v_0(0, xL, xH, yL, yH);
-  return new Uint8Array([...header, ...rasterData]);
+  const result = new Uint8Array(header.length + bytesPerLine * height);
+
+  let off = 0;
+  for (let i = 0; i < header.length; i++) {
+    result[off++] = header[i];
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x += 8) {
+      let byteVal = 0;
+      for (let b = 0; b < 8; b++) {
+        const px = x + b;
+        if (px < width) {
+          const idx = (y * width + px) * 4;
+          const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+          if (brightness < 128) {
+            byteVal |= (1 << (7 - b));
+          }
+        }
+      }
+      result[off++] = byteVal;
+    }
+  }
+
+  return result;
 }
 
 function formatDate(dateString, format) {
