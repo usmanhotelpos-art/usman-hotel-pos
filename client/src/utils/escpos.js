@@ -939,21 +939,28 @@ export function renderReceiptToCanvas(order, settings = {}) {
   }
 
   if (isPaid && settings.btShowPaidWatermark !== false) {
-    const stampR = 32;
-    const stampCx = margin + stampR + 6;
-    const stampCy = Math.round((customerStartY + y) / 2);
     ctx.save();
+    const paidFont = `${paidBold ? 'bold ' : ''}${paidFontSize}px Arial`;
+    const subFont = `${paidBold ? 'bold ' : ''}${Math.round(paidFontSize * 0.55)}px Arial`;
+    ctx.font = paidFont;
+    const paidW = ctx.measureText('PAID').width;
+    ctx.font = subFont;
+    const hotelW = ctx.measureText('Usman Hotel').width;
+    const totalH = paidFontSize + Math.round(paidFontSize * 0.55) + 4;
+    const r = Math.max(paidW, hotelW, totalH) / 2 + 6;
+    const stampCx = margin + r + 6;
+    const stampCy = customerStartY + Math.round(r * 0.7);
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(stampCx, stampCy, stampR, 0, Math.PI * 2);
+    ctx.arc(stampCx, stampCy, r, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.font = `bold ${paidFontSize}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#000000';
+    ctx.font = paidFont;
     ctx.fillText('PAID', stampCx, stampCy - Math.round(paidFontSize * 0.45));
-    ctx.font = `bold ${Math.round(paidFontSize * 0.55)}px Arial`;
+    ctx.font = subFont;
     ctx.fillText('Usman Hotel', stampCx, stampCy + Math.round(paidFontSize * 0.5));
     ctx.restore();
   }
