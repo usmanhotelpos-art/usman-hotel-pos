@@ -667,7 +667,7 @@ function App() {
 
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
-    if (/^\/(catalogue|menu|qr)(\/|$|\?)/.test(path)) {
+    if (/\/?(catalogue|menu|qr)(\/|$|\?)/.test(path)) {
       setCataloguePage(true);
     }
   }, []);
@@ -675,8 +675,8 @@ function App() {
   useEffect(() => {
     if (cataloguePage || !settings.cataloguePath) return;
     const path = window.location.pathname.toLowerCase();
-    const customPath = `/${settings.cataloguePath.toLowerCase()}`;
-    if (path === customPath || path.startsWith(`${customPath}/`) || path.startsWith(`${customPath}?`)) {
+    const customPath = settings.cataloguePath.toLowerCase().replace(/^\/+|\/+$/g, '');
+    if (path.includes(`/${customPath}`) || path.includes(`/${customPath}/`) || path.includes(`/${customPath}?`)) {
       setCataloguePage(true);
     }
   }, [settings.cataloguePath, cataloguePage]);
@@ -8246,10 +8246,15 @@ function App() {
   }
 
   function getCatalogueUrl() {
-    const host = catalogueHost?.trim() || window.location.host;
-    const normalizedHost = host.startsWith('http') ? host : `${window.location.protocol}//${host}`;
-    const cleanedPath = cataloguePath.replace(/^\/+|\/+$/g, '') || 'catalogue';
-    return `${normalizedHost.replace(/\/$/, '')}/${cleanedPath}`;
+    const host = catalogueHost?.trim();
+    if (host) {
+      const normalizedHost = host.startsWith('http') ? host : `${window.location.protocol}//${host}`;
+      const cleanedPath = cataloguePath.replace(/^\/+|\/+$/g, '') || 'catalogue';
+      return `${normalizedHost.replace(/\/$/, '')}/${cleanedPath}`;
+    }
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const cleanedPath = (cataloguePath || 'catalogue').replace(/^\/+|\/+$/g, '');
+    return `${window.location.origin}${basePath}/${cleanedPath}`;
   }
 
   function getAssignedCatalogueProductIds() {
