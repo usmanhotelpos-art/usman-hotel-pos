@@ -998,6 +998,7 @@ function App() {
   const [riderBookPageIndex, setRiderBookPageIndex] = useState(0);
   const [riderBookActionOpen, setRiderBookActionOpen] = useState(null);
   const [showRiderBookSummaryModal, setShowRiderBookSummaryModal] = useState(false);
+  const [showMobileRiderFilters, setShowMobileRiderFilters] = useState(false);
   const [riderBookSummaryType, setRiderBookSummaryType] = useState('cash');
   const [riderBookSummaryData, setRiderBookSummaryData] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -4411,7 +4412,7 @@ function App() {
 
     return (
       <div className="space-y-6">
-        <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft glow-border glow-pulse">
+        <div className="hidden md:block rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft glow-border glow-pulse">
 
 
           <div className="space-y-4">
@@ -4583,6 +4584,138 @@ function App() {
           </div>
         </div>
 
+        {/* Mobile filter button */}
+        <div className="md:hidden flex items-center gap-2">
+          <button
+            onClick={() => setShowMobileRiderFilters(true)}
+            className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700 flex items-center gap-2"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+            </svg>
+            Filters & Summary
+          </button>
+        </div>
+
+        {/* Mobile filters popup */}
+        {showMobileRiderFilters && (
+          <div className="md:hidden fixed inset-0 z-50 flex items-start pt-12 justify-center bg-slate-950/80 p-4">
+            <div className="w-full max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm font-semibold text-white">Filters & Summary</div>
+                <button onClick={() => setShowMobileRiderFilters(false)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 hover:border-rose-500">Close</button>
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-2">
+                  <div
+                    onClick={() => { openRiderBookSummaryModal('cash'); setShowMobileRiderFilters(false); }}
+                    className="cursor-pointer rounded-2xl border border-slate-800 bg-slate-950 p-3"
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Cash Summary</div>
+                    <div className="mt-2 text-lg font-semibold text-white">{Number(riderBookCashSummary.riderAmount).toLocaleString()} Rs</div>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">Summary</div>
+                  </div>
+                  <div
+                    onClick={() => { openRiderBookSummaryModal('online'); setShowMobileRiderFilters(false); }}
+                    className="cursor-pointer rounded-2xl border border-slate-800 bg-slate-950 p-3"
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Online Summary</div>
+                    <div className="mt-2 text-lg font-semibold text-white">{Number(riderBookOnlineSummary.riderAmount).toLocaleString()} Rs</div>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white">Summary</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Difference</div>
+                    <div className="mt-2 text-lg font-semibold text-white">{Number(riderBookDifference).toLocaleString()} Rs</div>
+                    {riderBookVisibleCashOnlineOrders.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          await updateRiderBookOrdersStatus(
+                            riderBookVisibleCashOnlineOrders.map((order) => order.id),
+                            'Payment Collected',
+                            null,
+                            'Paid'
+                          );
+                          setRiderBookSubTab('paid');
+                          setShowMobileRiderFilters(false);
+                        }}
+                        className="mt-2 w-full rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        {riderBookDifference < 0 ? 'Pay to Rider' : 'Collect Amount from Rider'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {['live', 'sales'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => {
+                        setRiderBookMainTab(tab);
+                        setRiderBookSubTab(tab === 'live' ? 'cash' : 'due');
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${riderBookMainTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                    >
+                      {tab === 'live' ? 'Live' : 'Sales'}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={riderBookSearch}
+                  onChange={(e) => setRiderBookSearch(e.target.value)}
+                  placeholder="Search rider, order, address..."
+                  className="w-full rounded-full border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                />
+                <select
+                  value={riderBookFilterRider}
+                  onChange={(e) => { setRiderBookFilterRider(e.target.value); setRiderBookPageIndex(0); }}
+                  className="w-full rounded-full border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
+                >
+                  <option value="">All Riders</option>
+                  {Array.from(new Set(riderBookAssignedOrders.map((o) => o.deliveryAgent).filter(Boolean))).map((rider) => (
+                    <option key={rider} value={rider}>{rider}</option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap gap-1">
+                  {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => { setRiderBookDateFilter(filter); setRiderBookPageIndex(0); }}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${riderBookDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                    >
+                      {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'previous-5-days' ? 'Last 5 Days' : 'Custom'}
+                    </button>
+                  ))}
+                </div>
+                {riderBookDateFilter === 'custom' && (
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={riderBookCustomDateFrom} onChange={(e) => { setRiderBookCustomDateFrom(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                    <span className="text-slate-400">to</span>
+                    <input type="date" value={riderBookCustomDateTo} onChange={(e) => { setRiderBookCustomDateTo(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1">
+                  {(riderBookMainTab === 'live' ? ['cash', 'online'] : ['due', 'paid', 'all']).map((sub) => {
+                    const isActive = riderBookSubTab === sub;
+                    const gradient = sub === 'cash' ? 'from-emerald-500 to-emerald-700' : sub === 'online' ? 'from-sky-500 to-indigo-600' : 'from-slate-700 to-slate-800';
+                    return (
+                      <button
+                        key={sub}
+                        onClick={() => setRiderBookSubTab(sub)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${isActive ? `bg-gradient-to-r ${gradient} text-white shadow-lg` : 'bg-slate-800 text-slate-300'}`}
+                      >
+                        {riderBookMainTab === 'live'
+                          ? sub === 'all' ? 'All' : sub === 'cash' ? 'Cash' : 'Online'
+                          : sub === 'all' ? 'All' : sub === 'due' ? 'Due' : 'Paid'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {riderBookSelectedOrders.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700">
             <button onClick={markRiderCash} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Cash</button>
@@ -4592,7 +4725,7 @@ function App() {
           </div>
         )}
         <div className="rounded-[32px] border border-slate-800 bg-slate-950 p-4 shadow-soft overflow-x-auto">
-          <div className="hidden lg:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 text-[10px] uppercase tracking-[0.24em] text-slate-400 border-b border-slate-800 pb-3 mb-3">
+          <div className="hidden md:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 text-[10px] uppercase tracking-[0.24em] text-slate-400 border-b border-slate-800 pb-3 mb-3">
             <span></span>
             <span>Order #</span>
             <span>Delivery Address</span>
@@ -4614,92 +4747,163 @@ function App() {
               const isPaidStatus = paymentStatus === 'PAID';
               const isDueStatus = paymentStatus === 'Due';
               return (
-                <div key={order.id} className="hidden lg:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200 items-center transition hover:border-emerald-500/20 hover:bg-slate-900">
-                  <input type="checkbox" checked={isSelected} onChange={() => toggleRiderBookOrderSelection(order.id)} className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500" />
-                  <div className="font-semibold text-white">{order.orderNumber || order.id}</div>
-                  <div className="text-[11px] text-slate-300 truncate">{order.address || 'Walk-In'}</div>
-                  <div className="text-[11px] text-slate-300">{order.phone || '-'}</div>
-                  <div className="text-[11px] text-slate-300">{order.serviceType || '-'}</div>
-                  <div className="text-[11px] text-slate-300">{itemCount} item{itemCount !== 1 ? 's' : ''}</div>
-                  <div className="font-semibold text-white">{Number(order.total || order.amount || 0)} Rs</div>
-                  <div className="text-[11px] text-slate-300">{order.deliveryAgent || '-'}</div>
-                  <div className="px-2 py-2">
-                    <div className={`inline-flex items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold ${isPaidStatus ? 'border-emerald-500 bg-emerald-950 text-emerald-300' : isDueStatus ? 'border-rose-500 bg-rose-950 text-rose-300' : 'border-slate-700 bg-slate-950 text-slate-200'}`}>
-                      {paymentStatus ? (
-                        <>
-                          {isPaidStatus && (
-                            <svg viewBox="0 0 24 24" className="h-3 w-3 text-emerald-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M20 6L9 17l-5-5" />
-                            </svg>
-                          )}
-                          <span className="truncate max-w-[90px]">{paymentStatus}</span>
-                        </>
-                      ) : (
-                        <span className="text-slate-500">-</span>
+                <div key={order.id}>
+                  {/* Desktop order row */}
+                  <div className="hidden md:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200 items-center transition hover:border-emerald-500/20 hover:bg-slate-900">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleRiderBookOrderSelection(order.id)} className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500" />
+                    <div className="font-semibold text-white">{order.orderNumber || order.id}</div>
+                    <div className="text-[11px] text-slate-300 truncate">{order.address || 'Walk-In'}</div>
+                    <div className="text-[11px] text-slate-300">{order.phone || '-'}</div>
+                    <div className="text-[11px] text-slate-300">{order.serviceType || '-'}</div>
+                    <div className="text-[11px] text-slate-300">{itemCount} item{itemCount !== 1 ? 's' : ''}</div>
+                    <div className="font-semibold text-white">{Number(order.total || order.amount || 0)} Rs</div>
+                    <div className="text-[11px] text-slate-300">{order.deliveryAgent || '-'}</div>
+                    <div className="px-2 py-2">
+                      <div className={`inline-flex items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold ${isPaidStatus ? 'border-emerald-500 bg-emerald-950 text-emerald-300' : isDueStatus ? 'border-rose-500 bg-rose-950 text-rose-300' : 'border-slate-700 bg-slate-950 text-slate-200'}`}>
+                        {paymentStatus ? (
+                          <>
+                            {isPaidStatus && (
+                              <svg viewBox="0 0 24 24" className="h-3 w-3 text-emerald-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M20 6L9 17l-5-5" />
+                              </svg>
+                            )}
+                            <span className="truncate max-w-[90px]">{paymentStatus}</span>
+                          </>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-slate-400">{orderDate}</div>
+                    <div className="relative flex items-center justify-end">
+                      <button
+                        onClick={() => setRiderBookActionOpen(riderBookActionOpen === order.id ? null : order.id)}
+                        className="rounded-full border border-slate-700 bg-slate-950 p-2 text-slate-200 transition hover:border-emerald-500 hover:bg-slate-900"
+                        title="Actions"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5C7 2 2.7 4.4 1 8.5 2.7 12.6 7 15 12 15s9.3-2.4 11-6.5C21.3 4.4 17 2 12 2zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
+                      </button>
+                      {riderBookActionOpen === order.id && (
+                        <div className="absolute right-0 top-full mt-2 z-50 rounded-2xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
+                          <button
+                            type="button"
+                            title="View order"
+                            onClick={() => {
+                              openViewOrderModal(order);
+                              setRiderBookActionOpen(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800 transition flex items-center gap-2 border-b border-slate-800"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            title="Delete order"
+                            onClick={() => {
+                              deleteOrder(order.id);
+                              setRiderBookActionOpen(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-xs text-rose-300 hover:bg-slate-800 transition flex items-center gap-2 border-b border-slate-800"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                            Delete
+                          </button>
+                          <button
+                            type="button"
+                            title="Print order"
+                            onClick={() => {
+                              printReceipt(order);
+                              setRiderBookActionOpen(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-xs text-emerald-300 hover:bg-slate-800 transition flex items-center gap-2 border-b border-slate-800"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                            Print
+                          </button>
+                          <button
+                            type="button"
+                            title="Assign rider"
+                            onClick={() => {
+                              openRiderAssignmentModal(order);
+                              setRiderBookActionOpen(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-xs text-purple-300 hover:bg-slate-800 transition flex items-center gap-2"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                            Assign Rider
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
-                  <div className="text-[11px] text-slate-400">{orderDate}</div>
-                  <div className="relative flex items-center justify-end">
-                    <button
-                      onClick={() => setRiderBookActionOpen(riderBookActionOpen === order.id ? null : order.id)}
-                      className="rounded-full border border-slate-700 bg-slate-950 p-2 text-slate-200 transition hover:border-emerald-500 hover:bg-slate-900"
-                      title="Actions"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5C7 2 2.7 4.4 1 8.5 2.7 12.6 7 15 12 15s9.3-2.4 11-6.5C21.3 4.4 17 2 12 2zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
-                    </button>
-                    {riderBookActionOpen === order.id && (
-                      <div className="absolute right-0 top-full mt-2 z-50 rounded-2xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
-                        <button
-                          type="button"
-                          title="View order"
-                          onClick={() => {
-                            openViewOrderModal(order);
-                            setRiderBookActionOpen(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800 transition flex items-center gap-2 border-b border-slate-800"
-                        >
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          title="Delete order"
-                          onClick={() => {
-                            deleteOrder(order.id);
-                            setRiderBookActionOpen(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-xs text-rose-300 hover:bg-slate-800 transition flex items-center gap-2 border-b border-slate-800"
-                        >
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                          Delete
-                        </button>
-                        <button
-                          type="button"
-                          title="Print order"
-                          onClick={() => {
-                            printReceipt(order);
-                            setRiderBookActionOpen(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-xs text-emerald-300 hover:bg-slate-800 transition flex items-center gap-2 border-b border-slate-800"
-                        >
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                          Print
-                        </button>
-                        <button
-                          type="button"
-                          title="Assign rider"
-                          onClick={() => {
-                            openRiderAssignmentModal(order);
-                            setRiderBookActionOpen(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-xs text-purple-300 hover:bg-slate-800 transition flex items-center gap-2"
-                        >
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
-                          Assign Rider
-                        </button>
+                  {/* Mobile order card */}
+                  <div className="md:hidden rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200 transition hover:border-emerald-500/20">
+                    <div className="flex items-start gap-3">
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleRiderBookOrderSelection(order.id)} className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-semibold text-white text-sm truncate">{order.orderNumber || order.id}</div>
+                          <div className="font-semibold text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</div>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400 truncate">{order.address || 'Walk-In'}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] text-slate-400">{order.deliveryAgent || '-'}</span>
+                          <span className="text-slate-600">|</span>
+                          <span className="text-[11px] text-slate-400">{order.serviceType || '-'}</span>
+                          <span className="text-slate-600">|</span>
+                          <span className="text-[11px] text-slate-400">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div className={`inline-flex items-center gap-1 rounded-xl px-2 py-0.5 text-[10px] font-semibold ${isPaidStatus ? 'border-emerald-500 bg-emerald-950 text-emerald-300' : isDueStatus ? 'border-rose-500 bg-rose-950 text-rose-300' : 'border-slate-700 bg-slate-950 text-slate-200'}`}>
+                            {paymentStatus ? (
+                              <>
+                                {isPaidStatus && (
+                                  <svg viewBox="0 0 24 24" className="h-2.5 w-2.5 text-emerald-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                )}
+                                <span>{paymentStatus}</span>
+                              </>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-500">{orderDate}</span>
+                            <div className="relative">
+                              <button
+                                onClick={() => setRiderBookActionOpen(riderBookActionOpen === order.id ? null : order.id)}
+                                className="rounded-full border border-slate-700 bg-slate-950 p-1.5 text-slate-200"
+                                title="Actions"
+                              >
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5C7 2 2.7 4.4 1 8.5 2.7 12.6 7 15 12 15s9.3-2.4 11-6.5C21.3 4.4 17 2 12 2zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
+                              </button>
+                              {riderBookActionOpen === order.id && (
+                                <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
+                                  <button onClick={() => { openViewOrderModal(order); setRiderBookActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
+                                    View
+                                  </button>
+                                  <button onClick={() => { deleteOrder(order.id); setRiderBookActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-rose-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                    Delete
+                                  </button>
+                                  <button onClick={() => { printReceipt(order); setRiderBookActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                    Print
+                                  </button>
+                                  <button onClick={() => { openRiderAssignmentModal(order); setRiderBookActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-purple-300 hover:bg-slate-800 flex items-center gap-1.5">
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                                    Assign Rider
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
