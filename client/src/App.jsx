@@ -617,7 +617,7 @@ function App() {
           console.log('New app version detected');
           
           // Clear all POS app related data to force fresh load
-          const keysToKeep = ['riderToken', 'riderLoginToken'];
+          const keysToKeep = ['riderToken', 'riderLoginToken', 'posToken'];
           Object.keys(localStorage).forEach(key => {
             if (!keysToKeep.includes(key)) {
               localStorage.removeItem(key);
@@ -1335,9 +1335,6 @@ function App() {
       }
     } catch (error) {
       setAuthMessage('Session expired, please login again.');
-      localStorage.removeItem('posToken');
-      setToken('');
-      setUser(null);
     } finally {
       setLoading(false);
     }
