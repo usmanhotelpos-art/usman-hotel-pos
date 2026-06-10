@@ -989,7 +989,7 @@ function App() {
   const [riderBookSubTab, setRiderBookSubTab] = useState('all');
   const [deliveryPaymentStatusFilter, setDeliveryPaymentStatusFilter] = useState('all');
   const [riderBookFilterRider, setRiderBookFilterRider] = useState('');
-  const [riderBookDateFilter, setRiderBookDateFilter] = useState('today');
+  const [riderBookDateFilter, setRiderBookDateFilter] = useState('previous-5-days');
   const [riderBookCustomDateFrom, setRiderBookCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [riderBookCustomDateTo, setRiderBookCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [riderBookSelectedOrders, setRiderBookSelectedOrders] = useState([]);
@@ -4154,16 +4154,7 @@ function App() {
         );
       }
       if (riderBookSubTab === 'all') {
-        if (paymentStatus === 'paid' || orderStatus === 'completed') return false;
-        return (
-          paymentStatus === 'receive cash till' ||
-          paymentStatus === 'may be online' ||
-          paymentStatus === 'online' ||
-          paymentMethod === 'online' ||
-          paymentMethod === 'cash' ||
-          paymentStatus === 'paid to cash on counter' ||
-          (orderStatus === 'payment collected' && (paymentMethod === 'online' || paymentMethod === 'cash'))
-        );
+        return true;
       }
     }
     if (riderBookMainTab === 'sales') {
@@ -6473,7 +6464,8 @@ function App() {
         {isMobile && cart.length > 0 && !showMobileCart && (
           <button
             onClick={() => setShowMobileCart(true)}
-            className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(16,185,129,0.5)] active:scale-95 transition-all duration-200"
+            className="fixed bottom-20 right-4 z-[60] flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(16,185,129,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(16,185,129,0.7)]"
+            style={{boxShadow: '0 8px 32px rgba(16,185,129,0.5)'}}
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🛒</span>
             <span>{cart.reduce((sum, it) => sum + (it.quantity || 0), 0)} items · {cart.reduce((sum, it) => sum + (Number(it.price) || 0) * (it.quantity || 0), 0)} PKR</span>
