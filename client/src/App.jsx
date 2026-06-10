@@ -6473,8 +6473,8 @@ function App() {
         )}
 
         {showCustomerDetailsPopup && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
-            <div className={`w-full ${isMobile ? 'max-h-[85vh] rounded-t-3xl' : 'max-w-md rounded-[32px]'} border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto ${isMobile ? '' : 'max-h-[calc(100vh-3rem)]'}`}>
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={closeCustomerDetailsPopup}>
+            <div className={`w-full ${isMobile ? 'max-h-[90vh] rounded-t-2xl' : 'max-w-md rounded-[32px]'} border border-slate-700 bg-slate-950 p-5 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto ${isMobile ? '' : 'max-h-[calc(100vh-3rem)]'}`} onClick={(e) => e.stopPropagation()} style={isMobile ? {maxHeight: '90vh'} : {}}>
               {popupError && <div className="mb-4 rounded-3xl border border-rose-500 bg-rose-900/20 px-4 py-3 text-sm text-rose-200 font-semibold">{popupError}</div>}
               <div className="flex items-center justify-between">
                 <div>
@@ -6608,8 +6608,8 @@ function App() {
         )}
 
         {showPaymentPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
-            <div className="w-full max-w-md rounded-[32px] border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={closePaymentPopup}>
+            <div className={`w-full ${isMobile ? 'max-h-[85vh] rounded-t-2xl' : 'max-w-md rounded-[32px]'} border border-slate-700 bg-slate-950 p-5 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Payment</p>
