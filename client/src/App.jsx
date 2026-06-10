@@ -353,6 +353,7 @@ function App() {
     notes: '',
     paymentStatus: ''
   });
+  const [showMobileCart, setShowMobileCart] = useState(false);
   const [showCustomerDetailsPopup, setShowCustomerDetailsPopup] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const [popupError, setPopupError] = useState('');
@@ -6281,24 +6282,24 @@ function App() {
                 <h3 className={`mt-1 text-xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Select products</h3>
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {filteredProducts.map((product) => (
                 <button
                   key={product.id}
                   type="button"
-                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+                  className="rounded-2xl border border-slate-200 bg-white p-2 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md active:scale-[0.97]"
                   onClick={() => addToCart(product)}
                 >
-                  <div className="flex flex-col items-center text-center mb-2">
+                  <div className="flex flex-col items-center text-center mb-1.5">
                     {product.photo ? (
-                      <img src={product.photo} alt={product.name} className="w-12 h-12 rounded-full object-cover mb-2 shadow-sm" />
+                      <img src={product.photo} alt={product.name} className="w-10 h-10 rounded-full object-cover mb-1 shadow-sm" />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center mb-2 text-slate-400 text-xl">📦</div>
+                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center mb-1 text-slate-400 text-lg">📦</div>
                     )}
                   </div>
-                  <div className="text-left">
-                    <div className="text-xs font-semibold text-slate-900 mb-1">{product.name}</div>
-                    <div className="text-sm font-bold text-emerald-600">
+                  <div className="text-center">
+                    <div className="text-[11px] font-semibold text-slate-900 mb-0.5 leading-tight line-clamp-2">{product.name}</div>
+                    <div className="text-xs font-bold text-emerald-600">
                       {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
                     </div>
                   </div>
@@ -6308,8 +6309,8 @@ function App() {
           </div>
 
           {showWeightPopup && selectedCartProduct && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-              <div className="w-full max-w-sm rounded-[32px] border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]">
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+              <div className={`w-full ${isMobile ? 'max-h-[70vh] rounded-t-3xl' : 'max-w-sm rounded-[32px]'} border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]`}>
                 <div className="flex items-center justify-between gap-4 mb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Select weight</p>
@@ -6333,8 +6334,8 @@ function App() {
           )}
 
           {showFlavorPopup && selectedCartProduct && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-              <div className="w-full max-w-sm rounded-[32px] border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]">
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+              <div className={`w-full ${isMobile ? 'max-h-[70vh] rounded-t-3xl' : 'max-w-sm rounded-[32px]'} border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]`}>
                 <div className="flex items-center justify-between gap-4 mb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Choose flavor</p>
@@ -6372,7 +6373,13 @@ function App() {
             </div>
           )}
 
-          <div className={`min-w-0 lg:sticky lg:top-0 rounded-[16px] border shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <div className={`min-w-0 lg:sticky lg:top-0 rounded-[16px] border shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'} ${isMobile ? (showMobileCart ? 'fixed inset-0 z-50 rounded-none flex flex-col' : 'hidden') : ''}`}>
+            {isMobile && showMobileCart && (
+              <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-inherit">
+                <h3 className="text-base font-semibold text-slate-100">🛒 Cart ({cart.length} items)</h3>
+                <button onClick={() => setShowMobileCart(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700">✕</button>
+              </div>
+            )}
             <div className="px-3 pt-1.5 mb-2 relative">
               <div className="absolute top-1.5 right-3">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-md">
@@ -6463,9 +6470,19 @@ function App() {
           </div>
         </section>
 
+        {isMobile && cart.length > 0 && !showMobileCart && (
+          <button
+            onClick={() => setShowMobileCart(true)}
+            className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(16,185,129,0.5)] active:scale-95 transition-all duration-200"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🛒</span>
+            <span>{cart.reduce((sum, it) => sum + (it.quantity || 0), 0)} items · {cart.reduce((sum, it) => sum + (Number(it.price) || 0) * (it.quantity || 0), 0)} PKR</span>
+          </button>
+        )}
+
         {showCustomerDetailsPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
-            <div className="w-full max-w-md rounded-[32px] border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] max-h-[calc(100vh-3rem)] overflow-y-auto flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+            <div className={`w-full ${isMobile ? 'max-h-[85vh] rounded-t-3xl' : 'max-w-md rounded-[32px]'} border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto ${isMobile ? '' : 'max-h-[calc(100vh-3rem)]'}`}>
               {popupError && <div className="mb-4 rounded-3xl border border-rose-500 bg-rose-900/20 px-4 py-3 text-sm text-rose-200 font-semibold">{popupError}</div>}
               <div className="flex items-center justify-between">
                 <div>
