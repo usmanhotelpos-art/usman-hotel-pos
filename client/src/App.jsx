@@ -985,7 +985,7 @@ function App() {
     }
   };
   const [riderBookMainTab, setRiderBookMainTab] = useState('live');
-  const [riderBookSubTab, setRiderBookSubTab] = useState('cash');
+  const [riderBookSubTab, setRiderBookSubTab] = useState('all');
   const [deliveryPaymentStatusFilter, setDeliveryPaymentStatusFilter] = useState('all');
   const [riderBookFilterRider, setRiderBookFilterRider] = useState('');
   const [riderBookDateFilter, setRiderBookDateFilter] = useState('today');
