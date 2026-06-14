@@ -140,9 +140,19 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_riderTab == 'assigned') {
         _assignedOrders = await ApiService.getAssignedOrders(_rider.id);
       } else if (_riderTab == 'deliveredCash') {
-        _deliveredCashOrders = await ApiService.getDeliveredOrders(_rider.id, 'cash');
+        final orders = await ApiService.getDeliveredOrders(_rider.id, 'cash');
+        // Filter out orders that have been marked as Paid (Completed) from Rider Book
+        _deliveredCashOrders = orders.where((o) {
+          final orig = o['originalOrder'] as Map<String, dynamic>? ?? o;
+          return orig['status']?.toString() != 'Completed' && orig['paymentStatus']?.toString() != 'Paid';
+        }).toList();
       } else if (_riderTab == 'deliveredOnline') {
-        _deliveredOnlineOrders = await ApiService.getDeliveredOrders(_rider.id, 'online');
+        final orders = await ApiService.getDeliveredOrders(_rider.id, 'online');
+        // Filter out orders that have been marked as Paid (Completed) from Rider Book
+        _deliveredOnlineOrders = orders.where((o) {
+          final orig = o['originalOrder'] as Map<String, dynamic>? ?? o;
+          return orig['status']?.toString() != 'Completed' && orig['paymentStatus']?.toString() != 'Paid';
+        }).toList();
       } else if (_riderTab == 'newOrders' && _isAdminRider) {
         final allOrders = await ApiService.getAllOrders();
         _newDeliveryOrders = allOrders.where((o) {

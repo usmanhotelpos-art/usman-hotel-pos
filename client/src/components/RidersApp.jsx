@@ -219,10 +219,10 @@ export function RidersApp() {
   };
 
   const openSummaryModal = (type) => {
-    const orders = type === 'cash' ? deliveredCashOrders : deliveredOnlineOrders;
+    const orders = type === 'cash' ? activeDeliveredCashOrders : activeDeliveredOnlineOrders;
     const data = calculateSummaryForOrders(orders, type);
-    const cashAmount = calculateSummaryForOrders(deliveredCashOrders, 'cash').riderAmount;
-    const onlineAmount = calculateSummaryForOrders(deliveredOnlineOrders, 'online').riderAmount;
+    const cashAmount = calculateSummaryForOrders(activeDeliveredCashOrders, 'cash').riderAmount;
+    const onlineAmount = calculateSummaryForOrders(activeDeliveredOnlineOrders, 'online').riderAmount;
     const difference = cashAmount - onlineAmount;
     setSummaryType(type);
     setSummaryData({
@@ -237,8 +237,25 @@ export function RidersApp() {
     setShowSummaryModal(false);
   };
 
-  const cashSummaryData = calculateSummaryForOrders(deliveredCashOrders, 'cash');
-  const onlineSummaryData = calculateSummaryForOrders(deliveredOnlineOrders, 'online');
+  // Filter out orders that have been marked as Paid (Completed) from Rider App delivered tabs
+  // These should remain in the main Rider Book Paid tab only
+  const activeDeliveredCashOrders = useMemo(() =>
+    deliveredCashOrders.filter(order => {
+      const po = order.originalOrder || order;
+      return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+    }),
+    [deliveredCashOrders]
+  );
+  const activeDeliveredOnlineOrders = useMemo(() =>
+    deliveredOnlineOrders.filter(order => {
+      const po = order.originalOrder || order;
+      return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+    }),
+    [deliveredOnlineOrders]
+  );
+
+  const cashSummaryData = calculateSummaryForOrders(activeDeliveredCashOrders, 'cash');
+  const onlineSummaryData = calculateSummaryForOrders(activeDeliveredOnlineOrders, 'online');
 
   const headerCashSummaryData = cashSummaryData;
   const headerOnlineSummaryData = onlineSummaryData;
@@ -483,7 +500,12 @@ export function RidersApp() {
         });
         if (res.ok) {
           const data = await res.json();
-          setDeliveredCashOrders(deduplicateOrders(data));
+          // Filter out orders that have been marked as Paid (Completed) from Rider Book
+          const filtered = (Array.isArray(data) ? data : []).filter(order => {
+            const po = order.originalOrder || order;
+            return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+          });
+          setDeliveredCashOrders(deduplicateOrders(filtered));
         }
       } else if (riderTab === 'deliveredOnline') {
         const res = await fetch(`${apiBase}/rider/delivered-orders/${rider.id}/online`, {
@@ -491,7 +513,12 @@ export function RidersApp() {
         });
         if (res.ok) {
           const data = await res.json();
-          setDeliveredOnlineOrders(deduplicateOrders(data));
+          // Filter out orders that have been marked as Paid (Completed) from Rider Book
+          const filtered = (Array.isArray(data) ? data : []).filter(order => {
+            const po = order.originalOrder || order;
+            return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+          });
+          setDeliveredOnlineOrders(deduplicateOrders(filtered));
         }
       }
     } catch (error) {
@@ -1066,18 +1093,18 @@ export function RidersApp() {
                 <div className="mt-3 flex items-center gap-3">
                   <CheckCircle size={24} className="text-emerald-400" />
                   <div>
-                    <p className="text-2xl font-semibold text-white">{deliveredCashOrders.length + deliveredOnlineOrders.length}</p>
+                    <p className="text-2xl font-semibold text-white">{activeDeliveredCashOrders.length + activeDeliveredOnlineOrders.length}</p>
                     <p className="text-sm text-slate-500">Total completed</p>
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
                   <div className="rounded-2xl bg-slate-950/80 p-2 text-center">
                     <p className="font-semibold text-white">Cash</p>
-                    <p>{deliveredCashOrders.length}</p>
+                    <p>{activeDeliveredCashOrders.length}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-950/80 p-2 text-center">
                     <p className="font-semibold text-white">Online</p>
-                    <p>{deliveredOnlineOrders.length}</p>
+                    <p>{activeDeliveredOnlineOrders.length}</p>
                   </div>
                 </div>
               </div>
@@ -1197,7 +1224,9 @@ export function RidersApp() {
                         }}
                         className="mt-3 inline-flex cursor-pointer rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:bg-white/10"
                       >
-                        Summary
+                        {tab.key === 'deliveredCash'
+                          ? `${formatCurrency(cashSummaryData.riderAmount)} (${activeDeliveredCashOrders.length})`
+                          : `${formatCurrency(onlineSummaryData.riderAmount)} (${activeDeliveredOnlineOrders.length})`}
                       </span>
                     )}
                   </div>
@@ -1345,10 +1374,10 @@ export function RidersApp() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {deliveredCashOrders.length === 0 ? (
+              {activeDeliveredCashOrders.length === 0 ? (
                 <p className="text-gray-500 col-span-full text-center py-8">No cash delivery records</p>
               ) : (
-                deliveredCashOrders.map((order) => (
+                activeDeliveredCashOrders.map((order) => (
                   <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-emerald-200">
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -1431,10 +1460,10 @@ export function RidersApp() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {deliveredOnlineOrders.length === 0 ? (
+              {activeDeliveredOnlineOrders.length === 0 ? (
                 <p className="text-gray-500 col-span-full text-center py-8">No online payment delivery records</p>
               ) : (
-                deliveredOnlineOrders.map((order) => (
+                activeDeliveredOnlineOrders.map((order) => (
                   <div key={order.id} className="bg-white rounded-lg shadow p-4 border border-blue-200">
                     <div className="flex justify-between items-start mb-3">
                       <div>

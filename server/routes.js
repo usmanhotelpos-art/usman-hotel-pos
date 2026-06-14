@@ -1127,7 +1127,9 @@ router.get('/rider/delivered-orders/:riderId/:paymentMethod', authenticate, (req
   if (rider || isAdminRider) {
     const riderName = rider ? (rider.name || '').toLowerCase() : null;
     posOrders.forEach((po) => {
-      if ((po.status || '').toLowerCase() === 'payment collected') {
+      const orderStatus = (po.status || '').toLowerCase();
+      const paymentStatus = (po.paymentStatus || '').toLowerCase();
+      if (orderStatus === 'payment collected' && orderStatus !== 'completed' && paymentStatus !== 'paid') {
         const matchesPayment = paymentMethod.toLowerCase() === 'cash' 
           ? (po.paymentMethod || '').toLowerCase() === 'cash'
           : paymentMethod.toLowerCase() === 'online'
@@ -1162,7 +1164,9 @@ router.get('/rider/delivered-orders/:riderId', authenticate, (req, res) => {
   if (rider || isAdminRider) {
     const riderName = rider ? (rider.name || '').toLowerCase() : null;
     posOrders.forEach((po) => {
-      if ((po.status || '').toLowerCase() === 'payment collected') {
+      const orderStatus = (po.status || '').toLowerCase();
+      const paymentStatus = (po.paymentStatus || '').toLowerCase();
+      if (orderStatus === 'payment collected' && orderStatus !== 'completed' && paymentStatus !== 'paid') {
         if (isAdminRider || (riderName && (po.deliveryAgent || '').toLowerCase() === riderName)) {
           deliveredOrders.push({
             id: po.id,
