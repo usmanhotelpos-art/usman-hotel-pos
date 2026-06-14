@@ -3118,10 +3118,11 @@ function App() {
       const summary = getEditingOrderSummary();
       const payload = {
         items: editingOrderCart,
+        orderType: orderEditForm.orderType,
         customerName: orderEditForm.customerName,
         phone: orderEditForm.phone,
         address: orderEditForm.orderType === 'Delivery' ? orderEditForm.address : '',
-        tableNumber: orderEditForm.tableNumber,
+        tableNumber: orderEditForm.orderType === 'Dine-In' ? orderEditForm.tableNumber : '',
         deliveryAgent: orderEditForm.orderType === 'Delivery' ? orderEditForm.deliveryAgent : '',
         serviceType: orderEditForm.orderType === 'Delivery' ? orderEditForm.serviceType : '',
         deliveryFee: orderEditForm.orderType === 'Delivery' ? Number(orderEditForm.deliveryFee) || 0 : 0,
@@ -3142,6 +3143,9 @@ function App() {
       setOrderModalOpen(false);
       setEditingOrder(null);
       setEditingOrderCart([]);
+      const tabMap = { 'Delivery': 'delivery', 'Takeaway': 'takeaway', 'Dine-In': 'dinein' };
+      const newTab = tabMap[orderEditForm.orderType] || 'delivery';
+      setOrdersMainTab(newTab);
       await loadOrdersData();
       await loadPosData();
     } catch (error) {
