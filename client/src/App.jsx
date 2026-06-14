@@ -515,6 +515,7 @@ function App() {
   const [dineinSubTab, setDineinSubTab] = useState('tables');
   const [deliverySettingsSubTab, setDeliverySettingsSubTab] = useState('serviceTypes');
   const [deliveryViewMode, setDeliveryViewMode] = useState('table');
+  const [deliveryActionOpen, setDeliveryActionOpen] = useState(null);
   const [takeawayViewMode, setTakeawayViewMode] = useState('table');
   const [selectedRider, setSelectedRider] = useState('');
   const [bulkRiderAssignmentOpen, setBulkRiderAssignmentOpen] = useState(false);
@@ -9448,6 +9449,37 @@ function App() {
                           <span>{order.paymentStatus || '-'}</span>
                         </div>
                         <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</span>
+                        <div className="relative">
+                          <button
+                            onClick={() => setDeliveryActionOpen(deliveryActionOpen === order.id ? null : order.id)}
+                            className="rounded-full border border-slate-700 bg-slate-950 p-1.5 text-slate-200"
+                            title="Actions"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5C7 2 2.7 4.4 1 8.5 2.7 12.6 7 15 12 15s9.3-2.4 11-6.5C21.3 4.4 17 2 12 2zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
+                          </button>
+                          {deliveryActionOpen === order.id && (
+                            <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
+                              <button onClick={() => { setOrderDetailsModal(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
+                                View
+                              </button>
+                              <button onClick={() => { deleteOrder(order.id); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-rose-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                Delete
+                              </button>
+                              <button onClick={() => { printReceipt(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                Print
+                              </button>
+                              {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
+                                <button onClick={() => { openRiderAssignmentModal(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-purple-300 hover:bg-slate-800 flex items-center gap-1.5">
+                                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                                  Assign Rider
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
