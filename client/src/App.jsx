@@ -9472,7 +9472,7 @@ function App() {
                           </button>
                           {deliveryActionOpen === order.id && (
                             <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
-                              <button onClick={() => { openOrderModal(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                              <button onClick={() => { openOrderForEditInPos(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                 Edit
                               </button>
