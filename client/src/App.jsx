@@ -999,6 +999,7 @@ function App() {
   const [riderBookActionOpen, setRiderBookActionOpen] = useState(null);
   const [showRiderBookSummaryModal, setShowRiderBookSummaryModal] = useState(false);
   const [showMobileRiderFilters, setShowMobileRiderFilters] = useState(false);
+  const [showOrdersMobileFilters, setShowOrdersMobileFilters] = useState(false);
   const [riderBookSummaryType, setRiderBookSummaryType] = useState('cash');
   const [riderBookSummaryData, setRiderBookSummaryData] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -8725,18 +8726,138 @@ function App() {
   function renderOrders() {
     return (
       <div className="space-y-6">
-        <div className="flex flex-wrap gap-3">
-          <button onClick={() => setOrdersMainTab('delivery')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'delivery' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Delivery Orders</button>
-          <button onClick={() => setOrdersMainTab('takeaway')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'takeaway' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Takeaway Orders</button>
-          <button onClick={() => setOrdersMainTab('dinein')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'dinein' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Dine-In Orders</button>
-          <button onClick={() => setOrdersMainTab('online')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'online' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Online Orders</button>
-          <button onClick={() => setOrdersMainTab('deliverySettings')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'deliverySettings' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Delivery Settings</button>
+        {/* Desktop */}
+        <div className="hidden md:block space-y-6">
+          <div className="flex flex-wrap gap-3">
+            <button onClick={() => setOrdersMainTab('delivery')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'delivery' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Delivery Orders</button>
+            <button onClick={() => setOrdersMainTab('takeaway')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'takeaway' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Takeaway Orders</button>
+            <button onClick={() => setOrdersMainTab('dinein')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'dinein' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Dine-In Orders</button>
+            <button onClick={() => setOrdersMainTab('online')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'online' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Online Orders</button>
+            <button onClick={() => setOrdersMainTab('deliverySettings')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${ordersMainTab === 'deliverySettings' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Delivery Settings</button>
+          </div>
+          {ordersMainTab === 'delivery' && renderDeliveryOrders()}
+          {ordersMainTab === 'takeaway' && renderTakeawayOrders()}
+          {ordersMainTab === 'dinein' && renderDineinOrders()}
+          {ordersMainTab === 'online' && renderOnlineOrders()}
+          {ordersMainTab === 'deliverySettings' && renderDeliverySettings()}
         </div>
-        {ordersMainTab === 'delivery' && renderDeliveryOrders()}
-        {ordersMainTab === 'takeaway' && renderTakeawayOrders()}
-        {ordersMainTab === 'dinein' && renderDineinOrders()}
-        {ordersMainTab === 'online' && renderOnlineOrders()}
-        {ordersMainTab === 'deliverySettings' && renderDeliverySettings()}
+
+        {/* Mobile */}
+        <div className="md:hidden space-y-3">
+          {/* Filter trigger + search row */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowOrdersMobileFilters(true)}
+              className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700 flex items-center gap-2"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+              </svg>
+              Filters
+            </button>
+            <input
+              type="text"
+              placeholder="Search order#, address, phone..."
+              value={orderSearch}
+              onChange={(e) => setOrderSearch(e.target.value)}
+              className="flex-1 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Delivery sub-tabs outside popup */}
+          {ordersMainTab === 'delivery' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeliverySubTab('kitchen')}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'kitchen' ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' : 'bg-slate-800 text-slate-300'}`}
+              >
+                🆕 New
+              </button>
+              <button
+                onClick={() => setDeliverySubTab('assigned')}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'assigned' ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' : 'bg-slate-800 text-slate-300'}`}
+              >
+                👤 Assigned
+              </button>
+            </div>
+          )}
+
+          {/* Mobile orders view */}
+          {ordersMainTab === 'delivery' && renderDeliveryOrders()}
+          {ordersMainTab === 'takeaway' && renderTakeawayOrders()}
+          {ordersMainTab === 'dinein' && renderDineinOrders()}
+          {ordersMainTab === 'online' && renderOnlineOrders()}
+          {ordersMainTab === 'deliverySettings' && renderDeliverySettings()}
+        </div>
+
+        {/* Mobile filters popup */}
+        {showOrdersMobileFilters && (
+          <div className="md:hidden fixed inset-0 z-50 flex items-start pt-12 justify-center bg-slate-950/80 p-4">
+            <div className="w-full max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm font-semibold text-white">Filters</div>
+                <button onClick={() => setShowOrdersMobileFilters(false)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 hover:border-rose-500">Close</button>
+              </div>
+              <div className="space-y-4">
+                {/* Main tabs */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Order Type</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['delivery', 'takeaway', 'dinein', 'online', 'deliverySettings'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => { setOrdersMainTab(tab); setShowOrdersMobileFilters(false); }}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${ordersMainTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                      >
+                        {tab === 'delivery' ? 'Delivery Orders' : tab === 'takeaway' ? 'Takeaway Orders' : tab === 'dinein' ? 'Dine-In Orders' : tab === 'online' ? 'Online Orders' : 'Delivery Settings'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Date filters for delivery */}
+                {ordersMainTab === 'delivery' && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Date Filter</div>
+                    <div className="flex flex-wrap gap-2">
+                      {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+                        <button
+                          key={filter}
+                          onClick={() => { setDeliveryDateFilter(filter); setOrderPageIndex(0); }}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${deliveryDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                        >
+                          {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'previous-5-days' ? 'Last 5 Days' : 'Custom'}
+                        </button>
+                      ))}
+                    </div>
+                    {deliveryDateFilter === 'custom' && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <input type="date" value={deliveryCustomDateFrom} onChange={(e) => { setDeliveryCustomDateFrom(e.target.value); setOrderPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                        <span className="text-slate-400">to</span>
+                        <input type="date" value={deliveryCustomDateTo} onChange={(e) => { setDeliveryCustomDateTo(e.target.value); setOrderPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* "All" sub-tab for delivery */}
+                {ordersMainTab === 'delivery' && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Show</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => { setDeliverySubTab('all'); setShowOrdersMobileFilters(false); }}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                      >
+                        📋 All Orders
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -8982,304 +9103,371 @@ function App() {
     const pageCount = orderPageSize > 0 ? Math.max(1, Math.ceil(filteredOrders.length / orderPageSize)) : 1;
     const paginatedOrders = orderPageSize > 0 ? filteredOrders.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize) : filteredOrders;
     return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            {['kitchen', 'assigned', 'all'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setDeliverySubTab(status)}
-                className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-transform transform hover:-translate-y-0.5 ${deliverySubTab === status ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg scale-105' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-              >
-                <span className="text-lg">{status === 'kitchen' ? '🆕' : status === 'assigned' ? '👤' : '📋'}</span>
-                <span className="uppercase text-xs tracking-wide">{status === 'kitchen' ? 'New' : status === 'assigned' ? 'Assigned' : 'All'}</span>
-              </button>
-            ))}
+      <>
+        {/* Desktop */}
+        <div className="hidden md:block space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              {['kitchen', 'assigned', 'all'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setDeliverySubTab(status)}
+                  className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-transform transform hover:-translate-y-0.5 ${deliverySubTab === status ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg scale-105' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  <span className="text-lg">{status === 'kitchen' ? '🆕' : status === 'assigned' ? '👤' : '📋'}</span>
+                  <span className="uppercase text-xs tracking-wide">{status === 'kitchen' ? 'New' : status === 'assigned' ? 'Assigned' : 'All'}</span>
+                </button>
+              ))}
 
-            <div className="relative mt-1">
-              <input
-                type="text"
-                placeholder="🔎 Search order#, address, phone..."
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                className="w-72 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500 transition-shadow shadow-sm"
-              />
+              <div className="relative mt-1">
+                <input
+                  type="text"
+                  placeholder="🔎 Search order#, address, phone..."
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  className="w-72 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500 transition-shadow shadow-sm"
+                />
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+                <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18"/></svg>
+                <select value={orderFilterRider} onChange={(e) => setOrderFilterRider(e.target.value)} className="bg-transparent outline-none text-sm px-2">
+                  <option value="">All Riders</option>
+                  {Array.from(new Set(deliveryOrders.map((order) => order.deliveryAgent).filter(Boolean))).map((rider) => (
+                    <option key={rider} value={rider}>{rider}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+                <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8M8 12h8"/></svg>
+                <select value={orderFilterPayment} onChange={(e) => setOrderFilterPayment(e.target.value)} className="bg-transparent outline-none text-sm px-2">
+                  <option value="">All Payments</option>
+                  {Array.from(new Set(deliveryOrders.map((order) => order.paymentMethod).filter(Boolean))).map((method) => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-              <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18"/></svg>
-              <select value={orderFilterRider} onChange={(e) => setOrderFilterRider(e.target.value)} className="bg-transparent outline-none text-sm px-2">
-                <option value="">All Riders</option>
-                {Array.from(new Set(deliveryOrders.map((order) => order.deliveryAgent).filter(Boolean))).map((rider) => (
-                  <option key={rider} value={rider}>{rider}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-              <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8M8 12h8"/></svg>
-              <select value={orderFilterPayment} onChange={(e) => setOrderFilterPayment(e.target.value)} className="bg-transparent outline-none text-sm px-2">
-                <option value="">All Payments</option>
-                {Array.from(new Set(deliveryOrders.map((order) => order.paymentMethod).filter(Boolean))).map((method) => (
-                  <option key={method} value={method}>{method}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Filter by Date</div>
+              {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => {
+                    setDeliveryDateFilter(filter);
+                    setOrderPageIndex(0);
+                  }}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliveryDateFilter === filter ? 'bg-cyan-500 text-white shadow-inner' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
+                </button>
+              ))}
+              {deliveryDateFilter === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <input type="date" value={deliveryCustomDateFrom} onChange={(e) => { setDeliveryCustomDateFrom(e.target.value); setOrderPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200" />
+                  <span className="text-slate-400">to</span>
+                  <input type="date" value={deliveryCustomDateTo} onChange={(e) => { setDeliveryCustomDateTo(e.target.value); setOrderPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200" />
+                </div>
+              )}
+              <div className="inline-flex items-center gap-2 ml-2">
+                <button type="button" onClick={() => setDeliveryViewMode('tile')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'tile' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Tile view">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h7v7H4v-7zm9 5h7v2h-7v-2z" fill="currentColor"/></svg>
+                </button>
+                <button type="button" onClick={() => setDeliveryViewMode('table')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'table' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Table view">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4z" fill="currentColor"/></svg>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Filter by Date</div>
-            {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
-              <button
-                key={filter}
-                onClick={() => {
-                  setDeliveryDateFilter(filter);
-                  setOrderPageIndex(0);
-                }}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${deliveryDateFilter === filter ? 'bg-cyan-500 text-white shadow-inner' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-              >
-                {filter === 'today' ? '📅 Today' : filter === 'yesterday' ? '📅 Yesterday' : filter === 'previous-5-days' ? '📅 Last 5 Days' : '📅 Custom'}
-              </button>
-            ))}
-            {deliveryDateFilter === 'custom' && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={deliveryCustomDateFrom} onChange={(e) => { setDeliveryCustomDateFrom(e.target.value); setOrderPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200" />
-                <span className="text-slate-400">to</span>
-                <input type="date" value={deliveryCustomDateTo} onChange={(e) => { setDeliveryCustomDateTo(e.target.value); setOrderPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200" />
+          <div className={`transition-opacity duration-200 ${deliveryLoading ? 'opacity-40 blur-sm' : 'opacity-100'}`}>
+
+          {selectedOrders.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 p-4 gap-3">
+                <div className="text-sm text-slate-300">
+                  {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={clearOrderSelection} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Clear</button>
+                  <button onClick={openBulkRiderAssignmentModal} className="rounded-3xl border border-purple-600 bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500">Assign Rider</button>
+                </div>
               </div>
-            )}
-            <div className="inline-flex items-center gap-2 ml-2">
-              <button type="button" onClick={() => setDeliveryViewMode('tile')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'tile' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Tile view">
-                <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h7v7H4v-7zm9 5h7v2h-7v-2z" fill="currentColor"/></svg>
-              </button>
-              <button type="button" onClick={() => setDeliveryViewMode('table')} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition ${deliveryViewMode === 'table' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}`} title="Table view">
-                <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4z" fill="currentColor"/></svg>
-              </button>
+          )}
+
+          {deliveryViewMode === 'table' ? (
+            <div className="overflow-x-auto rounded-[32px] border border-slate-800 bg-slate-900 p-2 shadow-soft">
+              <table className="w-full min-w-[900px] text-left text-xs text-slate-100">
+                <thead className="border-b border-slate-800 text-slate-400">
+                  <tr>
+                    <th className="px-2 py-2">
+                        <input
+                          type="checkbox"
+                          checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
+                          onChange={(e) => e.target.checked ? selectAllOrders(paginatedOrders) : clearOrderSelection()}
+                          className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                        />
+                    </th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Order #</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Delivery address</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Phone</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Service type</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Products</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Total</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Rider</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Payment</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Date</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {paginatedOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-slate-950/80 transition">
+                      <td className="px-2 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.includes(order.id)}
+                            onChange={() => toggleOrderSelection(order.id)}
+                            className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                          />
+                      </td>
+                      <td className="px-2 py-2 text-xs font-semibold text-white">{order.orderNumber || order.id}</td>
+                      <td className="px-2 py-2 max-w-[150px] truncate text-slate-300 text-xs">{order.address || '-'}</td>
+                      <td className="px-2 py-2 text-slate-300 text-xs">{order.phone || '-'}</td>
+                      <td className="px-2 py-2 text-slate-300 text-xs">{order.serviceType || '-'}</td>
+                      <td className="px-2 py-2 text-slate-300 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
+                          <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 font-semibold text-white text-xs">{order.total || order.amount || 0} Rs</td>
+                      <td className="px-2 py-2 text-slate-300 text-xs">{order.deliveryAgent || 'Unassigned'}</td>
+                      <td className="px-2 py-2">
+                        <div className="inline-flex items-center gap-0.5 rounded-xl border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-[10px] font-medium text-slate-200 group">
+                          {order.paymentStatus ? (
+                            <>
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse group-hover:animate-bounce"></span>
+                              <span className="truncate">{order.paymentStatus}</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-500">-</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 text-slate-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-wrap gap-2">
+                          {renderOrderEditButton(order)}
+                          <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                          </button>
+                          <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-2 text-slate-950 transition hover:bg-emerald-500">
+                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                          </button>
+                          {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
+                            <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="rounded-full border border-slate-700 bg-purple-600 px-3 py-2 text-white transition hover:bg-purple-500">
+                              <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-3">
+              {paginatedOrders.map((order) => {
+                const paidStatus = ['Completed', 'Payment Collected', 'Delivered'].includes(order.status) ? 'Paid' : 'Due';
+                const isSelected = selectedOrders.includes(order.id);
+                return (
+                  <div key={order.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-soft hover:shadow-lg transition relative">
+                    {isSelected && (
+                      <div className="absolute -top-2 -right-2 z-10 h-6 w-6 rounded-full bg-emerald-600 flex items-center justify-center">
+                        <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleOrderSelection(order.id)}
+                            className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div>
+                            <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
+                            {order.customerName && (
+                              <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
+                            )}
+                          </div>
+                        </div>
+                      <div className="space-y-2 text-right">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${paidStatus === 'Paid' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>{paidStatus}</span>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Products</div>
+                          <div className="text-sm font-semibold text-white">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`mt-4 space-y-3 divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-200'} text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <div className="flex items-center justify-between gap-2 pb-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Items</span><span>{(order.items || []).length}</span></div>
+                      <div className="flex items-center justify-between gap-2 py-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Products</span><span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span></div>
+                      <div className="flex items-center justify-between gap-2 pt-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Address</span><span className="truncate text-right">{order.address || '-'}</span></div>
+                    </div>
+                    <div className="space-y-4 pt-3">
+                      <div className="rounded-[24px] border border-slate-800 bg-slate-950/60 p-4">
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Delivery address</p>
+                        <div className="mt-2 text-sm font-semibold text-white">{order.address || '-'}</div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Phone</p>
+                          <div className="mt-2 text-sm text-slate-200">{order.phone || '-'}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Service type</p>
+                          <div className="mt-2 text-sm text-slate-200">{order.serviceType || '-'}</div>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Products</p>
+                          <div className="mt-2 text-sm text-slate-200">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Total</p>
+                          <div className="mt-2 text-sm font-semibold text-white">{order.total || order.amount || 0} Rs</div>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Rider</p>
+                          <div className="mt-2 text-sm text-slate-200">{order.deliveryAgent || 'Unassigned'}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Date & time</p>
+                          <div className="mt-2 text-sm text-slate-200">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-500`}>
+                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                        </button>
+                        <button type="button" title="Print order" onClick={() => printReceipt(order)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-600 bg-emerald-600 text-slate-950 shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-emerald-500`}>
+                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                        </button>
+                        {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
+                          <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-purple-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-purple-500">
+                            <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
+                          </button>
+                        )}
+                        {renderOrderEditButton(order)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+            <div>{filteredOrders.length ? (orderPageSize > 0 ? `Showing ${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, filteredOrders.length)} of ${filteredOrders.length} orders` : `Showing 1-${filteredOrders.length} of ${filteredOrders.length} orders`) : 'No orders available'}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Per page:</span>
+              {[20, 50, 100, 'All'].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setOrderPageSize(size === 'All' ? 0 : size);
+                    setOrderPageIndex(0);
+                  }}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${orderPageSize === (size === 'All' ? 0 : size) ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button disabled={orderPageIndex === 0 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700">← Prev</button>
+              <span className="text-xs text-slate-400">Page {orderPageIndex + 1} of {pageCount}</span>
+              <button disabled={orderPageIndex >= pageCount - 1 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700">Next →</button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className={`transition-opacity duration-200 ${deliveryLoading ? 'opacity-40 blur-sm' : 'opacity-100'}`}>
-
-        {selectedOrders.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 p-4 gap-3">
-              <div className="text-sm text-slate-300">
-                {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={clearOrderSelection} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Clear</button>
-                <button onClick={openBulkRiderAssignmentModal} className="rounded-3xl border border-purple-600 bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500">Assign Rider</button>
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {selectedOrders.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 gap-2">
+              <div className="text-xs text-slate-300">{selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected</div>
+              <div className="flex gap-2">
+                <button onClick={clearOrderSelection} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">Clear</button>
+                <button onClick={openBulkRiderAssignmentModal} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1 text-xs font-semibold text-white">Assign Rider</button>
               </div>
             </div>
-        )}
+          )}
 
-        {deliveryViewMode === 'table' ? (
-          <div className="overflow-x-auto rounded-[32px] border border-slate-800 bg-slate-900 p-2 shadow-soft">
-            <table className="w-full min-w-[900px] text-left text-xs text-slate-100">
-              <thead className="border-b border-slate-800 text-slate-400">
-                <tr>
-                  <th className="px-2 py-2">
-                      <input
-                        type="checkbox"
-                        checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
-                        onChange={(e) => e.target.checked ? selectAllOrders(paginatedOrders) : clearOrderSelection()}
-                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                      />
-                  </th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Order #</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Delivery address</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Phone</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Service type</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Products</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Total</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Rider</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Payment</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Date</th>
-                  <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {paginatedOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-950/80 transition">
-                    <td className="px-2 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedOrders.includes(order.id)}
-                          onChange={() => toggleOrderSelection(order.id)}
-                          className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                        />
-                    </td>
-                    <td className="px-2 py-2 text-xs font-semibold text-white">{order.orderNumber || order.id}</td>
-                    <td className="px-2 py-2 max-w-[150px] truncate text-slate-300 text-xs">{order.address || '-'}</td>
-                    <td className="px-2 py-2 text-slate-300 text-xs">{order.phone || '-'}</td>
-                    <td className="px-2 py-2 text-slate-300 text-xs">{order.serviceType || '-'}</td>
-                    <td className="px-2 py-2 text-slate-300 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
-                        <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 font-semibold text-white text-xs">{order.total || order.amount || 0} Rs</td>
-                    <td className="px-2 py-2 text-slate-300 text-xs">{order.deliveryAgent || 'Unassigned'}</td>
-                    <td className="px-2 py-2">
-                      <div className="inline-flex items-center gap-0.5 rounded-xl border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-[10px] font-medium text-slate-200 group">
-                        {order.paymentStatus ? (
-                          <>
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse group-hover:animate-bounce"></span>
-                            <span className="truncate">{order.paymentStatus}</span>
-                          </>
-                        ) : (
-                          <span className="text-slate-500">-</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 text-slate-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
-                    <td className="px-2 py-2">
-                      <div className="flex flex-wrap gap-2">
-                        {renderOrderEditButton(order)}
-                        <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                        </button>
-                        <button type="button" title="Print order" onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-2 text-slate-950 transition hover:bg-emerald-500">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                        </button>
-                        {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
-                          <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="rounded-full border border-slate-700 bg-purple-600 px-3 py-2 text-white transition hover:bg-purple-500">
-                            <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-3">
-            {paginatedOrders.map((order) => {
-              const paidStatus = ['Completed', 'Payment Collected', 'Delivered'].includes(order.status) ? 'Paid' : 'Due';
-              const isSelected = selectedOrders.includes(order.id);
+          {paginatedOrders.length === 0 ? (
+            <div className="text-center text-sm text-slate-500 py-8">No orders found</div>
+          ) : (
+            paginatedOrders.map((order) => {
+              const paidStatusClass = ['Completed', 'Payment Collected', 'Delivered'].includes(order.status) ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300';
               return (
-                <div key={order.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-soft hover:shadow-lg transition relative">
-                  {isSelected && (
-                    <div className="absolute -top-2 -right-2 z-10 h-6 w-6 rounded-full bg-emerald-600 flex items-center justify-center">
-                      <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleOrderSelection(order.id)}
-                          className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <div>
-                          <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
-                          {order.customerName && (
-                            <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
-                          )}
+                <div key={order.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedOrders.includes(order.id)}
+                      onChange={() => toggleOrderSelection(order.id)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-semibold text-white text-sm truncate">{order.orderNumber || order.id}</div>
+                        <div className="font-semibold text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</div>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-400 truncate">{order.address || 'Walk-In'}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] text-slate-400">{order.deliveryAgent || '-'}</span>
+                        <span className="text-slate-600">|</span>
+                        <span className="text-[11px] text-slate-400">{order.serviceType || '-'}</span>
+                        <span className="text-slate-600">|</span>
+                        <span className="text-[11px] text-slate-400">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <div className={`inline-flex items-center gap-1 rounded-xl px-2 py-0.5 text-[10px] font-semibold ${paidStatusClass}`}>
+                          <span>{order.paymentStatus || '-'}</span>
                         </div>
+                        <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</span>
                       </div>
-                    <div className="space-y-2 text-right">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${paidStatus === 'Paid' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>{paidStatus}</span>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Products</div>
-                        <div className="text-sm font-semibold text-white">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`mt-4 space-y-3 divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-200'} text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                    <div className="flex items-center justify-between gap-2 pb-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Items</span><span>{(order.items || []).length}</span></div>
-                    <div className="flex items-center justify-between gap-2 py-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Products</span><span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span></div>
-                    <div className="flex items-center justify-between gap-2 pt-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Address</span><span className="truncate text-right">{order.address || '-'}</span></div>
-                  </div>
-                  <div className="space-y-4 pt-3">
-                    <div className="rounded-[24px] border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Delivery address</p>
-                      <div className="mt-2 text-sm font-semibold text-white">{order.address || '-'}</div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Phone</p>
-                        <div className="mt-2 text-sm text-slate-200">{order.phone || '-'}</div>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Service type</p>
-                        <div className="mt-2 text-sm text-slate-200">{order.serviceType || '-'}</div>
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Products</p>
-                        <div className="mt-2 text-sm text-slate-200">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</div>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Total</p>
-                        <div className="mt-2 text-sm font-semibold text-white">{order.total || order.amount || 0} Rs</div>
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Rider</p>
-                        <div className="mt-2 text-sm text-slate-200">{order.deliveryAgent || 'Unassigned'}</div>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Date & time</p>
-                        <div className="mt-2 text-sm text-slate-200">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-500`}>
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                      </button>
-                      <button type="button" title="Print order" onClick={() => printReceipt(order)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-600 bg-emerald-600 text-slate-950 shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-emerald-500`}>
-                        <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                      </button>
-                      {deliverySubTab === 'kitchen' && !order.deliveryAgent && (
-                        <button type="button" title="Assign rider" onClick={() => openRiderAssignmentModal(order)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-purple-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-purple-500">
-                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>
-                        </button>
-                      )}
-                      {renderOrderEditButton(order)}
                     </div>
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
-          <div>{filteredOrders.length ? (orderPageSize > 0 ? `Showing ${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, filteredOrders.length)} of ${filteredOrders.length} orders` : `Showing 1-${filteredOrders.length} of ${filteredOrders.length} orders`) : 'No orders available'}</div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Per page:</span>
-            {[20, 50, 100, 'All'].map((size) => (
-              <button
-                key={size}
-                onClick={() => {
-                  setOrderPageSize(size === 'All' ? 0 : size);
-                  setOrderPageIndex(0);
-                }}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${orderPageSize === (size === 'All' ? 0 : size) ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <button disabled={orderPageIndex === 0 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700">← Prev</button>
-            <span className="text-xs text-slate-400">Page {orderPageIndex + 1} of {pageCount}</span>
-            <button disabled={orderPageIndex >= pageCount - 1 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50 transition hover:bg-slate-700">Next →</button>
-          </div>
+            })
+          )}
+
+          {paginatedOrders.length > 0 && (
+            <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-300">
+              <div>{filteredOrders.length ? `${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, filteredOrders.length)} of ${filteredOrders.length}` : 'No orders'}</div>
+              <div className="flex items-center gap-2">
+                <button disabled={orderPageIndex === 0 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 disabled:opacity-50">←</button>
+                <span className="text-[10px] text-slate-400">{orderPageIndex + 1}/{pageCount}</span>
+                <button disabled={orderPageIndex >= pageCount - 1 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 disabled:opacity-50">→</button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+      </>
     );
   }
 
