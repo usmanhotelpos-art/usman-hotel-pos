@@ -324,13 +324,14 @@ function App() {
   );
 
   const availableDineInTables = useMemo(() => {
-    const occupiedTableNames = new Set(
-      posOrders
-        .filter((order) => order.orderType === 'Dine-In' && !['Completed', 'Payment Collected'].includes(normalizeText(order.status)))
-        .map((order) => normalizeText(order.tableNumber))
-        .filter(Boolean)
-    );
-    return posTables.filter((table) => !occupiedTableNames.has(normalizeText(getTableLabel(table))));
+    const dineinOrders = posOrders.filter((o) => o.orderType === 'Dine-In');
+    return posTables.filter((table) => {
+      const tableLabel = normalizeText(getTableLabel(table));
+      return !dineinOrders.some((o) =>
+        normalizeText(o.tableNumber) === tableLabel &&
+        !['completed', 'payment collected'].includes(normalizeText(o.status))
+      );
+    });
   }, [posTables, posOrders]);
 
   const [posSearch, setPosSearch] = useState('');
@@ -522,6 +523,7 @@ function App() {
   const [orderPageIndex, setOrderPageIndex] = useState(0);
   // default per-page to 20; pagination options will include 20,50,100 and All
   const [orderPageSize, setOrderPageSize] = useState(20);
+  const [showMobileOrderFilters, setShowMobileOrderFilters] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const [recentOrderTab, setRecentOrderTab] = useState('Delivery');
   const [recentOrderDateFilter, setRecentOrderDateFilter] = useState('today');
