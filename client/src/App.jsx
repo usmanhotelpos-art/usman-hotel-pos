@@ -996,7 +996,7 @@ function App() {
   const [riderBookCustomDateTo, setRiderBookCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [riderBookSelectedOrders, setRiderBookSelectedOrders] = useState([]);
   const [riderBookSearch, setRiderBookSearch] = useState('');
-  const [riderBookPageSize, setRiderBookPageSize] = useState(15);
+  const [riderBookPageSize, setRiderBookPageSize] = useState(Infinity);
   const [riderBookPageIndex, setRiderBookPageIndex] = useState(0);
   const [riderBookActionOpen, setRiderBookActionOpen] = useState(null);
   const [showRiderBookSummaryModal, setShowRiderBookSummaryModal] = useState(false);
@@ -4286,9 +4286,14 @@ function App() {
   }, { total: 0, extras: 0, serviceType: 0, bbqTandoor: 0 });
   selectedTotals.excluded = Math.max(0, selectedTotals.total - selectedTotals.extras - selectedTotals.serviceType);
 
-  const riderBookVisibleOrders = riderBookSearchFiltered;
-  const riderBookPageCount = Math.max(1, Math.ceil(riderBookVisibleOrders.length / riderBookPageSize));
-  const riderBookPaginatedOrders = riderBookVisibleOrders.slice(riderBookPageIndex * riderBookPageSize, (riderBookPageIndex + 1) * riderBookPageSize);
+  const riderBookVisibleOrders = [...riderBookSearchFiltered].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.date || 0);
+    const dateB = new Date(b.createdAt || b.date || 0);
+    return dateB - dateA;
+  });
+  const effectivePageSize = riderBookPageSize === Infinity ? riderBookVisibleOrders.length : riderBookPageSize;
+  const riderBookPageCount = Math.max(1, Math.ceil(riderBookVisibleOrders.length / effectivePageSize));
+  const riderBookPaginatedOrders = riderBookVisibleOrders.slice(riderBookPageIndex * effectivePageSize, (riderBookPageIndex + 1) * effectivePageSize);
   const riderBookTotals = riderBookVisibleOrders.reduce((sum, order) => {
     const amount = Number(order.total || order.amount || 0);
     sum.total += amount;
@@ -4397,8 +4402,9 @@ function App() {
     const riderBookCashSummary = calculateRiderBookSummary(riderBookCashSummaryOrders, 'cash');
     const riderBookOnlineSummary = calculateRiderBookSummary(riderBookOnlineSummaryOrders, 'online');
     const riderBookDifference = riderBookCashSummary.riderAmount - riderBookOnlineSummary.riderAmount;
-    const pageStart = riderBookPageIndex * riderBookPageSize + 1;
-    const pageEnd = Math.min((riderBookPageIndex + 1) * riderBookPageSize, riderBookVisibleOrders.length);
+    const effectivePageSize = riderBookPageSize === Infinity ? riderBookVisibleOrders.length : riderBookPageSize;
+    const pageStart = riderBookPageIndex * effectivePageSize + 1;
+    const pageEnd = Math.min((riderBookPageIndex + 1) * effectivePageSize, riderBookVisibleOrders.length);
 
     const getRiderBookPaymentStatus = (order) => {
       if (order.status === 'Payment Pending') return 'Due';
@@ -4596,6 +4602,46 @@ function App() {
           </button>
         </div>
 
+        {/* Mobile search, rider filter, sub-tabs (always visible on mobile) */}
+        <div className="md:hidden space-y-2">
+          <input
+            type="text"
+            value={riderBookSearch}
+            onChange={(e) => setRiderBookSearch(e.target.value)}
+            placeholder="Search rider, order, address..."
+            className="w-full rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+          <div className="flex gap-2">
+            <select
+              value={riderBookFilterRider}
+              onChange={(e) => { setRiderBookFilterRider(e.target.value); setRiderBookPageIndex(0); }}
+              className="flex-1 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500"
+            >
+              <option value="">All Riders</option>
+              {Array.from(new Set(riderBookAssignedOrders.map((o) => o.deliveryAgent).filter(Boolean))).map((rider) => (
+                <option key={rider} value={rider}>{rider}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {(riderBookMainTab === 'live' ? ['cash', 'online'] : ['due', 'paid', 'all']).map((sub) => {
+              const isActive = riderBookSubTab === sub;
+              const gradient = sub === 'cash' ? 'from-emerald-500 to-emerald-700' : sub === 'online' ? 'from-sky-500 to-indigo-600' : 'from-slate-700 to-slate-800';
+              return (
+                <button
+                  key={sub}
+                  onClick={() => setRiderBookSubTab(sub)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${isActive ? `bg-gradient-to-r ${gradient} text-white shadow-lg` : 'bg-slate-800 text-slate-300'}`}
+                >
+                  {riderBookMainTab === 'live'
+                    ? sub === 'all' ? 'All' : sub === 'cash' ? 'Cash' : 'Online'
+                    : sub === 'all' ? 'All' : sub === 'due' ? 'Due' : 'Paid'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Mobile filters popup */}
         {showMobileRiderFilters && (
           <div className="md:hidden fixed inset-0 z-50 flex items-start pt-12 justify-center bg-slate-950/80 p-4">
@@ -4658,23 +4704,6 @@ function App() {
                     </button>
                   ))}
                 </div>
-                <input
-                  type="text"
-                  value={riderBookSearch}
-                  onChange={(e) => setRiderBookSearch(e.target.value)}
-                  placeholder="Search rider, order, address..."
-                  className="w-full rounded-full border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
-                />
-                <select
-                  value={riderBookFilterRider}
-                  onChange={(e) => { setRiderBookFilterRider(e.target.value); setRiderBookPageIndex(0); }}
-                  className="w-full rounded-full border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
-                >
-                  <option value="">All Riders</option>
-                  {Array.from(new Set(riderBookAssignedOrders.map((o) => o.deliveryAgent).filter(Boolean))).map((rider) => (
-                    <option key={rider} value={rider}>{rider}</option>
-                  ))}
-                </select>
                 <div className="flex flex-wrap gap-1">
                   {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
                     <button
@@ -4693,23 +4722,6 @@ function App() {
                     <input type="date" value={riderBookCustomDateTo} onChange={(e) => { setRiderBookCustomDateTo(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
                   </div>
                 )}
-                <div className="flex flex-wrap gap-1">
-                  {(riderBookMainTab === 'live' ? ['cash', 'online'] : ['due', 'paid', 'all']).map((sub) => {
-                    const isActive = riderBookSubTab === sub;
-                    const gradient = sub === 'cash' ? 'from-emerald-500 to-emerald-700' : sub === 'online' ? 'from-sky-500 to-indigo-600' : 'from-slate-700 to-slate-800';
-                    return (
-                      <button
-                        key={sub}
-                        onClick={() => setRiderBookSubTab(sub)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${isActive ? `bg-gradient-to-r ${gradient} text-white shadow-lg` : 'bg-slate-800 text-slate-300'}`}
-                      >
-                        {riderBookMainTab === 'live'
-                          ? sub === 'all' ? 'All' : sub === 'cash' ? 'Cash' : 'Online'
-                          : sub === 'all' ? 'All' : sub === 'due' ? 'Due' : 'Paid'}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             </div>
           </div>
@@ -4917,15 +4929,15 @@ function App() {
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
             <div>Visible orders: <span className="font-semibold text-white">{riderBookVisibleOrders.length}</span></div>
             <div>Selected: <span className="font-semibold text-white">{riderBookSelectedOrders.length || 0}</span></div>
-            <div>Page size: <span className="font-semibold text-white">{riderBookPageSize}</span></div>
+            <div>Page size: <span className="font-semibold text-white">{riderBookPageSize === Infinity ? 'All' : riderBookPageSize}</span></div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
             <span>Show</span>
-            {[15, 50, 100].map((size) => (
+            {[15, 50, 100, 'All'].map((size) => (
               <button
                 key={size}
-                onClick={() => setRiderBookPageSize(size)}
-                className={`rounded-full px-3 py-2 font-semibold transition ${riderBookPageSize === size ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                onClick={() => setRiderBookPageSize(size === 'All' ? Infinity : size)}
+                className={`rounded-full px-3 py-2 font-semibold transition ${riderBookPageSize === size || (size === 'All' && riderBookPageSize === Infinity) ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
                 {size}
               </button>
