@@ -502,11 +502,11 @@ function App() {
   const [showFlavorPopup, setShowFlavorPopup] = useState(false);
   const [ordersMainTab, setOrdersMainTab] = useState('delivery');
   // default to show all delivery orders as requested
-  const [deliverySubTab, setDeliverySubTab] = useState('all');
+  const [deliverySubTab, setDeliverySubTab] = useState('kitchen');
   const [deliveryDateFilter, setDeliveryDateFilter] = useState('today');
   const [deliveryCustomDateFrom, setDeliveryCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [deliveryCustomDateTo, setDeliveryCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [takeawaySubTab, setTakeawaySubTab] = useState('all');
+  const [takeawaySubTab, setTakeawaySubTab] = useState('pay-later');
   const [takeawayDateFilter, setTakeawayDateFilter] = useState('today');
   const [takeawayCustomDateFrom, setTakeawayCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [takeawayCustomDateTo, setTakeawayCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -946,9 +946,7 @@ function App() {
   }, [deliverySubTab, orderSearch, orderFilterRider, orderFilterPayment, orderPageSize, deliveryDateFilter, deliveryCustomDateFrom, deliveryCustomDateTo]);
 
   useEffect(() => {
-    if (deliverySubTab !== 'kitchen' && selectedOrders.length > 0) {
-      setSelectedOrders([]);
-    }
+    setSelectedOrders([]);
   }, [deliverySubTab]);
 
   useEffect(() => {
@@ -8930,7 +8928,8 @@ function App() {
 
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
-    const filteredOrders = deliveryOrders.filter((o) => {
+    const sortedDelivery = [...deliveryOrders].sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
+    const filteredOrders = sortedDelivery.filter((o) => {
       const status = String(o.status || '').toLowerCase();
       const hasRider = Boolean(o.deliveryAgent);
       const isNewOrdersTab = deliverySubTab === 'kitchen';
@@ -9062,7 +9061,7 @@ function App() {
 
         <div className={`transition-opacity duration-200 ${deliveryLoading ? 'opacity-40 blur-sm' : 'opacity-100'}`}>
 
-        {deliverySubTab === 'kitchen' && selectedOrders.length > 0 && (
+        {selectedOrders.length > 0 && (
             <div className="flex flex-wrap items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 p-4 gap-3">
               <div className="text-sm text-slate-300">
                 {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
@@ -9080,14 +9079,12 @@ function App() {
               <thead className="border-b border-slate-800 text-slate-400">
                 <tr>
                   <th className="px-2 py-2">
-                    {deliverySubTab === 'kitchen' ? (
                       <input
                         type="checkbox"
                         checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
                         onChange={(e) => e.target.checked ? selectAllOrders(paginatedOrders) : clearOrderSelection()}
                         className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
                       />
-                    ) : null}
                   </th>
                   <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Order #</th>
                   <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Delivery address</th>
@@ -9105,14 +9102,12 @@ function App() {
                 {paginatedOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-950/80 transition">
                     <td className="px-2 py-2">
-                      {deliverySubTab === 'kitchen' ? (
                         <input
                           type="checkbox"
-                          checked={selectedOrders.includes(order.id)}
+                          checked={isSelected}
                           onChange={() => toggleOrderSelection(order.id)}
                           className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
                         />
-                      ) : null}
                     </td>
                     <td className="px-2 py-2 text-xs font-semibold text-white">{order.orderNumber || order.id}</td>
                     <td className="px-2 py-2 max-w-[150px] truncate text-slate-300 text-xs">{order.address || '-'}</td>
@@ -9177,7 +9172,6 @@ function App() {
                     </div>
                   )}
                   <div className="flex items-start justify-between gap-3">
-                    {deliverySubTab === 'kitchen' ? (
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -9192,16 +9186,6 @@ function App() {
                           )}
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <div>
-                          <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
-                          {order.customerName && (
-                            <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                     <div className="space-y-2 text-right">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${paidStatus === 'Paid' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>{paidStatus}</span>
@@ -9469,9 +9453,10 @@ function App() {
 
   function renderTakeawayOrders() {
     const takeawayOrders = posOrders.filter((o) => o.orderType === 'Takeaway');
+    const sortedTakeaway = [...takeawayOrders].sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
     
     // Filter logic for each tab
-    const filteredTakeaway = takeawayOrders.filter((o) => {
+    const filteredTakeaway = sortedTakeaway.filter((o) => {
       if (takeawaySubTab === 'all') return true;
       if (takeawaySubTab === 'paid') return o.status === 'Completed';
       if (takeawaySubTab === 'pay-later') return o.status === 'Pay Later';
@@ -9824,6 +9809,8 @@ function App() {
             return order.status === dineinOrderStatusFilter;
           });
     }
+
+    statusFiltered = [...statusFiltered].sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
 
     const summary = {
       orderCount: statusFiltered.length,
