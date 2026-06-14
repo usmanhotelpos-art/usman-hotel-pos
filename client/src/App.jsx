@@ -1021,6 +1021,8 @@ function App() {
   const [tableSectionFilter, setTableSectionFilter] = useState('Floor');
   const [dineinDateFrom, setDineinDateFrom] = useState('');
   const [dineinDateTo, setDineinDateTo] = useState('');
+  const [onlineDateFrom, setOnlineDateFrom] = useState('');
+  const [onlineDateTo, setOnlineDateTo] = useState('');
   const [dineinOrderSearch, setDineinOrderSearch] = useState('');
   const [dineinOrderStatusFilter, setDineinOrderStatusFilter] = useState('all');
   const [dineinPageIndex, setDineinPageIndex] = useState(0);
@@ -8890,6 +8892,55 @@ function App() {
                     </div>
                   </div>
                 )}
+
+                {/* Date filters for takeaway */}
+                {ordersMainTab === 'takeaway' && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Date Filter</div>
+                    <div className="flex flex-wrap gap-2">
+                      {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
+                        <button
+                          key={filter}
+                          onClick={() => { setTakeawayDateFilter(filter); setTakeawayPageIndex(0); }}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${takeawayDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                        >
+                          {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'previous-5-days' ? 'Last 5 Days' : 'Custom'}
+                        </button>
+                      ))}
+                    </div>
+                    {takeawayDateFilter === 'custom' && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <input type="date" value={takeawayCustomDateFrom} onChange={(e) => { setTakeawayCustomDateFrom(e.target.value); setTakeawayPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                        <span className="text-slate-400">to</span>
+                        <input type="date" value={takeawayCustomDateTo} onChange={(e) => { setTakeawayCustomDateTo(e.target.value); setTakeawayPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Date filters for dine-in */}
+                {ordersMainTab === 'dinein' && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Date Range</div>
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={dineinDateFrom} onChange={(e) => setDineinDateFrom(e.target.value)} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 flex-1" />
+                      <span className="text-slate-400">to</span>
+                      <input type="date" value={dineinDateTo} onChange={(e) => setDineinDateTo(e.target.value)} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 flex-1" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Date filters for online */}
+                {ordersMainTab === 'online' && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Date Range</div>
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={onlineDateFrom} onChange={(e) => setOnlineDateFrom(e.target.value)} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 flex-1" />
+                      <span className="text-slate-400">to</span>
+                      <input type="date" value={onlineDateTo} onChange={(e) => setOnlineDateTo(e.target.value)} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 flex-1" />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -9638,7 +9689,11 @@ function App() {
         (o.phone || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
         (o.address || '').toLowerCase().includes(orderSearch.toLowerCase());
       const matchesPayment = !orderFilterPayment || o.paymentMethod === orderFilterPayment;
-      return matchesSearch && matchesPayment;
+      let matchesDate = true;
+      const orderDate = o.createdAt ? new Date(o.createdAt) : o.date ? new Date(o.date) : null;
+      if (orderDate && onlineDateFrom) { const from = new Date(onlineDateFrom + 'T00:00:00'); if (orderDate < from) matchesDate = false; }
+      if (orderDate && onlineDateTo) { const to = new Date(onlineDateTo + 'T23:59:59'); if (orderDate > to) matchesDate = false; }
+      return matchesSearch && matchesPayment && matchesDate;
     });
     return (
       <>
