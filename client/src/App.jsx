@@ -10089,6 +10089,22 @@ function App() {
         </div>
         {/* Mobile cards */}
         <div className="md:hidden space-y-3">
+          {/* Sub-tab navigation */}
+          <div className="flex flex-wrap gap-2">
+            {['pay-later', 'all', 'paid', 'due'].map((status) => (
+              <button
+                key={status}
+                onClick={() => {
+                  setTakeawaySubTab(status);
+                  setTakeawayPageIndex(0);
+                  setSelectedTakeawayOrders([]);
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${takeawaySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {status === 'paid' ? 'Paid' : status === 'pay-later' ? 'Pay Later' : status === 'due' ? 'Due' : 'All'}
+              </button>
+            ))}
+          </div>
           {displayOrders.length === 0 ? (
             <div className="text-center text-sm text-slate-500 py-8">No orders found</div>
           ) : (
