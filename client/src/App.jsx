@@ -5438,15 +5438,28 @@ function App() {
   };
 
   const removeFromEditingCart = (productId) => {
-    setEditingOrderCart((prev) => prev.filter((item) => item.productId !== productId));
+    setEditingOrderCart((prev) => {
+      const idx = prev.findIndex((item) => item.productId === productId);
+      if (idx === -1) return prev;
+      const item = prev[idx];
+      if (item.quantity > 1) {
+        return prev.map((it, i) => i === idx ? { ...it, quantity: it.quantity - 1 } : it);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const updateEditingCartItem = (productId, delta) => {
-    setEditingOrderCart((prev) =>
-      prev
-        .map((item) => (item.productId === productId ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item))
-        .filter((item) => item.quantity > 0)
-    );
+    setEditingOrderCart((prev) => {
+      const idx = prev.findIndex((item) => item.productId === productId);
+      if (idx === -1) return prev;
+      const existing = prev[idx];
+      const newQty = existing.quantity + delta;
+      if (newQty <= 0) {
+        return prev.filter((_, i) => i !== idx);
+      }
+      return prev.map((it, i) => i === idx ? { ...it, quantity: newQty } : it);
+    });
   };
 
   const updateEditingCartNotes = (productId, notes) => {
@@ -9459,6 +9472,10 @@ function App() {
                           </button>
                           {deliveryActionOpen === order.id && (
                             <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
+                              <button onClick={() => { openOrderModal(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                                Edit
+                              </button>
                               <button onClick={() => { setOrderDetailsModal(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                                 View
@@ -11255,6 +11272,35 @@ function App() {
                         <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Details</p>
                         <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-soft space-y-3 max-h-[350px] overflow-y-auto">
                           <div>
+                            <label className="block text-xs font-medium text-slate-300 mb-1">Order Type</label>
+                            <div className="flex gap-1">
+                              {[
+                                { name: 'Dine-In', colors: 'from-emerald-500 to-emerald-600', icon: '🍽️' },
+                                { name: 'Takeaway', colors: 'from-amber-500 to-orange-500', icon: '🛍️' },
+                                { name: 'Delivery', colors: 'from-sky-500 to-blue-600', icon: '🚚' },
+                              ].map(({ name, colors, icon }) => (
+                                <button
+                                  key={name}
+                                  onClick={() => {
+                                    setOrderEditForm((prev) => ({
+                                      ...prev,
+                                      orderType: name,
+                                      ...(name !== 'Delivery' ? { address: '', serviceType: '', deliveryFee: 0, deliveryAgent: '' } : {}),
+                                      ...(name !== 'Dine-In' ? { tableNumber: '' } : {}),
+                                    }));
+                                  }}
+                                  className={`flex-1 rounded-full px-2 py-1.5 text-[10px] font-bold tracking-wide uppercase transition-all duration-200 text-center leading-tight ${
+                                    orderEditForm.orderType === name
+                                      ? `bg-gradient-to-br ${colors} text-white shadow-[0_2px_8px_rgba(16,185,129,0.35)]`
+                                      : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {icon} {name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
                             <label className="block text-xs font-medium text-slate-300 mb-1">Phone</label>
                             <input value={orderEditForm.phone} onChange={(e) => setOrderEditForm({ ...orderEditForm, phone: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" />
                           </div>
@@ -11275,6 +11321,28 @@ function App() {
                               </div>
                             </>
                           )}
+                          {orderEditForm.orderType === 'Dine-In' && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-300 mb-1">Table / Room</label>
+                              <select value={orderEditForm.tableNumber} onChange={(e) => setOrderEditForm({ ...orderEditForm, tableNumber: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500">
+                                <option value="">Select table or room</option>
+                                {availableDineInTables.length ? availableDineInTables.map((table) => {
+                                  const tableLabel = typeof table === 'object' ? (table.label || table.name || table.tableNumber || table.number) : table;
+                                  return <option key={tableLabel} value={tableLabel}>{tableLabel}</option>;
+                                }) : <option disabled>No tables available</option>}
+                              </select>
+                            </div>
+                          )}
+                          {orderEditForm.orderType === 'Takeaway' && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-300 mb-1">Customer Name</label>
+                              <input value={orderEditForm.customerName} onChange={(e) => setOrderEditForm({ ...orderEditForm, customerName: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" placeholder="Customer name (optional)" />
+                            </div>
+                          )}
+                          <div>
+                            <label className="block text-xs font-medium text-slate-300 mb-1">Notes</label>
+                            <textarea value={orderEditForm.notes} onChange={(e) => setOrderEditForm({ ...orderEditForm, notes: e.target.value })} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500" placeholder="Order notes" rows={2} />
+                          </div>
                         </div>
                       </div>
                     </div>
