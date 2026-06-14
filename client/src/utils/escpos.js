@@ -444,9 +444,10 @@ export function buildEscposReceipt(order, settings = {}) {
   lines.push(CMD.BOLD_OFF);
   lines.push(useSmallFont ? CMD.FONT_B : CMD.FONT_A);
 
-  if (settings.location) {
+  const locationText = settings.btReceiptLocationText || settings.location || '';
+  if (settings.btReceiptLocationShow !== false && locationText) {
     lines.push(CMD.ALIGN_CENTER);
-    lines.push(_enc(settings.location));
+    lines.push(_enc(locationText));
     lines.push(CMD.LF);
   }
   if (settings.receiptCounterLabel) {
@@ -900,8 +901,9 @@ export function renderReceiptToCanvas(order, settings = {}) {
   }
 
   printLine(header, { bold: true, fontSize: titleSz, align: 'center', lineHeight: Math.round(titleSz * 1.4) });
-  if (settings.location) {
-    printLine(settings.location, { fontSize: locationFontSize, bold: locationBold, align: 'center' });
+  const locText = settings.btReceiptLocationText || settings.location || '';
+  if (settings.btReceiptLocationShow !== false && locText) {
+    printLine(locText, { fontSize: locationFontSize, bold: locationBold, align: 'center' });
   }
   if (settings.receiptCounterLabel) {
     printLine(settings.receiptCounterLabel, { fontSize: infoSz, align: 'center' });

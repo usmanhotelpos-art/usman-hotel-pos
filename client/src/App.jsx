@@ -167,6 +167,8 @@ function App() {
     btShowDeliveryLocation: true,
     btShowServiceType: true,
     btShowRider: true,
+    btReceiptLocationShow: true,
+    btReceiptLocationText: '',
     notificationsEnabled: false
   });
   const [form, setForm] = useState({});
@@ -7310,6 +7312,22 @@ function App() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4">
+              <h4 className="text-base font-semibold text-slate-100">Location on Receipt</h4>
+              <div className="mt-4 flex items-center gap-3">
+                <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={settings.btReceiptLocationShow} onChange={(e) => setSettings((prev) => ({ ...prev, btReceiptLocationShow: e.target.checked }))} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                  Show Location
+                </label>
+              </div>
+              {settings.btReceiptLocationShow && (
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Location Text</label>
+                  <input value={settings.btReceiptLocationText} onChange={(e) => setSettings((prev) => ({ ...prev, btReceiptLocationText: e.target.value }))} className="w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" placeholder="e.g. Usman Hotel, Main Branch" />
+                </div>
+              )}
             </div>
 
             <div className="mt-8 border-t border-slate-700 pt-8">
