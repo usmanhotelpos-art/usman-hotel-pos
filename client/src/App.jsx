@@ -10178,6 +10178,22 @@ function App() {
               </button>
             ))}
           </div>
+          {/* Selection toolbar */}
+          {selectedTakeawayOrders.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 gap-2">
+              <div className="text-xs text-slate-300">{selectedTakeawayOrders.length} order{selectedTakeawayOrders.length > 1 ? 's' : ''} selected</div>
+              <div className="flex gap-2">
+                {takeawaySubTab === 'pay-later' && (
+                  <button onClick={markSelectedTakeawayOrdersDue} className="rounded-full border border-red-700 bg-red-600 px-3 py-1 text-xs font-semibold text-white">Mark Due</button>
+                )}
+                {takeawaySubTab === 'due' && (
+                  <button onClick={markSelectedTakeawayOrdersPaid} className="rounded-full border border-emerald-700 bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">Mark Paid</button>
+                )}
+                <button onClick={clearTakeawaySelection} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">Clear</button>
+                <button onClick={deleteMultipleTakeawayOrders} className="rounded-full border border-rose-700 bg-rose-600 px-3 py-1 text-xs font-semibold text-white">Delete</button>
+              </div>
+            </div>
+          )}
           {displayOrders.length === 0 ? (
             <div className="text-center text-sm text-slate-500 py-8">No orders found</div>
           ) : (
@@ -10228,10 +10244,16 @@ function App() {
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Delete
                             </button>
-                            <button onClick={() => { printReceipt(order); setTakeawayActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-1.5">
+                            <button onClick={() => { printReceipt(order); setTakeawayActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Print
                             </button>
+                            {order.status === 'Pay Later' && (
+                              <button onClick={() => { markTakeawayOrderPaid(order.id); setTakeawayActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-amber-300 hover:bg-slate-800 flex items-center gap-1.5">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                                Mark Paid
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
