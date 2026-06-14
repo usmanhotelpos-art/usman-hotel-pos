@@ -9104,7 +9104,7 @@ function App() {
                     <td className="px-2 py-2">
                         <input
                           type="checkbox"
-                          checked={isSelected}
+                          checked={selectedOrders.includes(order.id)}
                           onChange={() => toggleOrderSelection(order.id)}
                           className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
                         />
