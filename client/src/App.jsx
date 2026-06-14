@@ -2818,8 +2818,13 @@ function App() {
         : orderType === 'Delivery'
           ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
           : 'Completed';
+      const wasEditing = !!editingOrder?.id;
       const order = await savePosOrder(saveStatus, {}, { refreshOrders: false });
       if (order) {
+        if (wasEditing) {
+          const tabMap = { 'Delivery': 'delivery', 'Takeaway': 'takeaway', 'Dine-In': 'dinein' };
+          setOrdersMainTab(tabMap[orderType] || 'delivery');
+        }
         setShowCustomerDetailsPopup(false);
         setShowPaymentPopup(false);
         setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
@@ -2870,8 +2875,13 @@ function App() {
         : orderType === 'Delivery'
           ? (orderDetails.deliveryAgent ? 'Riders Assigned' : 'Kitchen')
           : 'Completed';
+      const wasEditing = !!editingOrder?.id;
       const order = await savePosOrder(saveStatus, {}, { refreshOrders: false });
       if (order) {
+        if (wasEditing) {
+          const tabMap = { 'Delivery': 'delivery', 'Takeaway': 'takeaway', 'Dine-In': 'dinein' };
+          setOrdersMainTab(tabMap[orderType] || 'delivery');
+        }
         printReceipt(order).catch(err => console.warn('Print failed', err));
         setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
       } else {
@@ -2955,8 +2965,13 @@ function App() {
     setShowPaymentPopup(false);
     setPopupError('');
     try {
+      const wasEditing = !!editingOrder?.id;
       const order = await savePosOrder('Pay Later', {}, { refreshOrders: false });
       if (order) {
+        if (wasEditing) {
+          const tabMap = { 'Delivery': 'delivery', 'Takeaway': 'takeaway', 'Dine-In': 'dinein' };
+          setOrdersMainTab(tabMap[orderType] || 'delivery');
+        }
         printReceipt(order).catch(err => console.warn('Print failed', err));
         setTimeout(() => loadOrdersData().catch(err => console.warn('Failed to refresh orders', err)), 0);
       }
