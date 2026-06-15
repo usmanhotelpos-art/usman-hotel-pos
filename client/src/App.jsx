@@ -522,6 +522,12 @@ function App() {
   const [dineinActionOpen, setDineinActionOpen] = useState(null);
   const [tableOrderPopup, setTableOrderPopup] = useState(null);
   const [tableOrderAddOpen, setTableOrderAddOpen] = useState(null);
+  const [showQuickDineinPopup, setShowQuickDineinPopup] = useState(false);
+  const [showQuickTakeawayPopup, setShowQuickTakeawayPopup] = useState(false);
+  const [quickTakeawayTab, setQuickTakeawayTab] = useState('pay-later');
+  const [quickOrderDateFrom, setQuickOrderDateFrom] = useState('');
+  const [quickOrderDateTo, setQuickOrderDateTo] = useState('');
+  const [quickOrderDetail, setQuickOrderDetail] = useState(null);
   const [onlineActionOpen, setOnlineActionOpen] = useState(null);
   const [takeawayViewMode, setTakeawayViewMode] = useState('table');
   const [selectedRider, setSelectedRider] = useState('');
@@ -11065,6 +11071,24 @@ function App() {
             >
               🛒
             </button>
+            <button
+              onClick={() => setShowQuickDineinPopup(true)}
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 header-btn-3d ${
+                darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              title="Table Orders"
+            >
+              🍽️
+            </button>
+            <button
+              onClick={() => setShowQuickTakeawayPopup(true)}
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 header-btn-3d ${
+                darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              title="Takeaway Orders"
+            >
+              🥡
+            </button>
             <button onClick={() => setDarkMode((prev) => !prev)} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${
               darkMode
                 ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800 text-slate-200'
@@ -11718,6 +11742,181 @@ function App() {
                 <div className="mt-6 flex justify-end gap-3">
                   <button onClick={cancelMarkPaid} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Cancel</button>
                   <button onClick={handleMarkPaid} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Confirm Paid</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showQuickDineinPopup && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 p-4 flex items-center justify-center" onClick={() => setShowQuickDineinPopup(false)}>
+              <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-[24px] border border-white/20 bg-white/10 shadow-2xl shadow-white/20 backdrop-blur-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">🍽️ Dine-In Orders</h3>
+                    <p className="text-xs text-slate-300">Active table orders</p>
+                  </div>
+                  <button onClick={() => setShowQuickDineinPopup(false)} className="rounded-full p-1.5 text-slate-300 hover:bg-white/10">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                  </button>
+                </div>
+                <div className="p-4 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={quickOrderDateFrom} onChange={(e) => setQuickOrderDateFrom(e.target.value)} className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white" />
+                    <span className="text-xs text-slate-300">to</span>
+                    <input type="date" value={quickOrderDateTo} onChange={(e) => setQuickOrderDateTo(e.target.value)} className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {posOrders.filter((o) => o.orderType === 'Dine-In' && !['Completed', 'Payment Collected'].includes(o.status)).filter((o) => {
+                      const d = o.createdAt ? new Date(o.createdAt) : null;
+                      if (!d) return true;
+                      if (quickOrderDateFrom && d < new Date(quickOrderDateFrom)) return false;
+                      if (quickOrderDateTo && d > new Date(quickOrderDateTo + 'T23:59:59')) return false;
+                      return true;
+                    }).map((order) => (
+                      <div key={order.id} onClick={() => setQuickOrderDetail(order)} className="rounded-2xl bg-white p-3 shadow-lg cursor-pointer hover:shadow-xl transition border border-slate-200 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-600">#{order.orderNumber || order.id}</span>
+                          <span className="text-[10px] font-semibold text-emerald-600">{order.tableNumber || 'Table'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 leading-tight line-clamp-2">
+                          {(order.items || []).map((item, idx) => (
+                            <span key={idx}><span className="text-amber-600 font-semibold">{item.quantity}x</span> <span className="text-slate-700">{item.name}</span>{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-100">
+                          <span className="text-[10px] text-slate-400">{order.waiter || '-'}</span>
+                          <span className="text-xs font-bold text-rose-600">{order.total || order.amount || 0} PKR</span>
+                        </div>
+                      </div>
+                    ))}
+                    {posOrders.filter((o) => o.orderType === 'Dine-In' && !['Completed', 'Payment Collected'].includes(o.status)).filter((o) => {
+                      const d = o.createdAt ? new Date(o.createdAt) : null;
+                      if (!d) return true;
+                      if (quickOrderDateFrom && d < new Date(quickOrderDateFrom)) return false;
+                      if (quickOrderDateTo && d > new Date(quickOrderDateTo + 'T23:59:59')) return false;
+                      return true;
+                    }).length === 0 && (
+                      <div className="col-span-2 text-center py-8 text-slate-300 text-sm">No active dine-in orders</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showQuickTakeawayPopup && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 p-4 flex items-center justify-center" onClick={() => setShowQuickTakeawayPopup(false)}>
+              <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-[24px] border border-white/20 bg-white/10 shadow-2xl shadow-white/20 backdrop-blur-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">🥡 Takeaway Orders</h3>
+                    <p className="text-xs text-slate-300">Pay Later & Paid orders</p>
+                  </div>
+                  <button onClick={() => setShowQuickTakeawayPopup(false)} className="rounded-full p-1.5 text-slate-300 hover:bg-white/10">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                  </button>
+                </div>
+                <div className="p-4 border-b border-white/10">
+                  <div className="flex items-center gap-2 mb-3">
+                    <button onClick={() => setQuickTakeawayTab('pay-later')} className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${quickTakeawayTab === 'pay-later' ? 'bg-amber-500 text-white' : 'bg-white/10 text-slate-300'}`}>Pay Later</button>
+                    <button onClick={() => setQuickTakeawayTab('paid')} className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${quickTakeawayTab === 'paid' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-slate-300'}`}>Paid</button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={quickOrderDateFrom} onChange={(e) => setQuickOrderDateFrom(e.target.value)} className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white" />
+                    <span className="text-xs text-slate-300">to</span>
+                    <input type="date" value={quickOrderDateTo} onChange={(e) => setQuickOrderDateTo(e.target.value)} className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {posOrders.filter((o) => o.orderType === 'Takeaway').filter((o) => {
+                      if (quickTakeawayTab === 'pay-later') return o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later';
+                      if (quickTakeawayTab === 'paid') return o.status === 'Completed' || o.status === 'Payment Collected';
+                      return true;
+                    }).filter((o) => {
+                      const d = o.createdAt ? new Date(o.createdAt) : null;
+                      if (!d) return true;
+                      if (quickOrderDateFrom && d < new Date(quickOrderDateFrom)) return false;
+                      if (quickOrderDateTo && d > new Date(quickOrderDateTo + 'T23:59:59')) return false;
+                      return true;
+                    }).map((order) => (
+                      <div key={order.id} onClick={() => setQuickOrderDetail(order)} className="rounded-2xl bg-white p-3 shadow-lg cursor-pointer hover:shadow-xl transition border border-slate-200 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-600">#{order.orderNumber || order.id}</span>
+                          <span className={`text-[10px] font-semibold ${quickTakeawayTab === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>{quickTakeawayTab === 'paid' ? 'Paid' : 'Due'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 leading-tight line-clamp-2">
+                          {(order.items || []).map((item, idx) => (
+                            <span key={idx}><span className="text-amber-600 font-semibold">{item.quantity}x</span> <span className="text-slate-700">{item.name}</span>{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-100">
+                          <span className="text-[10px] text-slate-400">{order.customerName || 'Walk-In'}</span>
+                          <span className="text-xs font-bold text-rose-600">{order.total || order.amount || 0} PKR</span>
+                        </div>
+                      </div>
+                    ))}
+                    {posOrders.filter((o) => o.orderType === 'Takeaway').filter((o) => {
+                      if (quickTakeawayTab === 'pay-later') return o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later';
+                      if (quickTakeawayTab === 'paid') return o.status === 'Completed' || o.status === 'Payment Collected';
+                      return true;
+                    }).filter((o) => {
+                      const d = o.createdAt ? new Date(o.createdAt) : null;
+                      if (!d) return true;
+                      if (quickOrderDateFrom && d < new Date(quickOrderDateFrom)) return false;
+                      if (quickOrderDateTo && d > new Date(quickOrderDateTo + 'T23:59:59')) return false;
+                      return true;
+                    }).length === 0 && (
+                      <div className="col-span-2 text-center py-8 text-slate-300 text-sm">No {quickTakeawayTab === 'paid' ? 'paid' : 'due'} takeaway orders</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {quickOrderDetail && (
+            <div className="fixed inset-0 z-[60] bg-slate-950/80 p-4 flex items-center justify-center" onClick={() => setQuickOrderDetail(null)}>
+              <div className="relative w-full max-w-xs rounded-[20px] border border-white/20 bg-white shadow-2xl shadow-white/30 p-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">#{quickOrderDetail.orderNumber || quickOrderDetail.id}</h3>
+                    <p className="text-[10px] text-slate-500">{quickOrderDetail.customerName || quickOrderDetail.tableNumber || 'Order'}</p>
+                  </div>
+                  <button onClick={() => setQuickOrderDetail(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                  </button>
+                </div>
+                <div className="space-y-1.5 mb-3">
+                  {(quickOrderDetail.items || []).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-slate-700 truncate">{item.name || 'Item'}</div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <span className="text-[10px] text-amber-600 font-semibold">x{item.quantity || 1}</span>
+                        <span className="text-xs font-bold text-emerald-600">{item.price || 0} PKR</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200 mb-3">
+                  <span className="text-[10px] text-slate-400">Total</span>
+                  <span className="text-sm font-bold text-slate-800">{quickOrderDetail.total || quickOrderDetail.amount || 0} PKR</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={(e) => { e.stopPropagation(); printReceipt(quickOrderDetail); }} className="flex-1 rounded-lg bg-emerald-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Print</button>
+                  <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-violet-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Edit</button>
+                  <button onClick={(e) => { e.stopPropagation(); setOrderDetailsModal(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-blue-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">View</button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteOrder(quickOrderDetail.id); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-red-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Delete</button>
+                  {quickOrderDetail.status !== 'Completed' && quickOrderDetail.status !== 'Payment Collected' && (
+                    <>
+                      <button onClick={(e) => { e.stopPropagation(); confirmMarkPaid(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-amber-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Mark Paid</button>
+                      <button onClick={(e) => { e.stopPropagation(); confirmMarkDue(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-rose-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Mark Due</button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
