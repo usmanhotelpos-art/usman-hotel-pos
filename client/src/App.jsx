@@ -533,11 +533,6 @@ function App() {
   const [orderPageSize, setOrderPageSize] = useState(20);
   const [showMobileOrderFilters, setShowMobileOrderFilters] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
-  const [recentOrderTab, setRecentOrderTab] = useState('Delivery');
-  const [recentOrderDateFilter, setRecentOrderDateFilter] = useState('today');
-  const [recentOrderCustomDate, setRecentOrderCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [recentOrderPageIndex, setRecentOrderPageIndex] = useState(0);
-  const [recentOrderPageSize, setRecentOrderPageSize] = useState(12);
   const [darkMode, setDarkMode] = useState(false);
   const [posTheme, setPosTheme] = useState('classic'); // 'classic' or 'restaurant'
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
@@ -545,7 +540,6 @@ function App() {
   const [orderTypeStars, setOrderTypeStars] = useState(null);
   const [orderTypeNotif, setOrderTypeNotif] = useState(null);
   const [starKey, setStarKey] = useState(0);
-  const [showRecentOrdersPopup, setShowRecentOrdersPopup] = useState(false);
   const [btDevice, setBtDevice] = useState(null);
   const [btInfo, setBtInfo] = useState(getSavedPrinterInfo);
   const [btConnected, setBtConnected] = useState(false);
@@ -960,10 +954,6 @@ function App() {
   useEffect(() => {
     setTakeawayPageIndex(0);
   }, [takeawaySubTab, takeawayDateFilter, takeawayCustomDateFrom, takeawayCustomDateTo, takeawayPageSize]);
-
-  useEffect(() => {
-    setRecentOrderPageIndex(0);
-  }, [recentOrderTab, recentOrderPageSize]);
 
   const openBulkRiderAssignmentModal = () => {
     if (!selectedOrders.length) return;
@@ -6450,18 +6440,6 @@ function App() {
               >
                 🛒
               </button>
-              <button
-                onClick={() => setShowRecentOrdersPopup(true)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 header-btn-3d ${
-                  darkMode
-                    ? 'text-slate-400 hover:bg-slate-800'
-                    : 'text-slate-500 hover:bg-slate-100'
-                }`}
-                title="Recent Orders"
-              >
-                🕐
-              </button>
-              <div className="w-px h-5 bg-slate-600/30 mx-1" />
               <button onClick={() => { handleManualSync(); }} disabled={syncState.syncing} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${syncState.syncing ? 'sync-blinking' : ''} ${
                 darkMode
                   ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800 text-slate-200'
@@ -6957,20 +6935,6 @@ function App() {
           </div>
         )}
 
-        {showRecentOrdersPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
-            <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[32px] border border-slate-700 bg-slate-950 p-6 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)]">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Order history</p>
-                  <h3 className="mt-1 text-xl font-semibold text-white">Recent POS orders</h3>
-                </div>
-                <button onClick={() => setShowRecentOrdersPopup(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">✕</button>
-              </div>
-              {renderRecentOrders(true)}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -8969,190 +8933,7 @@ function App() {
     );
   }
 
-  function renderRecentOrders(popupMode) {
-    const tabs = ['Delivery', 'Takeaway', 'Dine-In'];
-    const selectedDate = (() => {
-      const today = new Date();
-      if (recentOrderDateFilter === 'today') return today;
-      if (recentOrderDateFilter === 'yesterday') {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        return yesterday;
-      }
-      return new Date(recentOrderCustomDate);
-    })();
 
-    const formatLocalDate = (date) => {
-      if (!date || Number.isNaN(date.getTime())) return '';
-      return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
-    };
-
-    const getOrderDateString = (order) => {
-      const raw = order.createdAt || order.date;
-      if (!raw) return null;
-      const date = new Date(raw);
-      if (Number.isNaN(date.getTime())) return null;
-      return date.toISOString().slice(0, 10);
-    };
-
-    const selectedDateString = Number.isNaN(selectedDate.getTime()) ? null : selectedDate.toISOString().slice(0, 10);
-    const recentOrders = posOrders.filter((order) => {
-      if (recentOrderTab === 'Delivery') return order.orderType === 'Delivery';
-      if (recentOrderTab === 'Takeaway') return order.orderType === 'Takeaway';
-      if (recentOrderTab === 'Dine-In') return order.orderType === 'Dine-In';
-      return false;
-    }).filter((order) => {
-      const orderDateString = getOrderDateString(order);
-      return orderDateString && selectedDateString ? orderDateString === selectedDateString : false;
-    });
-    const paginatedOrders = recentOrders.slice(recentOrderPageIndex * recentOrderPageSize, (recentOrderPageIndex + 1) * recentOrderPageSize);
-    const pageCount = Math.max(1, Math.ceil(recentOrders.length / recentOrderPageSize));
-    const isDelivery = recentOrderTab === 'Delivery';
-    const isTakeaway = recentOrderTab === 'Takeaway';
-    const isDinein = recentOrderTab === 'Dine-In';
-
-    const innerContent = (
-      <>
-        {!popupMode && (
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Order history</p>
-              <h3 className="mt-2 text-2xl font-semibold text-white">Recent POS orders</h3>
-              <div className="mt-2 text-sm text-slate-400">
-                Total orders:
-                <span className="ml-1 font-semibold text-white">{posOrders.length}</span>
-                <span className="mx-2 text-slate-500">|</span>
-                {recentOrders.length} {recentOrderTab} orders
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setRecentOrderTab(tab)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${recentOrderTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className={`${popupMode ? '' : 'mt-6'} rounded-3xl border border-slate-800 bg-slate-950 p-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
-            <div className="text-sm text-slate-400">Showing {paginatedOrders.length} of {recentOrders.length} orders</div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="text-sm text-slate-400">Date</label>
-              <select
-                value={recentOrderDateFilter}
-                onChange={(e) => setRecentOrderDateFilter(e.target.value)}
-                className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-              >
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="custom">Custom</option>
-              </select>
-              {recentOrderDateFilter === 'custom' && (
-                <input
-                  type="date"
-                  value={recentOrderCustomDate}
-                  onChange={(e) => setRecentOrderCustomDate(e.target.value)}
-                  className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-                />
-              )}
-              <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100">
-                {selectedDateString ? formatLocalDate(selectedDate) : 'Invalid date'}
-              </div>
-              <label className="text-sm text-slate-400">Rows</label>
-              <select
-                value={recentOrderPageSize}
-                onChange={(e) => setRecentOrderPageSize(Number(e.target.value))}
-                className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-              >
-                {[6, 12, 18, 24, 100].map((size) => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="max-h-[420px] overflow-y-auto overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950">
-            <table className="w-full min-w-[900px] divide-y divide-slate-700 text-left text-sm text-slate-300">
-              <thead className="bg-slate-950 text-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Order #</th>
-                  {isDelivery && <th className="px-4 py-3">Delivery address</th>}
-                  {isDelivery && <th className="px-4 py-3">Phone</th>}
-                  {isDelivery && <th className="px-4 py-3">Service type</th>}
-                  {isTakeaway && <th className="px-4 py-3">Customer</th>}
-                  {isTakeaway && <th className="px-4 py-3">Phone</th>}
-                  {isDinein && <th className="px-4 py-3">Table</th>}
-                  {isDinein && <th className="px-4 py-3">Customer</th>}
-                  <th className="px-4 py-3">Items</th>
-                  <th className="px-4 py-3">Total</th>
-                  {isDelivery && <th className="px-4 py-3">Rider</th>}
-                  {isDelivery && <th className="px-4 py-3">Payment</th>}
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 bg-slate-950">
-                {paginatedOrders.length ? paginatedOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-950/80 transition">
-                    <td className="px-4 py-3 font-semibold text-white">{order.orderNumber || order.id}</td>
-                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.address || '-'}</td>}
-                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.phone || '-'}</td>}
-                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.serviceType || '-'}</td>}
-                    {isTakeaway && <td className="px-4 py-3 text-slate-300">{order.customerName || 'Pickup'}</td>}
-                    {isTakeaway && <td className="px-4 py-3 text-slate-300">{order.phone || '-'}</td>}
-                    {isDinein && <td className="px-4 py-3 text-slate-300">{order.tableNumber || '-'}</td>}
-                    {isDinein && <td className="px-4 py-3 text-slate-300">{order.customerName || 'TABLE'}</td>}
-                    <td className="px-4 py-3 text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
-                        <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-white">{order.total || order.amount || 0} PKR</td>
-                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.deliveryAgent || 'Unassigned'}</td>}
-                    {isDelivery && <td className="px-4 py-3 text-slate-300">{order.paymentStatus || order.paymentMethod || '-'}</td>}
-                    <td className="px-4 py-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
-                    <td className="px-4 py-3 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString() : order.date || 'N/A'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {renderOrderEditButton(order)}
-                        <button onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500">Delete</button>
-                        <button onClick={() => printReceipt(order)} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-500">Print</button>
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={isDelivery ? 11 : isTakeaway ? 8 : 8} className="px-4 py-6 text-center text-sm text-slate-500">No orders found for {recentOrderTab}.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-sm text-slate-300">
-            <div>{recentOrders.length ? `Page ${recentOrderPageIndex + 1} of ${pageCount}` : 'No orders available'}</div>
-            <div className="flex items-center gap-2">
-              <button disabled={recentOrderPageIndex === 0} onClick={() => setRecentOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50">Prev</button>
-              <button disabled={recentOrderPageIndex >= pageCount - 1} onClick={() => setRecentOrderPageIndex((prev) => Math.min(prev + 1, pageCount - 1))} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50">Next</button>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-    return popupMode ? innerContent : (
-      <section className="rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-soft">
-        {innerContent}
-      </section>
-    );
-  }
 
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
@@ -10642,86 +10423,43 @@ function App() {
                                 ))}
                               </div>
                               <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
-                              <div className="flex items-center gap-1 pt-1 border-t border-slate-800">
-                                <button onClick={(e) => { e.stopPropagation(); printReceipt(tableOrder); }} className="rounded-md bg-green-600 px-1.5 py-1 text-[9px] font-semibold text-white">Print</button>
-                                <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); }} className="rounded-md bg-violet-600 px-1.5 py-1 text-[9px] font-semibold text-white">Edit</button>
-                                <button onClick={(e) => { e.stopPropagation(); setOrderDetailsModal(tableOrder); }} className="rounded-md bg-blue-600 px-1.5 py-1 text-[9px] font-semibold text-white">View</button>
-                                <button onClick={(e) => { e.stopPropagation(); deleteOrder(tableOrder.id); }} className="rounded-md bg-red-600 px-1.5 py-1 text-[9px] font-semibold text-white">Del</button>
-                                {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
-                                  <>
-                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkPaid(tableOrder); }} className="rounded-md bg-amber-600 px-1.5 py-1 text-[9px] font-semibold text-white">Paid</button>
-                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkDue(tableOrder); }} className="rounded-md bg-rose-600 px-1.5 py-1 text-[9px] font-semibold text-white">Due</button>
-                                  </>
-                                )}
-                                <div className="relative">
-                                  <button onClick={(e) => { e.stopPropagation(); setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id); }} className="rounded-md bg-slate-700 px-1.5 py-1 text-[9px] font-semibold text-slate-200">+</button>
+                              <div className="flex justify-end pt-1 border-t border-slate-800">
+                                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={() => setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id)} className="rounded-lg bg-slate-800 px-2 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 flex items-center gap-1">
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                                    Actions
+                                  </button>
                                   {tableOrderAddOpen === tableOrder.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden min-w-[100px]">
-                                      <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5">
-                                        + Add Item
+                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-slate-900/50 overflow-hidden min-w-[140px]">
+                                      <button onClick={() => { openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                                        Edit Order
                                       </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-4 shadow-soft">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Outside tables</p>
-                      <h4 className="mt-1 text-base font-semibold text-white">Outside hotel</h4>
-                    </div>
-                    <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{outsideTables.length}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {outsideTables.map((table) => {
-                      const tableLabel = getTableLabel(table);
-                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
-                      return (
-                        <div
-                          key={table.id}
-                          className={`rounded-2xl border p-3 ${tableOrder ? 'border-amber-600 bg-amber-950 cursor-pointer hover:border-amber-400' : 'border-slate-700 bg-slate-950'}`}
-                          onClick={() => tableOrder && setTableOrderPopup(tableOrder)}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="font-semibold text-white text-xs truncate">{table.label || table.name || `Table ${table.id}`}</div>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${tableOrder ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'}`}>
-                              {tableOrder ? 'Busy' : 'Free'}
-                            </span>
-                          </div>
-                          {tableOrder && (
-                            <div className="mt-2 space-y-1.5">
-                              <div className="text-[10px] text-slate-400">#{tableOrder.orderNumber}</div>
-                              <div className="text-[10px] text-slate-300 leading-tight line-clamp-2">
-                                {(tableOrder.items || []).map((item, idx) => (
-                                  <span key={idx}>{item.quantity}x {item.name}{idx < (tableOrder.items||[]).length - 1 ? ', ' : ''}</span>
-                                ))}
-                              </div>
-                              <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
-                              <div className="flex items-center gap-1 pt-1 border-t border-slate-800">
-                                <button onClick={(e) => { e.stopPropagation(); printReceipt(tableOrder); }} className="rounded-md bg-green-600 px-1.5 py-1 text-[9px] font-semibold text-white">Print</button>
-                                <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); }} className="rounded-md bg-violet-600 px-1.5 py-1 text-[9px] font-semibold text-white">Edit</button>
-                                <button onClick={(e) => { e.stopPropagation(); setOrderDetailsModal(tableOrder); }} className="rounded-md bg-blue-600 px-1.5 py-1 text-[9px] font-semibold text-white">View</button>
-                                <button onClick={(e) => { e.stopPropagation(); deleteOrder(tableOrder.id); }} className="rounded-md bg-red-600 px-1.5 py-1 text-[9px] font-semibold text-white">Del</button>
-                                {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
-                                  <>
-                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkPaid(tableOrder); }} className="rounded-md bg-amber-600 px-1.5 py-1 text-[9px] font-semibold text-white">Paid</button>
-                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkDue(tableOrder); }} className="rounded-md bg-rose-600 px-1.5 py-1 text-[9px] font-semibold text-white">Due</button>
-                                  </>
-                                )}
-                                <div className="relative">
-                                  <button onClick={(e) => { e.stopPropagation(); setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id); }} className="rounded-md bg-slate-700 px-1.5 py-1 text-[9px] font-semibold text-slate-200">+</button>
-                                  {tableOrderAddOpen === tableOrder.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden min-w-[100px]">
-                                      <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5">
-                                        + Add Item
+                                      <button onClick={() => { setOrderDetailsModal(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-blue-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>
+                                        View Order
                                       </button>
+                                      <button onClick={() => { printReceipt(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M6 9V3h12v6M6 18h12v-6H6v6zM9 21h6"/></svg>
+                                        Print
+                                      </button>
+                                      <button onClick={() => { deleteOrder(tableOrder.id); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-red-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
+                                        Delete
+                                      </button>
+                                      {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
+                                        <>
+                                          <div className="border-t border-slate-800" />
+                                          <button onClick={() => { confirmMarkPaid(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-amber-300 hover:bg-slate-800 flex items-center gap-2">
+                                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                                            Mark Paid
+                                          </button>
+                                          <button onClick={() => { confirmMarkDue(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-rose-300 hover:bg-slate-800 flex items-center gap-2">
+                                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                                            Mark Due
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -11327,18 +11065,6 @@ function App() {
             >
               🛒
             </button>
-            <button
-              onClick={() => setShowRecentOrdersPopup(true)}
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 header-btn-3d ${
-                darkMode
-                  ? 'text-slate-400 hover:bg-slate-800'
-                  : 'text-slate-500 hover:bg-slate-100'
-              }`}
-              title="Recent Orders"
-            >
-              🕐
-            </button>
-            <div className="w-px h-5 bg-slate-600/30 mx-1" />
             <button onClick={() => setDarkMode((prev) => !prev)} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${
               darkMode
                 ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800 text-slate-200'
