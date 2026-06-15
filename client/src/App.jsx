@@ -520,6 +520,8 @@ function App() {
   const [deliveryActionOpen, setDeliveryActionOpen] = useState(null);
   const [takeawayActionOpen, setTakeawayActionOpen] = useState(null);
   const [dineinActionOpen, setDineinActionOpen] = useState(null);
+  const [tableOrderPopup, setTableOrderPopup] = useState(null);
+  const [tableOrderAddOpen, setTableOrderAddOpen] = useState(null);
   const [onlineActionOpen, setOnlineActionOpen] = useState(null);
   const [takeawayViewMode, setTakeawayViewMode] = useState('table');
   const [selectedRider, setSelectedRider] = useState('');
@@ -1779,11 +1781,11 @@ function App() {
   }, [holdModalOpen, settings.holdAutoRefreshSeconds, settings.holdShowAutoRefresh]);
 
   useEffect(() => {
-    document.body.style.overflow = (holdModalOpen || orderModalOpen || orderDetailsModal || markPaidOrder || showTableModal || riderAssignmentModal || bulkRiderAssignmentOpen) ? 'hidden' : '';
+    document.body.style.overflow = (holdModalOpen || orderModalOpen || orderDetailsModal || tableOrderPopup || markPaidOrder || showTableModal || riderAssignmentModal || bulkRiderAssignmentOpen) ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [holdModalOpen, orderModalOpen, orderDetailsModal, markPaidOrder, showTableModal, riderAssignmentModal, bulkRiderAssignmentOpen]);
+  }, [holdModalOpen, orderModalOpen, orderDetailsModal, tableOrderPopup, markPaidOrder, showTableModal, riderAssignmentModal, bulkRiderAssignmentOpen]);
 
   useEffect(() => {
     const updateMobile = () => setIsMobileSidebar(window.innerWidth < 768);
@@ -10605,43 +10607,62 @@ function App() {
           </div>
 
           {dineinSubTab === 'tables' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="grid gap-4">
-                <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
-                  <div className="flex items-center justify-between">
+                <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-4 shadow-soft">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Floor tables</p>
-                      <h4 className="mt-2 text-lg font-semibold text-white">In hotel floor</h4>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Floor tables</p>
+                      <h4 className="mt-1 text-base font-semibold text-white">In hotel floor</h4>
                     </div>
                     <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{floorTables.length}</span>
                   </div>
-                  <div className="mt-4 grid gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     {floorTables.map((table) => {
                       const tableLabel = getTableLabel(table);
                       const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
-                      const waiters = staff.filter((member) => member.role === 'Waiter' && member.loginEnabled);
                       return (
-                        <div key={table.id} className={`rounded-3xl border p-4 ${tableOrder ? 'border-amber-600 bg-amber-950' : 'border-slate-700 bg-slate-950'}`}>
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="font-semibold text-white text-sm">{table.label || table.name || `Table ${table.id}`}</div>
-                              <div className="text-[10px] text-slate-400">{table.capacity || 4} seats</div>
-                            </div>
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tableOrder ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'}`}>
-                              {tableOrder ? 'Occupied' : 'Available'}
+                        <div
+                          key={table.id}
+                          className={`rounded-2xl border p-3 ${tableOrder ? 'border-amber-600 bg-amber-950 cursor-pointer hover:border-amber-400' : 'border-slate-700 bg-slate-950'}`}
+                          onClick={() => tableOrder && setTableOrderPopup(tableOrder)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-semibold text-white text-xs truncate">{table.label || table.name || `Table ${table.id}`}</div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${tableOrder ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'}`}>
+                              {tableOrder ? 'Busy' : 'Free'}
                             </span>
                           </div>
                           {tableOrder && (
-                            <div className="mt-3 space-y-2 text-xs text-slate-300">
-                              <div>Order: {tableOrder.orderNumber}</div>
-                              <div>Status: {tableOrder.status}</div>
-                              <div>Customer: {tableOrder.customerName || 'TABLE'}</div>
-                              <div>Items: {(tableOrder.items || []).length}</div>
-                              <div className="font-semibold text-white">Total: {tableOrder.total || tableOrder.amount || 0} PKR</div>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                <button onClick={() => printReceipt(tableOrder)} className="rounded px-2 py-1 text-xs font-semibold bg-green-600 text-white">Print</button>
-                                {renderOrderEditButton(tableOrder)}
-                                <button onClick={() => deleteOrder(tableOrder.id)} className="rounded px-2 py-1 text-xs font-semibold bg-red-600 text-white">Delete</button>
+                            <div className="mt-2 space-y-1.5">
+                              <div className="text-[10px] text-slate-400">#{tableOrder.orderNumber}</div>
+                              <div className="text-[10px] text-slate-300 leading-tight line-clamp-2">
+                                {(tableOrder.items || []).map((item, idx) => (
+                                  <span key={idx}>{item.quantity}x {item.name}{idx < (tableOrder.items||[]).length - 1 ? ', ' : ''}</span>
+                                ))}
+                              </div>
+                              <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
+                              <div className="flex items-center gap-1 pt-1 border-t border-slate-800">
+                                <button onClick={(e) => { e.stopPropagation(); printReceipt(tableOrder); }} className="rounded-md bg-green-600 px-1.5 py-1 text-[9px] font-semibold text-white">Print</button>
+                                <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); }} className="rounded-md bg-violet-600 px-1.5 py-1 text-[9px] font-semibold text-white">Edit</button>
+                                <button onClick={(e) => { e.stopPropagation(); setOrderDetailsModal(tableOrder); }} className="rounded-md bg-blue-600 px-1.5 py-1 text-[9px] font-semibold text-white">View</button>
+                                <button onClick={(e) => { e.stopPropagation(); deleteOrder(tableOrder.id); }} className="rounded-md bg-red-600 px-1.5 py-1 text-[9px] font-semibold text-white">Del</button>
+                                {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkPaid(tableOrder); }} className="rounded-md bg-amber-600 px-1.5 py-1 text-[9px] font-semibold text-white">Paid</button>
+                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkDue(tableOrder); }} className="rounded-md bg-rose-600 px-1.5 py-1 text-[9px] font-semibold text-white">Due</button>
+                                  </>
+                                )}
+                                <div className="relative">
+                                  <button onClick={(e) => { e.stopPropagation(); setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id); }} className="rounded-md bg-slate-700 px-1.5 py-1 text-[9px] font-semibold text-slate-200">+</button>
+                                  {tableOrderAddOpen === tableOrder.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden min-w-[100px]">
+                                      <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5">
+                                        + Add Item
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )}
@@ -10650,41 +10671,60 @@ function App() {
                     })}
                   </div>
                 </div>
-                <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
-                  <div className="flex items-center justify-between">
+                <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-4 shadow-soft">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Outside tables</p>
-                      <h4 className="mt-2 text-lg font-semibold text-white">Outside hotel</h4>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Outside tables</p>
+                      <h4 className="mt-1 text-base font-semibold text-white">Outside hotel</h4>
                     </div>
                     <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{outsideTables.length}</span>
                   </div>
-                  <div className="mt-4 grid gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     {outsideTables.map((table) => {
                       const tableLabel = getTableLabel(table);
                       const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
-                      const waiters = staff.filter((member) => member.role === 'Waiter' && member.loginEnabled);
                       return (
-                        <div key={table.id} className={`rounded-3xl border p-4 ${tableOrder ? 'border-amber-600 bg-amber-950' : 'border-slate-700 bg-slate-950'}`}>
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="font-semibold text-white text-sm">{table.label || table.name || `Table ${table.id}`}</div>
-                              <div className="text-[10px] text-slate-400">{table.capacity || 4} seats</div>
-                            </div>
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tableOrder ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'}`}>
-                              {tableOrder ? 'Occupied' : 'Available'}
+                        <div
+                          key={table.id}
+                          className={`rounded-2xl border p-3 ${tableOrder ? 'border-amber-600 bg-amber-950 cursor-pointer hover:border-amber-400' : 'border-slate-700 bg-slate-950'}`}
+                          onClick={() => tableOrder && setTableOrderPopup(tableOrder)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-semibold text-white text-xs truncate">{table.label || table.name || `Table ${table.id}`}</div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${tableOrder ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'}`}>
+                              {tableOrder ? 'Busy' : 'Free'}
                             </span>
                           </div>
                           {tableOrder && (
-                            <div className="mt-3 space-y-2 text-xs text-slate-300">
-                              <div>Order: {tableOrder.orderNumber}</div>
-                              <div>Status: {tableOrder.status}</div>
-                              <div>Customer: {tableOrder.customerName || 'TABLE'}</div>
-                              <div>Items: {(tableOrder.items || []).length}</div>
-                              <div className="font-semibold text-white">Total: {tableOrder.total || tableOrder.amount || 0} PKR</div>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                <button onClick={() => printReceipt(tableOrder)} className="rounded px-2 py-1 text-xs font-semibold bg-green-600 text-white">Print</button>
-                                {renderOrderEditButton(tableOrder)}
-                                <button onClick={() => deleteOrder(tableOrder.id)} className="rounded px-2 py-1 text-xs font-semibold bg-red-600 text-white">Delete</button>
+                            <div className="mt-2 space-y-1.5">
+                              <div className="text-[10px] text-slate-400">#{tableOrder.orderNumber}</div>
+                              <div className="text-[10px] text-slate-300 leading-tight line-clamp-2">
+                                {(tableOrder.items || []).map((item, idx) => (
+                                  <span key={idx}>{item.quantity}x {item.name}{idx < (tableOrder.items||[]).length - 1 ? ', ' : ''}</span>
+                                ))}
+                              </div>
+                              <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
+                              <div className="flex items-center gap-1 pt-1 border-t border-slate-800">
+                                <button onClick={(e) => { e.stopPropagation(); printReceipt(tableOrder); }} className="rounded-md bg-green-600 px-1.5 py-1 text-[9px] font-semibold text-white">Print</button>
+                                <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); }} className="rounded-md bg-violet-600 px-1.5 py-1 text-[9px] font-semibold text-white">Edit</button>
+                                <button onClick={(e) => { e.stopPropagation(); setOrderDetailsModal(tableOrder); }} className="rounded-md bg-blue-600 px-1.5 py-1 text-[9px] font-semibold text-white">View</button>
+                                <button onClick={(e) => { e.stopPropagation(); deleteOrder(tableOrder.id); }} className="rounded-md bg-red-600 px-1.5 py-1 text-[9px] font-semibold text-white">Del</button>
+                                {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkPaid(tableOrder); }} className="rounded-md bg-amber-600 px-1.5 py-1 text-[9px] font-semibold text-white">Paid</button>
+                                    <button onClick={(e) => { e.stopPropagation(); confirmMarkDue(tableOrder); }} className="rounded-md bg-rose-600 px-1.5 py-1 text-[9px] font-semibold text-white">Due</button>
+                                  </>
+                                )}
+                                <div className="relative">
+                                  <button onClick={(e) => { e.stopPropagation(); setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id); }} className="rounded-md bg-slate-700 px-1.5 py-1 text-[9px] font-semibold text-slate-200">+</button>
+                                  {tableOrderAddOpen === tableOrder.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden min-w-[100px]">
+                                      <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5">
+                                        + Add Item
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )}
@@ -11952,6 +11992,42 @@ function App() {
                 <div className="mt-6 flex justify-end gap-3">
                   <button onClick={cancelMarkPaid} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Cancel</button>
                   <button onClick={handleMarkPaid} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Confirm Paid</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tableOrderPopup && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 p-4 flex items-center justify-center" onClick={() => setTableOrderPopup(null)}>
+              <div
+                className="relative w-full max-w-sm rounded-[24px] border border-amber-400/50 bg-slate-900 p-5 shadow-[0_0_60px_rgba(251,191,36,0.25)] shadow-amber-400/20"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">{tableOrderPopup.tableNumber || 'Table'}</h3>
+                    <p className="text-xs text-slate-400">Order #{tableOrderPopup.orderNumber}</p>
+                  </div>
+                  <button onClick={() => setTableOrderPopup(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-800">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {(tableOrderPopup.items || []).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-xl bg-slate-800/60 px-3 py-2.5 border border-slate-700/50">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{item.name || 'Item'}</div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-2">
+                        <span className="text-xs text-amber-400 font-semibold">x{item.quantity || 1}</span>
+                        <span className="text-sm font-bold text-emerald-400">{item.price || 0} PKR</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-700 flex justify-between items-center">
+                  <span className="text-sm text-slate-400">Total Items: {(tableOrderPopup.items || []).reduce((c, it) => c + Number(it.quantity || 0), 0)}</span>
+                  <span className="text-base font-bold text-white">{tableOrderPopup.total || tableOrderPopup.amount || 0} PKR</span>
                 </div>
               </div>
             </div>
