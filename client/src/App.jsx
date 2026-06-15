@@ -6466,77 +6466,126 @@ function App() {
 
         <section className="grid gap-4 lg:grid-cols-[1.5fr_0.65fr] xl:grid-cols-[1.55fr_0.6fr]">
           <div className={`w-full min-w-0 rounded-[32px] border p-4 shadow-soft mt-5 ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-            {/* Categories — square cards with icon on top, text below */}
-            {posTopSettings.showCategories && (
-              <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 gap-1.5 mb-4">
-                <button onClick={() => setSelectedCategory('All')} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
-                  selectedCategory === 'All'
-                    ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50 scale-105'
-                    : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
-                }`}>
-                  <span className="text-3xl mb-0.5 drop-shadow-md">🎯</span>
-                  <span className="text-[10px] leading-tight text-center font-semibold">All</span>
-                </button>
-                <button onClick={() => setSelectedCategory(MASHALLAH_CATEGORY)} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
-                  selectedCategory === MASHALLAH_CATEGORY
-                    ? 'bg-amber-600 text-white shadow-lg ring-2 ring-amber-400/50 scale-105'
-                    : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
-                }`}>
-                  <span className="text-3xl mb-0.5 drop-shadow-md">🌟</span>
-                  <span className="text-[10px] leading-tight text-center font-semibold">Mashallah</span>
-                </button>
-                {posCategories.map((category) => (
-                  <button key={category.id || category.name} onClick={() => setSelectedCategory(category.name)} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
-                    selectedCategory === category.name
-                      ? 'bg-violet-600 text-white shadow-lg ring-2 ring-violet-400/50 scale-105'
-                      : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
+            {isMobile && posTopSettings.showCategories ? (
+              <div className="flex gap-2">
+                <div className="w-14 shrink-0 overflow-y-auto max-h-[65vh] space-y-1.5">
+                  <button onClick={() => setSelectedCategory('All')} className={`flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[9px] font-medium transition-all duration-200 min-h-[52px] w-full ${
+                    selectedCategory === 'All' ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50 scale-105' : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
                   }`}>
-                    {category.icon ? (
-                      <img src={category.icon} alt="" className="w-7 h-7 rounded-full object-cover mb-0.5 shadow-sm" />
-                    ) : (
-                      <span className="text-3xl mb-0.5 drop-shadow-md">{getCategoryIcon(category.name)}</span>
-                    )}
-                    <span className="text-[10px] leading-tight text-center truncate w-full font-semibold">{category.name}</span>
+                    <span className="text-xl mb-0.5">🎯</span>
+                    <span className="leading-tight text-center font-semibold truncate w-full">All</span>
                   </button>
-                ))}
-                <button onClick={() => { setEditingCategory(null); setForm({ name: '' }); setInventorySubTab('categories'); }} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium border-2 border-dashed transition-all duration-200 min-h-[72px] active:scale-95 ${
-                  darkMode ? 'border-slate-600 text-slate-400 hover:bg-slate-800 hover:border-slate-500' : 'border-slate-300 text-slate-400 hover:bg-slate-50 hover:border-slate-400'
-                }`}>
-                  <span className="text-2xl mb-0.5">+</span>
-                  <span className="text-[10px] leading-tight text-center font-semibold">Add</span>
-                </button>
+                  <button onClick={() => setSelectedCategory(MASHALLAH_CATEGORY)} className={`flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[9px] font-medium transition-all duration-200 min-h-[52px] w-full ${
+                    selectedCategory === MASHALLAH_CATEGORY ? 'bg-amber-600 text-white shadow-lg ring-2 ring-amber-400/50 scale-105' : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
+                  }`}>
+                    <span className="text-xl mb-0.5">🌟</span>
+                    <span className="leading-tight text-center font-semibold truncate w-full">Mashallah</span>
+                  </button>
+                  {posCategories.map((category) => (
+                    <button key={category.id || category.name} onClick={() => setSelectedCategory(category.name)} className={`flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[9px] font-medium transition-all duration-200 min-h-[52px] w-full ${
+                      selectedCategory === category.name ? 'bg-violet-600 text-white shadow-lg ring-2 ring-violet-400/50 scale-105' : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
+                    }`}>
+                      {category.icon ? (
+                        <img src={category.icon} alt="" className="w-5 h-5 rounded-full object-cover mb-0.5 shadow-sm" />
+                      ) : (
+                        <span className="text-xl mb-0.5">{getCategoryIcon(category.name)}</span>
+                      )}
+                      <span className="leading-tight text-center truncate w-full">{category.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {filteredProducts.map((product) => (
+                      <button key={product.id} type="button" className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-soft transition active:scale-[0.97]" onClick={() => addToCart(product)}>
+                        <div className="flex flex-col items-center text-center mb-1">
+                          {product.photo ? (
+                            <img src={product.photo} alt={product.name} className="w-8 h-8 rounded-full object-cover mb-0.5 shadow-sm" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center mb-0.5 text-slate-400 text-sm">📦</div>
+                          )}
+                        </div>
+                        <div className="text-[9px] font-semibold text-slate-900 leading-tight line-clamp-2 mb-0.5">{product.name}</div>
+                        <div className="text-[9px] font-bold text-emerald-600">{product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+            ) : (
+              <>
+                {posTopSettings.showCategories && (
+                  <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 gap-1.5 mb-4">
+                    <button onClick={() => setSelectedCategory('All')} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
+                      selectedCategory === 'All'
+                        ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50 scale-105'
+                        : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
+                    }`}>
+                      <span className="text-3xl mb-0.5 drop-shadow-md">🎯</span>
+                      <span className="text-[10px] leading-tight text-center font-semibold">All</span>
+                    </button>
+                    <button onClick={() => setSelectedCategory(MASHALLAH_CATEGORY)} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
+                      selectedCategory === MASHALLAH_CATEGORY
+                        ? 'bg-amber-600 text-white shadow-lg ring-2 ring-amber-400/50 scale-105'
+                        : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
+                    }`}>
+                      <span className="text-3xl mb-0.5 drop-shadow-md">🌟</span>
+                      <span className="text-[10px] leading-tight text-center font-semibold">Mashallah</span>
+                    </button>
+                    {posCategories.map((category) => (
+                      <button key={category.id || category.name} onClick={() => setSelectedCategory(category.name)} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-all duration-200 min-h-[72px] shadow-soft hover:shadow-md active:scale-95 ${
+                        selectedCategory === category.name
+                          ? 'bg-violet-600 text-white shadow-lg ring-2 ring-violet-400/50 scale-105'
+                          : `${darkMode ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:-translate-y-0.5'}`
+                      }`}>
+                        {category.icon ? (
+                          <img src={category.icon} alt="" className="w-7 h-7 rounded-full object-cover mb-0.5 shadow-sm" />
+                        ) : (
+                          <span className="text-3xl mb-0.5 drop-shadow-md">{getCategoryIcon(category.name)}</span>
+                        )}
+                        <span className="text-[10px] leading-tight text-center truncate w-full font-semibold">{category.name}</span>
+                      </button>
+                    ))}
+                    <button onClick={() => { setEditingCategory(null); setForm({ name: '' }); setInventorySubTab('categories'); }} className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium border-2 border-dashed transition-all duration-200 min-h-[72px] active:scale-95 ${
+                      darkMode ? 'border-slate-600 text-slate-400 hover:bg-slate-800 hover:border-slate-500' : 'border-slate-300 text-slate-400 hover:bg-slate-50 hover:border-slate-400'
+                    }`}>
+                      <span className="text-2xl mb-0.5">+</span>
+                      <span className="text-[10px] leading-tight text-center font-semibold">Add</span>
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>POS Catalog</p>
+                    <h3 className={`mt-1 text-xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Select products</h3>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {filteredProducts.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="rounded-2xl border border-slate-200 bg-white p-2 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md active:scale-[0.97]"
+                      onClick={() => addToCart(product)}
+                    >
+                      <div className="flex flex-col items-center text-center mb-1.5">
+                        {product.photo ? (
+                          <img src={product.photo} alt={product.name} className="w-10 h-10 rounded-full object-cover mb-1 shadow-sm" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center mb-1 text-slate-400 text-lg">📦</div>
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[11px] font-semibold text-slate-900 mb-0.5 leading-tight line-clamp-2">{product.name}</div>
+                        <div className="text-xs font-bold text-emerald-600">
+                          {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className={`text-xs uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>POS Catalog</p>
-                <h3 className={`mt-1 text-xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Select products</h3>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {filteredProducts.map((product) => (
-                <button
-                  key={product.id}
-                  type="button"
-                  className="rounded-2xl border border-slate-200 bg-white p-2 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md active:scale-[0.97]"
-                  onClick={() => addToCart(product)}
-                >
-                  <div className="flex flex-col items-center text-center mb-1.5">
-                    {product.photo ? (
-                      <img src={product.photo} alt={product.name} className="w-10 h-10 rounded-full object-cover mb-1 shadow-sm" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center mb-1 text-slate-400 text-lg">📦</div>
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[11px] font-semibold text-slate-900 mb-0.5 leading-tight line-clamp-2">{product.name}</div>
-                    <div className="text-xs font-bold text-emerald-600">
-                      {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
 
           {showWeightPopup && selectedCartProduct && (
@@ -6640,7 +6689,7 @@ function App() {
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 rounded-full bg-slate-900 px-1.5 py-0.5 shadow-[0_4px_0_rgba(15,23,42,0.25)]">
                         <button onClick={() => updateCartItem(item.itemId, -1)} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-100 transition hover:bg-slate-700 active:translate-y-[1px]">-</button>
-                        <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-slate-950 px-2 text-xs font-semibold text-slate-100">{item.quantity}</span>
+                        <span onClick={(e) => { e.stopPropagation(); const v = prompt('Enter quantity:', item.quantity); if (v !== null) { const n = parseInt(v, 10); if (n > 0) { setCart(prev => prev.map(c => c.itemId === item.itemId ? { ...c, quantity: n, total: n * (Number(c.price) || 0) } : c)); } } }} className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-slate-950 px-2 text-xs font-semibold text-slate-100 cursor-pointer hover:bg-slate-800">{item.quantity}</span>
                         <button onClick={() => updateCartItem(item.itemId, 1)} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-100 transition hover:bg-slate-700 active:translate-y-[1px]">+</button>
                       </div>
                       <button onClick={() => editCartItemDetails(item.itemId)} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-[10px] font-bold text-white transition hover:from-blue-600 hover:to-blue-700 shadow-[0_2px_8px_rgba(59,130,246,0.3)] active:translate-y-[1px]" title="Edit product">✎</button>
