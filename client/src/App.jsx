@@ -4149,7 +4149,11 @@ function App() {
     setRiderBookSummaryData(null);
   };
 
-  const riderBookAssignedOrders = posOrders.filter((order) => order.deliveryAgent || (String(order.status || '').toLowerCase() === 'payment collected'));
+  const riderBookAssignedOrders = posOrders.filter((order) => {
+    const s = String(order.status || '').toLowerCase();
+    const isPaid = s === 'completed' || s === 'payment collected';
+    return !isPaid && order.deliveryAgent;
+  });
   const riderBookFilteredByRider = riderBookFilterRider
     ? riderBookAssignedOrders.filter((order) => {
         if (String(order.status || '').toLowerCase() === 'payment collected') {
@@ -9001,7 +9005,8 @@ function App() {
       if (isNewOrdersTab) {
         matchesDeliveryTab = !hasRider || status === 'kitchen';
       } else if (deliverySubTab === 'assigned') {
-        matchesDeliveryTab = hasRider || status === 'riders assigned';
+        const isPaid = ['completed', 'payment collected'].includes(status);
+        matchesDeliveryTab = !isPaid && (hasRider || status === 'riders assigned');
       }
       const matchesSearch = !orderSearch || 
         (String(o.orderNumber || o.id)).toLowerCase().includes(orderSearch.toLowerCase()) ||
@@ -10455,6 +10460,87 @@ function App() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {floorTables.map((table) => {
+                      const tableLabel = getTableLabel(table);
+                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
+                      return (
+                        <div
+                          key={table.id}
+                          className={`rounded-2xl border p-3 ${tableOrder ? 'border-amber-600 bg-amber-950 cursor-pointer hover:border-amber-400' : 'border-slate-700 bg-slate-950'}`}
+                          onClick={() => tableOrder && setTableOrderPopup(tableOrder)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-semibold text-white text-xs truncate">{table.label || table.name || `Table ${table.id}`}</div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${tableOrder ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'}`}>
+                              {tableOrder ? 'Busy' : 'Free'}
+                            </span>
+                          </div>
+                          {tableOrder && (
+                            <div className="mt-2 space-y-1.5">
+                              <div className="text-[10px] text-slate-400">#{tableOrder.orderNumber}</div>
+                              <div className="text-[10px] text-slate-300 leading-tight line-clamp-2">
+                                {(tableOrder.items || []).map((item, idx) => (
+                                  <span key={idx}>{item.quantity}x {item.name}{idx < (tableOrder.items||[]).length - 1 ? ', ' : ''}</span>
+                                ))}
+                              </div>
+                              <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
+                              <div className="flex justify-end pt-1 border-t border-slate-800">
+                                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={() => setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id)} className="rounded-lg bg-slate-800 px-2 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 flex items-center gap-1">
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                                    Actions
+                                  </button>
+                                  {tableOrderAddOpen === tableOrder.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-slate-900/50 overflow-hidden min-w-[140px]">
+                                      <button onClick={() => { openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                                        Edit Order
+                                      </button>
+                                      <button onClick={() => { setQuickOrderDetail(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-blue-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>
+                                        View Order
+                                      </button>
+                                      <button onClick={() => { printReceipt(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M6 9V3h12v6M6 18h12v-6H6v6zM9 21h6"/></svg>
+                                        Print
+                                      </button>
+                                      <button onClick={() => { deleteOrder(tableOrder.id); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-red-300 hover:bg-slate-800 flex items-center gap-2">
+                                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
+                                        Delete
+                                      </button>
+                                      {tableOrder.status !== 'Completed' && tableOrder.status !== 'Payment Collected' && (
+                                        <>
+                                          <div className="border-t border-slate-800" />
+                                          <button onClick={() => { confirmMarkPaid(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-amber-300 hover:bg-slate-800 flex items-center gap-2">
+                                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                                            Mark Paid
+                                          </button>
+                                          <button onClick={() => { confirmMarkDue(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-rose-300 hover:bg-slate-800 flex items-center gap-2">
+                                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                                            Mark Due
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-4 shadow-soft">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Outside tables</p>
+                      <h4 className="mt-1 text-base font-semibold text-white">Outside hotel</h4>
+                    </div>
+                    <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{outsideTables.length}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {outsideTables.map((table) => {
                       const tableLabel = getTableLabel(table);
                       const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
                       return (
