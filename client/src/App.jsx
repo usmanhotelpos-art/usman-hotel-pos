@@ -901,7 +901,7 @@ function App() {
   const [selectedTakeawayOrders, setSelectedTakeawayOrders] = useState([]);
   const [orderSearch, setOrderSearch] = useState('');
   const [viewOrderModal, setViewOrderModal] = useState(null);
-  const [orderDetailsModal, setOrderDetailsModal] = useState(null);
+
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
 
@@ -1777,11 +1777,11 @@ function App() {
   }, [holdModalOpen, settings.holdAutoRefreshSeconds, settings.holdShowAutoRefresh]);
 
   useEffect(() => {
-    document.body.style.overflow = (holdModalOpen || orderModalOpen || orderDetailsModal || tableOrderPopup || markPaidOrder || showTableModal || riderAssignmentModal || bulkRiderAssignmentOpen) ? 'hidden' : '';
+    document.body.style.overflow = (holdModalOpen || orderModalOpen || quickOrderDetail || tableOrderPopup || markPaidOrder || showTableModal || riderAssignmentModal || bulkRiderAssignmentOpen) ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [holdModalOpen, orderModalOpen, orderDetailsModal, tableOrderPopup, markPaidOrder, showTableModal, riderAssignmentModal, bulkRiderAssignmentOpen]);
+  }, [holdModalOpen, orderModalOpen, quickOrderDetail, tableOrderPopup, markPaidOrder, showTableModal, riderAssignmentModal, bulkRiderAssignmentOpen]);
 
   useEffect(() => {
     const updateMobile = () => setIsMobileSidebar(window.innerWidth < 768);
@@ -3991,7 +3991,7 @@ function App() {
   };
 
   const openViewOrderModal = (order) => {
-    setOrderDetailsModal(order);
+    setQuickOrderDetail(order);
   };
 
   async function viewOrderById(orderId) {
@@ -9133,7 +9133,7 @@ function App() {
                       <td className="px-2 py-2 text-slate-300 text-xs">
                         <div className="flex items-center gap-2">
                           <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
-                          <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
+                          <button type="button" onClick={() => setQuickOrderDetail(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
                             <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                           </button>
                         </div>
@@ -9356,7 +9356,7 @@ function App() {
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                 Edit
                               </button>
-                              <button onClick={() => { setOrderDetailsModal(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                              <button onClick={() => { setQuickOrderDetail(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                                 View
                               </button>
@@ -9609,7 +9609,7 @@ function App() {
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                               Edit
                             </button>
-                            <button onClick={() => { setOrderDetailsModal(order); setOnlineActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                            <button onClick={() => { setQuickOrderDetail(order); setOnlineActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                               View
                             </button>
@@ -9823,7 +9823,7 @@ function App() {
                         <td className="px-4 py-4 text-slate-300">
                           <div className="flex items-center gap-2">
                             <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
-                            <button type="button" onClick={() => setOrderDetailsModal(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
+                            <button type="button" onClick={() => setQuickOrderDetail(order)} title="View items" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
                               <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                             </button>
                           </div>
@@ -10025,7 +10025,7 @@ function App() {
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                               Edit
                             </button>
-                            <button onClick={() => { setOrderDetailsModal(order); setTakeawayActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                            <button onClick={() => { setQuickOrderDetail(order); setTakeawayActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                               View
                             </button>
@@ -10441,7 +10441,7 @@ function App() {
                                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                         Edit Order
                                       </button>
-                                      <button onClick={() => { setOrderDetailsModal(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-blue-300 hover:bg-slate-800 flex items-center gap-2">
+                                      <button onClick={() => { setQuickOrderDetail(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-blue-300 hover:bg-slate-800 flex items-center gap-2">
                                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>
                                         View Order
                                       </button>
@@ -10531,7 +10531,7 @@ function App() {
                                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                   Edit
                                 </button>
-                                <button onClick={() => { setOrderDetailsModal(order); setDineinActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
+                                <button onClick={() => { setQuickOrderDetail(order); setDineinActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-slate-200 hover:bg-slate-800 flex items-center gap-1.5 border-b border-slate-800">
                                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
                                   View
                                 </button>
@@ -11909,7 +11909,7 @@ function App() {
                 <div className="flex flex-wrap gap-1.5">
                   <button onClick={(e) => { e.stopPropagation(); printReceipt(quickOrderDetail); }} className="flex-1 rounded-lg bg-emerald-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Print</button>
                   <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-violet-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Edit</button>
-                  <button onClick={(e) => { e.stopPropagation(); setOrderDetailsModal(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-blue-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">View</button>
+
                   <button onClick={(e) => { e.stopPropagation(); deleteOrder(quickOrderDetail.id); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-red-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Delete</button>
                   {quickOrderDetail.status !== 'Completed' && quickOrderDetail.status !== 'Payment Collected' && (
                     <>
@@ -11958,89 +11958,7 @@ function App() {
             </div>
           )}
 
-          {orderDetailsModal && (
-            <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/92 p-4 backdrop-blur-sm flex items-center justify-center">
-              <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-[32px] border border-white/10 bg-white/10 shadow-2xl shadow-emerald-500/10 backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 opacity-80" />
-                <div className="flex h-full flex-col overflow-hidden">
-                  <div className="flex-shrink-0 border-b border-white/10 p-6 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-2xl font-semibold text-white">Order Details: {orderDetailsModal.orderNumber || orderDetailsModal.id}</h2>
-                        <p className="text-sm text-slate-400">Order information and items</p>
-                      </div>
-                      <button onClick={() => setOrderDetailsModal(null)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-200 transition hover:bg-slate-800">
-                        <svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-6">
-                    <div className="space-y-6">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                          <h3 className="text-lg font-semibold text-white mb-3">Customer Information</h3>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-400">Name:</span><span className="text-white">{orderDetailsModal.customerName || (orderDetailsModal.orderType === 'Dine-In' ? 'TABLE' : 'Walk-In')}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-400">Phone:</span><span className="text-white">{orderDetailsModal.phone || '-'}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-400">Address:</span><span className="text-white truncate">{orderDetailsModal.address || '-'}</span></div>
-                          </div>
-                        </div>
-                        <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                          <h3 className="text-lg font-semibold text-white mb-3">Order Information</h3>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-400">Status:</span><span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadge(orderDetailsModal.status)}`}>{orderDetailsModal.status || 'Pending'}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-400">Type:</span><span className="text-white">{orderDetailsModal.orderType || 'Dine-In'}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-400">Rider:</span><span className="text-white">{orderDetailsModal.deliveryAgent || 'Unassigned'}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-400">Payment:</span><span className="text-white">{orderDetailsModal.paymentMethod || 'Cash'}</span></div>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                        <h3 className="text-lg font-semibold text-white mb-3">Order Items</h3>
-                        <div className="space-y-3">
-                          {(orderDetailsModal.items || []).map((item, index) => (
-                            <div key={index} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-b-0">
-                              <div className="flex-1">
-                                <div className="font-medium text-white">{item.name || 'Unknown Item'}</div>
-                                <div className="text-sm text-slate-400">Qty: {item.quantity || 1}</div>
-                                {item.notes && <div className="text-xs text-slate-500 mt-1">{item.notes}</div>}
-                              </div>
-                              <div className="text-right">
-                                <div className="font-semibold text-white">{item.price || 0} Rs</div>
-                                <div className="text-sm text-slate-400">Subtotal: {(item.price || 0) * (item.quantity || 1)} Rs</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                        <h3 className="text-lg font-semibold text-white mb-3">Order Summary</h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div className="flex justify-between"><span className="text-slate-400">Subtotal:</span><span className="text-white">{orderDetailsModal.subtotal || orderDetailsModal.amount || 0} Rs</span></div>
-                          <div className="flex justify-between"><span className="text-slate-400">Discount:</span><span className="text-white">-{orderDetailsModal.discount || 0} Rs</span></div>
-                          <div className="flex justify-between"><span className="text-slate-400">Tax:</span><span className="text-white">+{orderDetailsModal.tax || 0} Rs</span></div>
-                          <div className="flex justify-between"><span className="text-slate-400">Service type:</span><span className="text-white">{orderDetailsModal.serviceType || '-'}</span></div>
-                          <div className="flex justify-between"><span className="text-slate-400">Service charge:</span><span className="text-white">+{orderDetailsModal.serviceCharge || 0} Rs</span></div>
-                          <div className="flex justify-between"><span className="text-slate-400">Delivery Fee:</span><span className="text-white">+{orderDetailsModal.deliveryFee || 0} Rs</span></div>
-                          <div className="col-span-2 pt-2 border-t border-white/10 flex justify-between text-base font-bold">
-                            <span className="text-slate-300">Total:</span><span className="text-emerald-400">{orderDetailsModal.total || orderDetailsModal.amount || 0} Rs</span></div>
-                        </div>
-                      </div>
-
-                      {orderDetailsModal.notes && (
-                        <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
-                          <h3 className="text-lg font-semibold text-white mb-3">Notes</h3>
-                          <p className="text-sm text-slate-300">{orderDetailsModal.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
           {deleteConfirmOpen && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/92 p-4 backdrop-blur-sm flex items-center justify-center">
               <div className="relative w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white/10 shadow-2xl">
