@@ -6874,6 +6874,7 @@ function App() {
                 const typeOrders = posOrders
                   .filter(o => {
                     if (o.orderType !== type) return false;
+                    if (type === 'Delivery' && o.deliveryAgent) return false;
                     const d = o.createdAt ? new Date(o.createdAt) : null;
                     return d && d >= todayStart && d >= cutoff;
                   })
@@ -12258,11 +12259,8 @@ function App() {
                   <button onClick={(e) => { e.stopPropagation(); openOrderForEditInPos(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-violet-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Edit</button>
 
                   <button onClick={(e) => { e.stopPropagation(); deleteOrder(quickOrderDetail.id); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-red-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Delete</button>
-                  {quickOrderDetail.status !== 'Completed' && quickOrderDetail.status !== 'Payment Collected' && (
-                    <>
-                      <button onClick={(e) => { e.stopPropagation(); confirmMarkPaid(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-amber-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Mark Paid</button>
-                      <button onClick={(e) => { e.stopPropagation(); confirmMarkDue(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-rose-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Mark Due</button>
-                    </>
+                  {quickOrderDetail.orderType === 'Delivery' && !quickOrderDetail.deliveryAgent && (
+                    <button onClick={(e) => { e.stopPropagation(); openRiderAssignmentModal(quickOrderDetail); setQuickOrderDetail(null); }} className="flex-1 rounded-lg bg-purple-500 px-2 py-1.5 text-[10px] font-semibold text-white text-center">Assign Rider</button>
                   )}
                 </div>
               </div>
