@@ -6810,7 +6810,13 @@ function App() {
               {(() => {
                 const t = new Date(); t.setHours(0,0,0,0);
                 const c = new Date(Date.now() - 3*60*60*1000);
-                return posOrders.filter(o => { const d = o.createdAt ? new Date(o.createdAt) : null; return d && d >= t && d >= c; }).length;
+                const dc = new Date(Date.now() - 4*60*60*1000);
+                return posOrders.filter(o => {
+                  const d = o.createdAt ? new Date(o.createdAt) : null;
+                  if (!d || d < t) return false;
+                  if (o.orderType === 'Delivery') return d >= dc && !o.deliveryAgent;
+                  return d >= c;
+                }).length;
               })()} Orders
             </span>
           </button>
@@ -6839,6 +6845,7 @@ function App() {
                   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
                   const count = posOrders.filter(o => {
                     if (o.orderType !== key) return false;
+                    if (key === 'Delivery' && o.deliveryAgent) return false;
                     const d = o.createdAt ? new Date(o.createdAt) : null;
                     return d && d >= todayStart && d >= cutoff;
                   }).length;
@@ -9006,10 +9013,10 @@ function App() {
             ].map(({ key, icon, label, color, shadow }) => {
               const cutoff = new Date(Date.now() - (key === 'delivery' ? 4 : 3) * 60 * 60 * 1000);
               const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-              const typeOrders = posOrders.filter(o => {
+               const typeOrders = posOrders.filter(o => {
                 if (key === 'takeaway' && o.orderType !== 'Takeaway') return false;
                 if (key === 'dinein' && o.orderType !== 'Dine-In') return false;
-                if (key === 'delivery' && o.orderType !== 'Delivery') return false;
+                if (key === 'delivery' && (o.orderType !== 'Delivery' || o.deliveryAgent)) return false;
                 const d = o.createdAt ? new Date(o.createdAt) : null;
                 return d && d >= todayStart && d >= cutoff;
               });
