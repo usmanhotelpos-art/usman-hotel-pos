@@ -4150,9 +4150,7 @@ function App() {
   };
 
   const riderBookAssignedOrders = posOrders.filter((order) => {
-    const s = String(order.status || '').toLowerCase();
-    const isPaid = s === 'completed' || s === 'payment collected';
-    return !isPaid && order.deliveryAgent;
+    return order.deliveryAgent;
   });
   const riderBookFilteredByRider = riderBookFilterRider
     ? riderBookAssignedOrders.filter((order) => {
