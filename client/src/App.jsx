@@ -3045,7 +3045,7 @@ function App() {
 
   const openOrderModal = (order) => {
     setEditingOrder(order);
-    setEditingOrderCart((order.items || []).map((item) => ({ ...item })));
+    setEditingOrderCart((order.items || []).map((item) => ({ ...item, itemId: item.itemId || `${item.productId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })));
     setOrderEditForm({
       orderType: order.orderType || 'Dine-In',
       customerName: order.customerName || '',
@@ -3148,6 +3148,7 @@ function App() {
       const tabMap = { 'Delivery': 'delivery', 'Takeaway': 'takeaway', 'Dine-In': 'dinein' };
       const newTab = tabMap[orderEditForm.orderType] || 'delivery';
       setOrdersMainTab(newTab);
+      setActiveTab('orders');
       await loadOrdersData();
       await loadPosData();
     } catch (error) {
@@ -5459,37 +5460,28 @@ function App() {
       if (existing) {
         return prev.map((item) => (item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item));
       }
-      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1, notes: '' }];
+      return [...prev, { itemId: `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, productId: product.id, name: product.name, price: product.price, quantity: 1, notes: '' }];
     });
   };
 
-  const removeFromEditingCart = (productId) => {
-    setEditingOrderCart((prev) => {
-      const idx = prev.findIndex((item) => item.productId === productId);
-      if (idx === -1) return prev;
-      const item = prev[idx];
-      if (item.quantity > 1) {
-        return prev.map((it, i) => i === idx ? { ...it, quantity: it.quantity - 1 } : it);
-      }
-      return prev.filter((_, i) => i !== idx);
-    });
+  const removeFromEditingCart = (itemId) => {
+    setEditingOrderCart((prev) => prev.filter((item) => item.itemId !== itemId));
   };
 
-  const updateEditingCartItem = (productId, delta) => {
-    setEditingOrderCart((prev) => {
-      const idx = prev.findIndex((item) => item.productId === productId);
-      if (idx === -1) return prev;
-      const existing = prev[idx];
-      const newQty = existing.quantity + delta;
-      if (newQty <= 0) {
-        return prev.filter((_, i) => i !== idx);
-      }
-      return prev.map((it, i) => i === idx ? { ...it, quantity: newQty } : it);
-    });
+  const updateEditingCartItem = (itemId, delta) => {
+    setEditingOrderCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.itemId !== itemId) return item;
+          const newQty = Math.max(1, (item.quantity || 0) + delta);
+          return { ...item, quantity: newQty };
+        })
+        .filter((item) => item.quantity > 0)
+    );
   };
 
-  const updateEditingCartNotes = (productId, notes) => {
-    setEditingOrderCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, notes } : item)));
+  const updateEditingCartNotes = (itemId, notes) => {
+    setEditingOrderCart((prev) => prev.map((item) => (item.itemId === itemId ? { ...item, notes } : item)));
   };
 
   const saveDeliveryServiceType = async () => {
@@ -11641,19 +11633,19 @@ function App() {
                           ) : (
                             <div className="space-y-3">
                               {editingOrderCart.map((item) => (
-                                <div key={item.productId} className="rounded-3xl border border-slate-700 bg-slate-900 p-3">
+                                <div key={item.itemId} className="rounded-3xl border border-slate-700 bg-slate-900 p-3">
                                   <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex-1 min-w-0">
                                       <div className="font-semibold text-white text-sm truncate">{item.name}</div>
                                       <div className="text-xs text-slate-400">{item.price} PKR</div>
                                     </div>
-                                    <button onClick={() => removeFromEditingCart(item.productId)} className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-slate-700 bg-rose-600 text-white text-xs font-bold transition hover:bg-rose-500">−</button>
+                                    <button onClick={() => removeFromEditingCart(item.itemId)} className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-slate-700 bg-rose-600 text-white text-xs font-bold transition hover:bg-rose-500">−</button>
                                   </div>
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-2 bg-slate-800 rounded-full px-2 py-1">
-                                      <button onClick={() => updateEditingCartItem(item.productId, -1)} className="h-6 w-6 rounded-full bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-800">−</button>
+                                      <button onClick={() => updateEditingCartItem(item.itemId, -1)} className="h-6 w-6 rounded-full bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-800">−</button>
                                       <span className="w-6 text-center text-sm text-white">{item.quantity}</span>
-                                      <button onClick={() => updateEditingCartItem(item.productId, 1)} className="h-6 w-6 rounded-full bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-800">+</button>
+                                      <button onClick={() => updateEditingCartItem(item.itemId, 1)} className="h-6 w-6 rounded-full bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-800">+</button>
                                     </div>
                                     <span className="text-xs font-semibold text-emerald-400">{item.total || item.price * item.quantity} PKR</span>
                                   </div>
