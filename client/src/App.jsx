@@ -3005,6 +3005,7 @@ function App() {
   async function markTakeawayOrderPaid(orderId) {
     await updateOrderStatus(orderId, 'Completed');
     setTakeawaySubTab('paid');
+    await loadOrdersData();
   }
 
   async function assignRiderToOrder(orderId, riderName) {
@@ -3280,11 +3281,51 @@ function App() {
     );
   }
 
-  function confirmMarkPaid(order) {
-    setMarkPaidOrder(order);
-    setMarkPaidAmount(order.total || order.amount || 0);
-    setMarkPaidMethod(order.paymentMethod || 'Cash');
-    setMarkDueOrder(null);
+  async function confirmMarkPaid(order) {
+    setLoading(true);
+    setMessage('');
+    try {
+      const tableLabel = order.tableNumber;
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          status: 'Payment Collected',
+          items: order.items || [],
+          customerName: order.customerName || '',
+          tableNumber: order.tableNumber || ''
+        })
+      });
+      const amount = Number(order.total || order.amount || 0);
+      if (amount) {
+        await fetchJson(`${apiBase}/pos/payments`, {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: order.id,
+            amount,
+            paymentMethod: order.paymentMethod || 'Cash',
+            status: 'Completed',
+            description: `Payment collected for order ${order.orderNumber || order.id}`
+          })
+        });
+      }
+      if (tableLabel) {
+        const table = posTables.find((item) => item.label === tableLabel || item.name === tableLabel || item.number === tableLabel);
+        if (table) {
+          await fetchJson(`${apiBase}/pos/tables/${table.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'available' })
+          });
+        }
+      }
+      setMessage('Order marked paid successfully.');
+      setSelectedDineinOrders((prev) => prev.filter((id) => id !== order.id));
+      await loadOrdersData();
+      await loadPosData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function confirmMarkDue(order) {
@@ -8815,6 +8856,160 @@ function App() {
 
         {/* Mobile */}
         <div className="md:hidden space-y-3">
+          {/* ── Order Type Icon Navigation with Badges ── */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { key: 'takeaway', icon: '🛍️', label: 'Take Away', color: 'from-amber-500 to-orange-500', shadow: 'rgba(245,158,11,0.4)' },
+              { key: 'dinein', icon: '🍽️', label: 'Dine In', color: 'from-emerald-500 to-emerald-600', shadow: 'rgba(16,185,129,0.4)' },
+              { key: 'delivery', icon: '🚚', label: 'Delivery', color: 'from-sky-500 to-blue-600', shadow: 'rgba(14,165,233,0.4)' },
+            ].map(({ key, icon, label, color, shadow }) => {
+              const cutoff = new Date(Date.now() - (key === 'delivery' ? 4 : 3) * 60 * 60 * 1000);
+              const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+              const typeOrders = posOrders.filter(o => {
+                if (key === 'takeaway' && o.orderType !== 'Takeaway') return false;
+                if (key === 'dinein' && o.orderType !== 'Dine-In') return false;
+                if (key === 'delivery' && o.orderType !== 'Delivery') return false;
+                const d = o.createdAt ? new Date(o.createdAt) : null;
+                return d && d >= todayStart && d >= cutoff;
+              });
+              const count = typeOrders.length;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setOrdersMainTab(key)}
+                  className={`relative rounded-2xl p-3 text-center transition-all duration-200 active:scale-95 ${
+                    ordersMainTab === key
+                      ? `bg-gradient-to-br ${color} text-white shadow-lg`
+                      : 'bg-slate-900 border border-slate-700 text-slate-400'
+                  }`}
+                  style={ordersMainTab === key ? { boxShadow: `0 4px 20px ${shadow}` } : {}}
+                >
+                  <div className="text-2xl mb-0.5">{icon}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wide">{label}</div>
+                  {count > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold px-1 shadow-lg ring-2 ring-slate-950">
+                      {count > 99 ? '99+' : count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Recent Orders (all types, today within 3 hours, max 10, glowing boxes) ── */}
+          {(() => {
+            const cutoffTime = new Date(Date.now() - 3 * 60 * 60 * 1000);
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+            const recentOrders = posOrders
+              .filter(o => {
+                const d = o.createdAt ? new Date(o.createdAt) : null;
+                return d && d >= todayStart && d >= cutoffTime;
+              })
+              .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+              .slice(0, 10);
+            if (recentOrders.length === 0) return null;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">
+                    ⚡ Recent Orders (3h)
+                  </span>
+                  <span className="text-[10px] text-slate-500">{recentOrders.length} order{recentOrders.length > 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-2">
+                  {recentOrders.map(order => {
+                    const typeIcon = order.orderType === 'Delivery' ? '🚚' : order.orderType === 'Takeaway' ? '🛍️' : '🍽️';
+                    const glowColor = order.orderType === 'Delivery' ? 'rgba(14,165,233,0.25)' : order.orderType === 'Takeaway' ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)';
+                    const borderColor = order.orderType === 'Delivery' ? 'border-sky-700' : order.orderType === 'Takeaway' ? 'border-amber-700' : 'border-emerald-700';
+                    return (
+                      <div
+                        key={order.id}
+                        className={`rounded-2xl border ${borderColor} bg-slate-900 p-3 text-slate-200 relative overflow-hidden`}
+                        style={{ boxShadow: `0 0 18px ${glowColor}, 0 0 40px ${glowColor}` }}
+                      >
+                        {/* Glow overlay */}
+                        <div className="absolute inset-0 opacity-[0.04] rounded-2xl" style={{ background: `radial-gradient(circle at 50% 0%, ${glowColor.replace('0.25','0.6')}, transparent 70%)` }} />
+                        <div className="relative z-10 flex items-start gap-2">
+                          <div className="text-lg shrink-0 mt-0.5">{typeIcon}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-sm text-slate-100 truncate">{order.orderNumber || order.id}</span>
+                              <span className="font-bold text-sm text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</span>
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-400">
+                              <span>{order.customerName || (order.orderType === 'Delivery' ? order.address : order.orderType === 'Takeaway' ? 'PICK UP' : order.tableNumber || 'TABLE')}</span>
+                              {order.deliveryAgent && <span className="text-slate-500">| Rider: {order.deliveryAgent}</span>}
+                            </div>
+                            <div className="mt-1.5 flex items-center justify-between">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>
+                                {order.status || 'Pending'}
+                              </span>
+                              <span className="text-[10px] text-slate-500">
+                                {order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Unassigned Delivery Orders (4 hours today, no rider) ── */}
+          {(() => {
+            const cutoffTime = new Date(Date.now() - 4 * 60 * 60 * 1000);
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+            const unassignedOrders = posOrders
+              .filter(o => {
+                if (o.orderType !== 'Delivery') return false;
+                if (o.deliveryAgent) return false;
+                const d = o.createdAt ? new Date(o.createdAt) : null;
+                return d && d >= todayStart && d >= cutoffTime;
+              })
+              .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+            if (unassignedOrders.length === 0) return null;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">
+                    📦 Unassigned Delivery (4h)
+                  </span>
+                  <span className="text-[10px] text-slate-500">{unassignedOrders.length} order{unassignedOrders.length > 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-2">
+                  {unassignedOrders.map(order => (
+                    <div key={order.id} className="rounded-2xl border border-purple-700 bg-slate-900 p-3 text-xs text-slate-200" style={{ boxShadow: '0 0 14px rgba(168,85,247,0.2), 0 0 30px rgba(168,85,247,0.08)' }}>
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-sm text-white truncate">{order.orderNumber || order.id}</span>
+                            <span className="font-semibold text-sm text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</span>
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-slate-400 truncate">{order.address || 'Walk-In'}</div>
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <div className="flex flex-wrap gap-1">
+                              <span className="text-[10px] text-slate-500">{order.serviceType || '-'}</span>
+                              <span className="text-slate-600">|</span>
+                              <span className="text-[10px] text-slate-500">{(order.items || []).length} items</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                          </div>
+                          <div className="mt-1.5 flex gap-1.5">
+                            <button onClick={() => openRiderAssignmentModal(order)} className="rounded-full bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-500">Assign Rider</button>
+                            <button onClick={() => deleteOrder(order.id)} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500">Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Filter trigger + search row */}
           <div className="flex items-center gap-2">
             <button
@@ -9350,6 +9545,7 @@ function App() {
               <div className="flex gap-2">
                 <button onClick={clearOrderSelection} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">Clear</button>
                 <button onClick={openBulkRiderAssignmentModal} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1 text-xs font-semibold text-white">Assign Rider</button>
+                <button onClick={deleteMultipleOrders} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white">Delete</button>
               </div>
             </div>
           )}
