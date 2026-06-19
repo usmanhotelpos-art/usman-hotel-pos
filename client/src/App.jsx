@@ -10891,7 +10891,7 @@ function App() {
                                     Actions
                                   </button>
                                   {tableOrderAddOpen === tableOrder.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-slate-900/50 overflow-hidden min-w-[140px]">
+                                    <div className="absolute right-0 bottom-full mb-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-slate-900/50 overflow-hidden min-w-[140px]">
                                       <button onClick={() => { openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-2">
                                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                         Edit Order
@@ -10972,7 +10972,7 @@ function App() {
                                     Actions
                                   </button>
                                   {tableOrderAddOpen === tableOrder.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-slate-900/50 overflow-hidden min-w-[140px]">
+                                    <div className="absolute right-0 bottom-full mb-1 z-50 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-slate-900/50 overflow-hidden min-w-[140px]">
                                       <button onClick={() => { openOrderForEditInPos(tableOrder); setTableOrderAddOpen(null); }} className="w-full px-3 py-2 text-left text-[11px] text-violet-300 hover:bg-slate-800 flex items-center gap-2">
                                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                         Edit Order
