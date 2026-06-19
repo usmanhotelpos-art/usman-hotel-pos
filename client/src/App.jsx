@@ -528,6 +528,7 @@ function App() {
   const [deliveryCustomDateFrom, setDeliveryCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [deliveryCustomDateTo, setDeliveryCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [takeawaySubTab, setTakeawaySubTab] = useState('pay-later');
+  const [takeawaySearch, setTakeawaySearch] = useState('');
   const [takeawayDateFilter, setTakeawayDateFilter] = useState('today');
   const [takeawayCustomDateFrom, setTakeawayCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [takeawayCustomDateTo, setTakeawayCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -10202,9 +10203,17 @@ function App() {
       return orderDate ? orderDate >= from && orderDate <= to : false;
     });
 
-    const duePageCount = Math.max(1, Math.ceil(dateFilteredOrders.length / takeawayPageSize));
-    const paginatedDueOrders = dateFilteredOrders.slice(takeawayPageIndex * takeawayPageSize, (takeawayPageIndex + 1) * takeawayPageSize);
-    const displayOrders = takeawaySubTab === 'due' ? paginatedDueOrders : dateFilteredOrders;
+    const searchedOrders = dateFilteredOrders.filter((order) => {
+      if (!takeawaySearch.trim()) return true;
+      const q = takeawaySearch.trim().toLowerCase();
+      return (order.customerName || '').toLowerCase().includes(q) ||
+             (order.orderNumber || '').toString().toLowerCase().includes(q) ||
+             (order.id || '').toString().toLowerCase().includes(q);
+    });
+
+    const duePageCount = Math.max(1, Math.ceil(searchedOrders.length / takeawayPageSize));
+    const paginatedDueOrders = searchedOrders.slice(takeawayPageIndex * takeawayPageSize, (takeawayPageIndex + 1) * takeawayPageSize);
+    const displayOrders = takeawaySubTab === 'due' ? paginatedDueOrders : searchedOrders;
 
     return (
       <>
@@ -10223,7 +10232,7 @@ function App() {
                   }}
                   className={`rounded-full px-3 py-1 text-xs font-semibold transition ${takeawaySubTab === status ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                 >
-                  {status === 'paid' ? '💳 Paid Orders' : status === 'pay-later' ? '⏳ Pay Later' : status === 'due' ? '📍 Due Payment' : '📋 All Orders'}
+                  {status === 'paid' ? '💳 Paid Orders' : status === 'pay-later' ? '⏳ Pay Later' : status === 'due' ? '📍 Due Payment' : 'All Orders'}
                 </button>
               ))}
             </div>
@@ -10488,6 +10497,14 @@ function App() {
               </button>
             ))}
           </div>
+          {/* Mobile search */}
+          <input
+            type="text"
+            value={takeawaySearch}
+            onChange={(e) => setTakeawaySearch(e.target.value)}
+            placeholder="Search by customer name or order #..."
+            className="w-full rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
           {/* Selection toolbar */}
           {selectedTakeawayOrders.length > 0 && (
             <div className="flex flex-wrap items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 gap-2">
@@ -10518,10 +10535,10 @@ function App() {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="font-semibold text-white text-sm truncate">{order.orderNumber || order.id}</div>
+                      <div className="font-semibold text-white text-sm truncate">{order.customerName || 'PICK UP'}</div>
                       <div className="font-semibold text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</div>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-400 truncate">{order.customerName || 'PICK UP'}</div>
+                    <div className="mt-1 text-[10px] text-slate-500 truncate">{order.orderNumber || order.id}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-slate-400">{order.phone || '-'}</span>
                       <span className="text-slate-600">|</span>
