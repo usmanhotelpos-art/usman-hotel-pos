@@ -6927,6 +6927,12 @@ function App() {
                                 </div>
                                 <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                               </div>
+                              {(type === 'Takeaway' || type === 'Dine-In') && !['Payment Collected', 'Completed'].includes(order.status) && (
+                                <div className="mt-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={async (e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); await confirmMarkPaid(order); }} className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); confirmMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
+                                </div>
+                              )}
                               {type === 'Delivery' && !order.deliveryAgent && (
                                 <div className="mt-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={() => { openRiderAssignmentModal(order); setShowMobileOrdersPopup(false); }} className="rounded-full bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-500">Assign Rider</button>
