@@ -990,7 +990,7 @@ function App() {
 
   useEffect(() => {
     const dueExist = posOrders.some(o =>
-      (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later') &&
+      (o.status === 'Payment Pending' || o.paymentStatus === 'Due') &&
       (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')
     );
     setShowDueOrdersPopup(dueExist);
@@ -6882,7 +6882,7 @@ function App() {
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🔔</span>
               <span>
-                {posOrders.filter(o => (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length} Due
+                {posOrders.filter(o => (o.status === 'Payment Pending' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length} Due
               </span>
             </button>
 
@@ -6905,7 +6905,7 @@ function App() {
                       { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
                       { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
                     ].map(({ key, icon, label, activeCls, inactiveCls }) => {
-                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later')).length;
+                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.paymentStatus === 'Due')).length;
                       return (
                         <button
                           key={key}
@@ -6932,7 +6932,7 @@ function App() {
                   {(() => {
                     const type = dueOrdersTab;
                     const dueOrders = posOrders
-                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later'))
+                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.paymentStatus === 'Due'))
                       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
                     if (dueOrders.length === 0) return (
