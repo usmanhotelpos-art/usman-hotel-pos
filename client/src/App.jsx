@@ -282,6 +282,12 @@ function App() {
   const normalizeText = (value) => String(value || '').trim().toLowerCase();
   const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
 
+  const isAnyPopupOpen = useMemo(() =>
+    showMobileCart || showMobileOrdersPopup || showDueOrdersPanel ||
+    showCustomerDetailsPopup || showPaymentPopup || showShiftOrderPopup || orderModalOpen,
+    [showMobileCart, showMobileOrdersPopup, showDueOrdersPanel, showCustomerDetailsPopup, showPaymentPopup, showShiftOrderPopup, orderModalOpen]
+  );
+
   const Sparkline = ({ values = [], color = '#34D399', width = 120, height = 36 }) => {
     if (!values || values.length === 0) return <div style={{ width, height }} />;
     const max = Math.max(...values, 1);
@@ -6900,7 +6906,7 @@ function App() {
         )}
 
         {/* Mobile orders floating button */}
-        {isMobile && !showMobileCart && !showMobileOrdersPopup && (
+        {isMobile && !isAnyPopupOpen && (
           <button
             onClick={() => setShowMobileOrdersPopup(true)}
             className="fixed bottom-20 left-4 z-[60] flex items-center gap-2 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(139,92,246,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(139,92,246,0.7)]"
@@ -6926,7 +6932,7 @@ function App() {
         {/* Due Orders floating alert button + popup */}
         {isMobile && (
           <>
-            {!showDueOrdersPanel && (
+            {!isAnyPopupOpen && (
             <button
               onClick={() => setShowDueOrdersPanel(prev => !prev)}
               className={`fixed bottom-36 left-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
