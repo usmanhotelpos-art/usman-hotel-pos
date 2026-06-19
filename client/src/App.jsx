@@ -527,6 +527,9 @@ function App() {
   const [showQuickDineinPopup, setShowQuickDineinPopup] = useState(false);
   const [showQuickTakeawayPopup, setShowQuickTakeawayPopup] = useState(false);
   const [quickTakeawayTab, setQuickTakeawayTab] = useState('pay-later');
+  const [showQuickOrdersPopup, setShowQuickOrdersPopup] = useState(false);
+  const [quickOrdersTab, setQuickOrdersTab] = useState('Dine-In');
+  const [quickOrdersTakeawaySubTab, setQuickOrdersTakeawaySubTab] = useState('pay-later');
   const [quickOrderDateFrom, setQuickOrderDateFrom] = useState('');
   const [quickOrderDateTo, setQuickOrderDateTo] = useState('');
   const [quickOrderDetail, setQuickOrderDetail] = useState(null);
@@ -11433,22 +11436,13 @@ function App() {
               🛒
             </button>
             <button
-              onClick={() => setShowQuickDineinPopup(true)}
+              onClick={() => setShowQuickOrdersPopup(true)}
               className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 header-btn-3d ${
                 darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
               }`}
-              title="Table Orders"
+              title="Quick Orders"
             >
-              🍽️
-            </button>
-            <button
-              onClick={() => setShowQuickTakeawayPopup(true)}
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 header-btn-3d ${
-                darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
-              }`}
-              title="Takeaway Orders"
-            >
-              🥡
+              📋
             </button>
             <button onClick={() => setDarkMode((prev) => !prev)} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${
               darkMode
@@ -12233,6 +12227,134 @@ function App() {
                       <div className="col-span-2 text-center py-8 text-slate-300 text-sm">No {quickTakeawayTab === 'paid' ? 'paid' : 'due'} takeaway orders</div>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showQuickOrdersPopup && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 p-4 flex items-center justify-center" onClick={() => setShowQuickOrdersPopup(false)}>
+              <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-[24px] border border-white/20 bg-white/10 shadow-2xl shadow-white/20 backdrop-blur-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">📋 Quick Orders</h3>
+                    <p className="text-xs text-slate-300">All orders overview</p>
+                  </div>
+                  <button onClick={() => setShowQuickOrdersPopup(false)} className="rounded-full p-1.5 text-slate-300 hover:bg-white/10">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                  </button>
+                </div>
+                <div className="p-4 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={quickOrderDateFrom} onChange={(e) => setQuickOrderDateFrom(e.target.value)} className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white" />
+                    <span className="text-xs text-slate-300">to</span>
+                    <input type="date" value={quickOrderDateTo} onChange={(e) => setQuickOrderDateTo(e.target.value)} className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white" />
+                  </div>
+                </div>
+                <div className="p-4 pb-0">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: 'Dine-In', icon: '🍽️', label: 'Dine In', color: 'from-emerald-500 to-emerald-600', shadow: 'rgba(16,185,129,0.4)' },
+                      { key: 'Takeaway', icon: '🛍️', label: 'Take Away', color: 'from-amber-500 to-orange-500', shadow: 'rgba(245,158,11,0.4)' },
+                      { key: 'Delivery', icon: '🚚', label: 'Delivery', color: 'from-sky-500 to-blue-600', shadow: 'rgba(14,165,233,0.4)' },
+                    ].map(({ key, icon, label, color, shadow }) => {
+                      const isActive = quickOrdersTab === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setQuickOrdersTab(key)}
+                          className={`relative rounded-2xl p-3 text-center transition-all duration-200 active:scale-95 ${
+                            isActive
+                              ? `bg-gradient-to-br ${color} text-white shadow-lg`
+                              : 'border border-white/20 bg-white/5 text-slate-400'
+                          }`}
+                          style={isActive ? { boxShadow: `0 4px 20px ${shadow}` } : {}}
+                        >
+                          <div className="text-2xl mb-0.5">{icon}</div>
+                          <div className="text-[9px] font-bold uppercase tracking-wide">{label}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {quickOrdersTab === 'Takeaway' && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <button onClick={() => setQuickOrdersTakeawaySubTab('pay-later')} className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${quickOrdersTakeawaySubTab === 'pay-later' ? 'bg-amber-500 text-white' : 'bg-white/10 text-slate-300'}`}>Pay Later</button>
+                      <button onClick={() => setQuickOrdersTakeawaySubTab('paid')} className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${quickOrdersTakeawaySubTab === 'paid' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-slate-300'}`}>Paid</button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  {(() => {
+                    const type = quickOrdersTab;
+                    let filtered = posOrders.filter(o => o.orderType === type);
+                    if (type === 'Dine-In') {
+                      filtered = filtered.filter(o => !['Completed', 'Payment Collected'].includes(o.status));
+                    } else if (type === 'Takeaway') {
+                      filtered = filtered.filter(o => {
+                        if (quickOrdersTakeawaySubTab === 'pay-later') return o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later';
+                        if (quickOrdersTakeawaySubTab === 'paid') return o.status === 'Completed' || o.status === 'Payment Collected';
+                        return true;
+                      });
+                    } else if (type === 'Delivery') {
+                      filtered = filtered.filter(o => !o.deliveryAgent);
+                    }
+                    filtered = filtered.filter(o => {
+                      const d = o.createdAt ? new Date(o.createdAt) : null;
+                      if (!d) return true;
+                      if (quickOrderDateFrom && d < new Date(quickOrderDateFrom)) return false;
+                      if (quickOrderDateTo && d > new Date(quickOrderDateTo + 'T23:59:59')) return false;
+                      return true;
+                    });
+                    filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                    const glowCss = type === 'Delivery' ? 'rgba(14,165,233,0.25)' : type === 'Takeaway' ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)';
+                    const borderCls = type === 'Delivery' ? 'border-sky-700' : type === 'Takeaway' ? 'border-amber-700' : 'border-emerald-700';
+                    const icon = type === 'Delivery' ? '🚚' : type === 'Takeaway' ? '🛍️' : '🍽️';
+                    if (filtered.length === 0) return (
+                      <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                        <div className="text-4xl mb-2">{icon}</div>
+                        <p className="text-sm">No {type} orders found</p>
+                      </div>
+                    );
+                    return (
+                      <div className="grid grid-cols-2 gap-3">
+                        {filtered.map(order => (
+                          <div
+                            key={order.id}
+                            onClick={() => { setQuickOrderDetail(order); setShowQuickOrdersPopup(false); }}
+                            className={`rounded-2xl border ${borderCls} bg-white/10 p-3 shadow-lg cursor-pointer hover:bg-white/20 transition-all active:scale-[0.98] flex flex-col gap-1.5`}
+                            style={{ boxShadow: `0 0 14px ${glowCss}` }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-indigo-300">#{order.orderNumber || order.id}</span>
+                              <span className={`text-[10px] font-semibold ${type === 'Delivery' ? 'text-sky-300' : type === 'Takeaway' ? 'text-amber-300' : 'text-emerald-300'}`}>
+                                {type === 'Takeaway' ? (quickOrdersTakeawaySubTab === 'paid' ? 'Paid' : 'Due') : (order.tableNumber || order.customerName || 'Order')}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-300 leading-tight line-clamp-2">
+                              {(order.items || []).map((item, idx) => (
+                                <span key={idx}><span className="text-amber-400 font-semibold">{item.quantity}x</span> <span className="text-white">{item.name}</span>{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                              ))}
+                            </div>
+                            <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-white/10">
+                              <span className="text-[10px] text-slate-400">{order.customerName || order.waiter || '-'}</span>
+                              <span className="text-xs font-bold text-rose-300">{order.total || order.amount || 0} PKR</span>
+                            </div>
+                            {(type === 'Takeaway' || type === 'Dine-In') && !['Payment Collected', 'Completed'].includes(order.status) && (
+                              <div className="flex gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={async (e) => { e.stopPropagation(); setShowQuickOrdersPopup(false); await confirmMarkPaid(order); }} className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                                <button onClick={(e) => { e.stopPropagation(); setShowQuickOrdersPopup(false); confirmMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
+                              </div>
+                            )}
+                            {type === 'Delivery' && !order.deliveryAgent && (
+                              <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={() => { openRiderAssignmentModal(order); setShowQuickOrdersPopup(false); }} className="rounded-full bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-500">Assign Rider</button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
