@@ -366,6 +366,19 @@ function App() {
   const [showCustomerDetailsPopup, setShowCustomerDetailsPopup] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const [popupError, setPopupError] = useState('');
+  const [showShiftOrderPopup, setShowShiftOrderPopup] = useState(false);
+  const [shiftSourceOrder, setShiftSourceOrder] = useState(null);
+  const [shiftTargetType, setShiftTargetType] = useState('');
+  const [shiftForm, setShiftForm] = useState({
+    customerName: '',
+    phone: '',
+    address: '',
+    tableNumber: '',
+    deliveryAgent: '',
+    serviceType: '',
+    deliveryFee: 0,
+    notes: ''
+  });
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [showResetPinPopup, setShowResetPinPopup] = useState(false);
   const [resetPinInput, setResetPinInput] = useState('');
@@ -2745,6 +2758,55 @@ function App() {
       throw new Error(error.message || 'Failed to save order');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  function openShiftOrderPopup(order) {
+    setShiftSourceOrder(order);
+    setShiftTargetType('');
+    setShiftForm({
+      customerName: order.customerName || '',
+      phone: order.phone || '',
+      address: order.address || '',
+      tableNumber: order.tableNumber || '',
+      deliveryAgent: order.deliveryAgent || '',
+      serviceType: order.serviceType || '',
+      deliveryFee: Number(order.deliveryFee) || 0,
+      notes: order.notes || ''
+    });
+    setShowShiftOrderPopup(true);
+  }
+
+  async function handleShiftOrder() {
+    if (!shiftSourceOrder || !shiftTargetType) return;
+    setLoading(true);
+    setMessage('');
+    try {
+      const payload = {
+        orderType: shiftTargetType,
+        customerName: shiftForm.customerName || shiftSourceOrder.customerName || 'Shifted',
+        phone: shiftForm.phone || shiftSourceOrder.phone || '',
+        address: shiftTargetType === 'Delivery' ? (shiftForm.address || shiftSourceOrder.address || '') : '',
+        tableNumber: shiftTargetType === 'Dine-In' ? shiftForm.tableNumber : '',
+        deliveryAgent: shiftTargetType === 'Delivery' ? shiftForm.deliveryAgent : '',
+        serviceType: shiftTargetType === 'Delivery' ? shiftForm.serviceType : '',
+        deliveryFee: shiftTargetType === 'Delivery' ? Number(shiftForm.deliveryFee) || 0 : 0,
+        notes: shiftForm.notes || shiftSourceOrder.notes || ''
+      };
+      const updated = await fetchJson(`${apiBase}/pos/orders/${shiftSourceOrder.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      setMessage(`Order #${shiftSourceOrder.orderNumber || shiftSourceOrder.id} shifted to ${shiftTargetType}`);
+      setShowShiftOrderPopup(false);
+      setShiftSourceOrder(null);
+      setShiftTargetType('');
+      await loadOrdersData();
+      return updated;
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -9833,6 +9895,11 @@ function App() {
                                   Assign Rider
                                 </button>
                               )}
+                              <div className="border-t border-slate-800" />
+                              <button onClick={() => { openShiftOrderPopup(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-cyan-300 hover:bg-slate-800 flex items-center gap-1.5">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
+                                Shift Order
+                              </button>
                             </div>
                           )}
                         </div>
@@ -10079,6 +10146,11 @@ function App() {
                             <button onClick={() => { printReceipt(order); setOnlineActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-emerald-300 hover:bg-slate-800 flex items-center gap-1.5">
                               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5"><path d="M6 9V3h12v6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M6 18h12v-6H6v6z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 21h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                               Print
+                            </button>
+                            <div className="border-t border-slate-800" />
+                            <button onClick={() => { openShiftOrderPopup(order); setOnlineActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-cyan-300 hover:bg-slate-800 flex items-center gap-1.5">
+                              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
+                              Shift Order
                             </button>
                           </div>
                         )}
@@ -10502,6 +10574,11 @@ function App() {
                                 Mark Paid
                               </button>
                             )}
+                            <div className="border-t border-slate-800" />
+                            <button onClick={() => { openShiftOrderPopup(order); setTakeawayActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-cyan-300 hover:bg-slate-800 flex items-center gap-1.5">
+                              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
+                              Shift Order
+                            </button>
                           </div>
                         )}
                       </div>
@@ -11093,6 +11170,11 @@ function App() {
                                     </button>
                                   </>
                                 )}
+                                <div className="border-t border-slate-800" />
+                                <button onClick={() => { openShiftOrderPopup(order); setDineinActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-cyan-300 hover:bg-slate-800 flex items-center gap-1.5">
+                                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
+                                  Shift Order
+                                </button>
                               </div>
                             )}
                           </div>
@@ -12648,6 +12730,131 @@ function App() {
             </div>
           )}
       </div>
+
+      {/* Shift Order Popup */}
+      {showShiftOrderPopup && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 pt-8" onClick={() => { setShowShiftOrderPopup(false); setShiftTargetType(''); }}>
+          <div className="w-full max-h-[85vh] max-w-lg mx-2 rounded-3xl border border-slate-700 bg-slate-950 p-4 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.9)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-400">Shift Order</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">
+                  #{shiftSourceOrder?.orderNumber || shiftSourceOrder?.id || ''}
+                  <span className="text-sm font-normal text-slate-400 ml-2">({shiftSourceOrder?.orderType})</span>
+                </h3>
+              </div>
+              <button onClick={() => { setShowShiftOrderPopup(false); setShiftTargetType(''); }} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">✕</button>
+            </div>
+
+            {!shiftTargetType ? (
+              <div>
+                <p className="text-sm text-slate-400 mb-4">Select target order type:</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { key: 'Takeaway', icon: '🥡', label: 'Take Away', cls: 'from-amber-600 to-orange-600' },
+                    { key: 'Dine-In', icon: '🍽️', label: 'Dine In', cls: 'from-emerald-600 to-emerald-700' },
+                    { key: 'Delivery', icon: '🚚', label: 'Delivery', cls: 'from-sky-600 to-blue-600' },
+                  ].map(({ key, icon, label, cls }) => (
+                    <button
+                      key={key}
+                      onClick={() => setShiftTargetType(key)}
+                      className="rounded-xl border border-slate-700 bg-slate-900 py-4 text-center transition hover:border-cyan-500 active:scale-95"
+                    >
+                      <div className="text-2xl mb-1">{icon}</div>
+                      <div className="text-xs font-bold text-slate-200">{label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <button onClick={() => setShiftTargetType('')} className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-700">← Back</button>
+                  <span className="rounded-full bg-cyan-500/20 px-3 py-1 text-xs font-semibold text-cyan-300">
+                    {shiftTargetType === 'Takeaway' ? '🥡 Take Away' : shiftTargetType === 'Dine-In' ? '🍽️ Dine In' : '🚚 Delivery'}
+                  </span>
+                </div>
+
+                {/* Common: Customer name */}
+                {(shiftTargetType === 'Takeaway' || shiftTargetType === 'Dine-In' || shiftTargetType === 'Delivery') && (
+                  <div className="grid gap-2">
+                    <label className="text-xs text-slate-400">Customer name <span className="text-slate-500">(optional)</span></label>
+                    <input type="text" value={shiftForm.customerName} onChange={(e) => setShiftForm(f => ({ ...f, customerName: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500" placeholder="Customer name" />
+                  </div>
+                )}
+
+                {/* Takeaway & Delivery: Phone */}
+                {(shiftTargetType === 'Takeaway' || shiftTargetType === 'Delivery') && (
+                  <div className="grid gap-2">
+                    <label className="text-xs text-slate-400">Phone <span className="text-slate-500">(optional)</span></label>
+                    <input type="text" value={shiftForm.phone} onChange={(e) => setShiftForm(f => ({ ...f, phone: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500" placeholder="Phone number" />
+                  </div>
+                )}
+
+                {/* Dine-In: Table selection */}
+                {shiftTargetType === 'Dine-In' && (
+                  <div className="grid gap-2">
+                    <label className="text-xs text-slate-400">Table / Room</label>
+                    <select value={shiftForm.tableNumber} onChange={(e) => setShiftForm(f => ({ ...f, tableNumber: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500">
+                      <option value="">Select table or room</option>
+                      {posTables.filter(t => (t.section || 'Floor') === 'Floor' || (t.section || 'Floor') === 'Outside').map((table) => {
+                        const tableLabel = getTableLabel(table);
+                        return <option key={table.id} value={tableLabel}>{tableLabel}</option>;
+                      })}
+                    </select>
+                  </div>
+                )}
+
+                {/* Delivery: Address, Service Type, Rider, Fee */}
+                {shiftTargetType === 'Delivery' && (
+                  <>
+                    <div className="grid gap-2">
+                      <label className="text-xs text-slate-400">Delivery address</label>
+                      <input type="text" value={shiftForm.address} onChange={(e) => setShiftForm(f => ({ ...f, address: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500" placeholder="Enter delivery address" />
+                    </div>
+                    <div className="grid gap-2">
+                      <label className="text-xs text-slate-400">Service type</label>
+                      <select value={shiftForm.serviceType} onChange={(e) => setShiftForm(f => ({ ...f, serviceType: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500">
+                        <option value="">Select service type</option>
+                        {deliveryServiceTypes.map((type) => (
+                          <option key={type.id} value={type.name}>{type.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid gap-2">
+                      <label className="text-xs text-slate-400">Rider <span className="text-slate-500">(optional)</span></label>
+                      <select value={shiftForm.deliveryAgent} onChange={(e) => setShiftForm(f => ({ ...f, deliveryAgent: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500">
+                        <option value="">Select rider</option>
+                        {getBikers().map((rider) => (
+                          <option key={rider.id || rider.name} value={rider.name || rider.username}>{rider.name || rider.username}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid gap-2">
+                      <label className="text-xs text-slate-400">Delivery fee (PKR)</label>
+                      <input type="number" value={shiftForm.deliveryFee} onChange={(e) => setShiftForm(f => ({ ...f, deliveryFee: Number(e.target.value) || 0 }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500" placeholder="0" />
+                    </div>
+                  </>
+                )}
+
+                {/* All types: Notes */}
+                <div className="grid gap-2">
+                  <label className="text-xs text-slate-400">Notes <span className="text-slate-500">(optional)</span></label>
+                  <textarea value={shiftForm.notes} onChange={(e) => setShiftForm(f => ({ ...f, notes: e.target.value }))} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-cyan-500" placeholder="Order notes" rows={2} />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button onClick={() => { setShowShiftOrderPopup(false); setShiftTargetType(''); }} disabled={loading} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50">Cancel</button>
+                  <button onClick={handleShiftOrder} disabled={loading || (shiftTargetType === 'Delivery' && !shiftForm.address) || (shiftTargetType === 'Dine-In' && !shiftForm.tableNumber)} className="rounded-3xl bg-cyan-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {loading ? 'Shifting...' : 'Shift Order'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {isMobile && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 px-2 py-2 backdrop-blur-xl sm:hidden">
           <div className="mx-auto flex max-w-[1400px] items-center gap-2 overflow-x-auto whitespace-nowrap px-2">
