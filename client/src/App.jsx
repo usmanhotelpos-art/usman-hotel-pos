@@ -6835,7 +6835,7 @@ function App() {
         )}
 
         {/* Mobile orders floating button */}
-        {isMobile && !showMobileCart && (
+        {isMobile && !showMobileCart && !showMobileOrdersPopup && (
           <button
             onClick={() => setShowMobileOrdersPopup(true)}
             className="fixed bottom-20 left-4 z-[60] flex items-center gap-2 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(139,92,246,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(139,92,246,0.7)]"
@@ -6861,6 +6861,7 @@ function App() {
         {/* Due Orders floating alert button + popup */}
         {isMobile && (
           <>
+            {!showDueOrdersPanel && (
             {/* Floating alert button with red glow + bounce animation */}
             <button
               onClick={() => setShowDueOrdersPanel(prev => !prev)}
@@ -6881,6 +6882,7 @@ function App() {
                 })()}
               </span>
             </button>
+            )}
 
             {/* Due Orders expanded panel */}
             {showDueOrdersPanel && (
