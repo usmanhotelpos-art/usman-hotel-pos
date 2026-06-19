@@ -1041,10 +1041,10 @@ function App() {
     }
   };
   const [riderBookMainTab, setRiderBookMainTab] = useState('live');
-  const [riderBookSubTab, setRiderBookSubTab] = useState('all');
+  const [riderBookSubTab, setRiderBookSubTab] = useState('cash');
   const [deliveryPaymentStatusFilter, setDeliveryPaymentStatusFilter] = useState('all');
   const [riderBookFilterRider, setRiderBookFilterRider] = useState('');
-  const [riderBookDateFilter, setRiderBookDateFilter] = useState('previous-5-days');
+  const [riderBookDateFilter, setRiderBookDateFilter] = useState('today');
   const [riderBookCustomDateFrom, setRiderBookCustomDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [riderBookCustomDateTo, setRiderBookCustomDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [riderBookSelectedOrders, setRiderBookSelectedOrders] = useState([]);
@@ -4535,34 +4535,18 @@ function App() {
 
   const markRiderCash = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Collected', 'Cash', 'Receive Cash Till');
-    if (success) {
-      setRiderBookMainTab('live');
-      setRiderBookSubTab('cash');
-    }
   };
 
   const markRiderOnline = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Collected', 'Online', 'May be Online');
-    if (success) {
-      setRiderBookMainTab('live');
-      setRiderBookSubTab('online');
-    }
   };
 
   const markRiderPaid = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Completed', null, 'Paid');
-    if (success) {
-      setRiderBookMainTab('sales');
-      setRiderBookSubTab('paid');
-    }
   };
 
   const markCustomerPending = async () => {
     const success = await updateRiderBookOrdersStatus(riderBookSelectedOrders, 'Payment Pending', null, 'Due');
-    if (success) {
-      setRiderBookMainTab('sales');
-      setRiderBookSubTab('due');
-    }
   };
 
   const renderRiderBook = () => {
@@ -4677,12 +4661,10 @@ function App() {
               </select>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => selectAllRiderBookOrders(riderBookVisibleOrders)} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Select All</button>
+                <button onClick={clearRiderBookSelection} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Clear All</button>
                 {riderBookSelectedOrders.length > 0 && (
-                  <>
-                    <button onClick={() => selectAllRiderBookOrders(riderBookVisibleOrders)} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Select All</button>
-                    <button onClick={clearRiderBookSelection} className="rounded-full bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700">Clear</button>
-                    <span className="text-sm text-slate-400">{riderBookSelectedOrders.length} selected</span>
-                  </>
+                  <span className="text-sm text-slate-400">{riderBookSelectedOrders.length} selected</span>
                 )}
                 <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Date</span>
                 {['today', 'yesterday', 'previous-5-days', 'custom'].map((filter) => (
@@ -4898,6 +4880,14 @@ function App() {
           </div>
         )}
 
+        {/* Mobile Select All / Clear */}
+        <div className="md:hidden flex flex-wrap items-center gap-2 mb-3">
+          <button onClick={() => selectAllRiderBookOrders(riderBookVisibleOrders)} className="rounded-full bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500">Select All</button>
+          <button onClick={clearRiderBookSelection} className="rounded-full bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-600">Clear All</button>
+          {riderBookSelectedOrders.length > 0 && (
+            <span className="text-xs text-slate-400">{riderBookSelectedOrders.length} selected</span>
+          )}
+        </div>
         {riderBookSelectedOrders.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700">
             <button onClick={markRiderCash} className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Mark Cash</button>
