@@ -411,10 +411,9 @@ function App() {
   }, [mashallahSlots]);
 
   useEffect(() => {
-    if (!showMobileOrdersPopup) return;
     const id = setInterval(() => setPopupNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [showMobileOrdersPopup]);
+  }, []);
 
   const handleAddressSelect = (customer) => {
     setOrderDetails((prev) => ({
@@ -7178,7 +7177,7 @@ function App() {
                                   const mins = Math.floor(elapsed / 60000);
                                   const secs = Math.floor((elapsed % 60000) / 1000);
                                   const isOverdue = mins >= 50;
-                                  const mmss = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                  const mmss = isOverdue ? '50:00' : `${mins}:${secs.toString().padStart(2, '0')}`;
                                   const hhmm = new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                                   return (
                                     <>
