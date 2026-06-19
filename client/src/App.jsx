@@ -990,7 +990,7 @@ function App() {
 
   useEffect(() => {
     const dueExist = posOrders.some(o =>
-      (o.status === 'Payment Pending' || o.paymentStatus === 'Due') &&
+      (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') &&
       (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')
     );
     setShowDueOrdersPopup(dueExist);
@@ -6872,17 +6872,26 @@ function App() {
         )}
 
         {/* Due Orders floating alert button + popup */}
-        {isMobile && showDueOrdersPopup && (
+        {isMobile && (
           <>
             {/* Floating alert button with red glow + bounce animation */}
             <button
               onClick={() => setShowDueOrdersPanel(prev => !prev)}
-              className="animate-due-alert fixed bottom-36 left-4 z-[65] flex items-center gap-2 rounded-2xl bg-gradient-to-br from-red-700 to-rose-800 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(239,68,68,0.6)] active:scale-95 transition-all duration-200"
-              style={{boxShadow: '0 8px 32px rgba(239,68,68,0.5)'}}
+              className={`fixed bottom-36 left-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
+                showDueOrdersPopup
+                  ? 'animate-due-alert bg-gradient-to-br from-red-700 to-rose-800'
+                  : 'bg-gradient-to-br from-slate-700 to-slate-800'
+              }`}
+              style={{boxShadow: showDueOrdersPopup ? '0 8px 32px rgba(239,68,68,0.5)' : '0 4px 16px rgba(0,0,0,0.2)'}}
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🔔</span>
+              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
+                showDueOrdersPopup ? 'bg-white/20' : 'bg-white/10'
+              }`}>🔔</span>
               <span>
-                {posOrders.filter(o => (o.status === 'Payment Pending' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length} Due
+                {(() => {
+                  const count = posOrders.filter(o => (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length;
+                  return count > 0 ? `${count} Due` : 'No Dues';
+                })()}
               </span>
             </button>
 
@@ -6905,7 +6914,7 @@ function App() {
                       { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
                       { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
                     ].map(({ key, icon, label, activeCls, inactiveCls }) => {
-                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.paymentStatus === 'Due')).length;
+                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due')).length;
                       return (
                         <button
                           key={key}
@@ -6932,7 +6941,7 @@ function App() {
                   {(() => {
                     const type = dueOrdersTab;
                     const dueOrders = posOrders
-                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.paymentStatus === 'Due'))
+                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due'))
                       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
                     if (dueOrders.length === 0) return (
