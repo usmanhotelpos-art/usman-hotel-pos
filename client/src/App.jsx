@@ -4919,7 +4919,8 @@ function App() {
             {riderBookPaginatedOrders.map((order) => {
               const isSelected = riderBookSelectedOrders.includes(order.id);
               const itemCount = (order.items || []).length;
-              const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A';
+              const riderOrderDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'N/A';
+              const riderOrderTime = order.createdAt ? new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
               const paymentStatus = getRiderBookPaymentStatus(order);
               const isPaidStatus = paymentStatus === 'PAID';
               const isDueStatus = paymentStatus === 'Due';
@@ -4953,7 +4954,7 @@ function App() {
                         )}
                       </div>
                     </div>
-                    <div className="text-[11px] text-slate-400">{orderDate}</div>
+                    <div><span className="font-bold text-cyan-400 text-[11px]">{riderOrderDate}</span> <span className="font-bold text-amber-400 text-[11px]">{riderOrderTime}</span></div>
                     <div className="relative flex items-center justify-end">
                       <button
                         onClick={() => setRiderBookActionOpen(riderBookActionOpen === order.id ? null : order.id)}
@@ -5049,7 +5050,8 @@ function App() {
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-500">{orderDate}</span>
+                            <span className="font-bold text-cyan-400 text-[10px]">{riderOrderDate}</span>
+                            <span className="font-bold text-amber-400 text-[10px] ml-1">{riderOrderTime}</span>
                             <div className="relative">
                               <button
                                 onClick={() => setRiderBookActionOpen(riderBookActionOpen === order.id ? null : order.id)}
@@ -9669,7 +9671,7 @@ function App() {
                           )}
                         </div>
                       </td>
-                      <td className="px-2 py-2 text-slate-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
+                      <td className="px-2 py-2"><span className="font-bold text-cyan-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-'}</span> <span className="font-bold text-amber-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}</span></td>
                       <td className="px-2 py-2">
                         <div className="flex flex-wrap gap-2">
                           {renderOrderEditButton(order)}
@@ -9762,7 +9764,7 @@ function App() {
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Date & time</p>
-                          <div className="mt-2 text-sm text-slate-200">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</div>
+                          <div className="mt-2"><span className="text-sm font-bold text-cyan-400">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-'}</span> <span className="text-sm font-bold text-amber-400">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}</span></div>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
@@ -9855,7 +9857,8 @@ function App() {
                         <div className={`inline-flex items-center gap-1 rounded-xl px-2 py-0.5 text-[10px] font-semibold ${paidStatusClass}`}>
                           <span>{order.paymentStatus || '-'}</span>
                         </div>
-                        <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</span>
+                        <span className="font-bold text-cyan-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-'}</span>
+                        <span className="font-bold text-amber-400 text-[10px] ml-1">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}</span>
                         <div className="relative">
                           <button
                             onClick={() => setDeliveryActionOpen(deliveryActionOpen === order.id ? null : order.id)}
@@ -11139,10 +11142,11 @@ function App() {
                           <span className="text-[11px] text-slate-400">{(order.items || []).reduce((c, it) => c + Number(it.quantity || 0), 0)} items</span>
                         </div>
                         <div className="mt-2 flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
-                            <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</span>
-                          </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
+                        <span className="font-bold text-cyan-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-'}</span>
+                        <span className="font-bold text-amber-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}</span>
+                      </div>
                           <div className="relative">
                             <button
                               onClick={() => setDineinActionOpen(dineinActionOpen === order.id ? null : order.id)}
