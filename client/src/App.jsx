@@ -359,6 +359,7 @@ function App() {
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [showMobileOrdersPopup, setShowMobileOrdersPopup] = useState(false);
   const [mobilePopupType, setMobilePopupType] = useState('Takeaway');
+  const [popupNow, setPopupNow] = useState(Date.now());
   const [showDueOrdersPopup, setShowDueOrdersPopup] = useState(false);
   const [showDueOrdersPanel, setShowDueOrdersPanel] = useState(false);
   const [dueOrdersTab, setDueOrdersTab] = useState('Dine-In');
@@ -408,6 +409,12 @@ function App() {
       }
     }, 500);
   }, [mashallahSlots]);
+
+  useEffect(() => {
+    if (!showMobileOrdersPopup) return;
+    const id = setInterval(() => setPopupNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [showMobileOrdersPopup]);
 
   const handleAddressSelect = (customer) => {
     setOrderDetails((prev) => ({
@@ -7165,7 +7172,21 @@ function App() {
                                     <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold bg-purple-900 text-purple-200">Unassigned</span>
                                   )}
                                 </div>
-                                <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                {(() => {
+                                  if (!order.createdAt) return <span className="text-[10px] text-slate-500">-</span>;
+                                  const elapsed = popupNow - new Date(order.createdAt).getTime();
+                                  const mins = Math.floor(elapsed / 60000);
+                                  const secs = Math.floor((elapsed % 60000) / 1000);
+                                  const isOverdue = mins >= 50;
+                                  const mmss = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                  const hhmm = new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                  return (
+                                    <>
+                                      <span className={`text-xs font-bold ${isOverdue ? 'text-rose-400' : 'text-emerald-400'}`}>{mmss}</span>
+                                      <span className="text-[9px] text-slate-500 ml-1">{hhmm}</span>
+                                    </>
+                                  );
+                                })()}
                               </div>
                               {(type === 'Takeaway' || type === 'Dine-In') && !['Payment Collected', 'Completed'].includes(order.status) && (
                                 <div className="mt-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
