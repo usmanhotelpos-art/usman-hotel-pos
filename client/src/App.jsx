@@ -3108,7 +3108,10 @@ function App() {
   const openOrderForEditInPos = (order) => {
     setHoldModalOpen(false);
     setActiveTab('pos');
-    setCart((order.items || []).map((item) => ({ ...item })));
+    setCart((order.items || []).map((item) => ({
+      ...item,
+      itemId: item.itemId || `${item.productId || 'item'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    })));
     setOrderType(order.orderType || 'Dine-In');
     setOrderDetails({
       customerName: order.customerName || '',
@@ -6766,7 +6769,7 @@ function App() {
                         <button onClick={() => updateCartItem(item.itemId, 1)} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-100 transition hover:bg-slate-700 active:translate-y-[1px]">+</button>
                       </div>
                       <button onClick={() => editCartItemDetails(item.itemId)} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-[10px] font-bold text-white transition hover:from-blue-600 hover:to-blue-700 shadow-[0_2px_8px_rgba(59,130,246,0.3)] active:translate-y-[1px]" title="Edit product">✎</button>
-                      <button onClick={() => { setCart(cart.filter(cartItem => cartItem.itemId !== item.itemId)); }} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-[10px] font-bold text-white transition hover:from-red-600 hover:to-red-700 shadow-[0_2px_8px_rgba(239,68,68,0.3)] active:translate-y-[1px]" title="Delete product">✕</button>
+                      <button onClick={() => { setCart(prev => prev.filter(cartItem => cartItem.itemId !== item.itemId)); }} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-[10px] font-bold text-white transition hover:from-red-600 hover:to-red-700 shadow-[0_2px_8px_rgba(239,68,68,0.3)] active:translate-y-[1px]" title="Delete product">✕</button>
                     </div>
                   </div>
                   {/* notes removed per request; temporary edits available via Edit button */}
