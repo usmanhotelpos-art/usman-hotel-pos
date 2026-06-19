@@ -282,12 +282,6 @@ function App() {
   const normalizeText = (value) => String(value || '').trim().toLowerCase();
   const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
 
-  const isAnyPopupOpen = useMemo(() =>
-    showMobileCart || showMobileOrdersPopup || showDueOrdersPanel ||
-    showCustomerDetailsPopup || showPaymentPopup || showShiftOrderPopup || orderModalOpen,
-    [showMobileCart, showMobileOrdersPopup, showDueOrdersPanel, showCustomerDetailsPopup, showPaymentPopup, showShiftOrderPopup, orderModalOpen]
-  );
-
   const Sparkline = ({ values = [], color = '#34D399', width = 120, height = 36 }) => {
     if (!values || values.length === 0) return <div style={{ width, height }} />;
     const max = Math.max(...values, 1);
@@ -11488,6 +11482,9 @@ function App() {
   const riderTopList = riderRevenueSummary.slice(0, 5);
   const topDeliveryFeeRiders = [...riderRevenueSummary].sort((a, b) => b.deliveryFee - a.deliveryFee).slice(0, 3);
   const riderBottomList = riderRevenueSummary.length > 5 ? riderRevenueSummary.slice(-3).reverse() : [];
+
+  const isAnyPopupOpen = showMobileCart || showMobileOrdersPopup || showDueOrdersPanel ||
+    showCustomerDetailsPopup || showPaymentPopup || showShiftOrderPopup || orderModalOpen;
 
   if (cataloguePage) {
     return renderCustomerCataloguePage();
