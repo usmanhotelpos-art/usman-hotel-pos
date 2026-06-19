@@ -4926,10 +4926,12 @@ function App() {
               return (
                 <div key={order.id}>
                   {/* Desktop order row */}
-                  <div className="hidden md:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200 items-center transition hover:border-emerald-500/20 hover:bg-slate-900">
+                  <div className="hidden md:grid grid-cols-[40px_2.7fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 rounded-3xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200 items-center transition hover:border-emerald-500/20 hover:bg-slate-900">
                     <input type="checkbox" checked={isSelected} onChange={() => toggleRiderBookOrderSelection(order.id)} className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500" />
-                    <div className="font-semibold text-white">{order.orderNumber || order.id}</div>
-                    <div className="text-[11px] text-slate-300 truncate">{order.address || 'Walk-In'}</div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-emerald-400 text-[13px] leading-tight truncate">{order.address || 'No address'}</div>
+                      <div className="text-[11px] font-normal text-slate-500 truncate">{order.orderNumber || order.id}</div>
+                    </div>
                     <div className="text-[11px] text-slate-300">{order.phone || '-'}</div>
                     <div className="text-[11px] text-slate-300">{order.serviceType || '-'}</div>
                     <div className="text-[11px] text-slate-300">{itemCount} item{itemCount !== 1 ? 's' : ''}</div>
@@ -5020,10 +5022,10 @@ function App() {
                       <input type="checkbox" checked={isSelected} onChange={() => toggleRiderBookOrderSelection(order.id)} className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="font-semibold text-white text-sm truncate">{order.orderNumber || order.id}</div>
+                          <div className="font-bold text-emerald-400 text-sm leading-tight truncate">{order.address || 'No address'}</div>
                           <div className="font-semibold text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</div>
                         </div>
-                        <div className="mt-1 text-[11px] text-slate-400 truncate">{order.address || 'Walk-In'}</div>
+                        <div className="mt-1 text-[11px] font-normal text-slate-500 truncate">{order.orderNumber || order.id}</div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="text-[11px] text-slate-400">{order.deliveryAgent || '-'}</span>
                           <span className="text-slate-600">|</span>
