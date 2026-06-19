@@ -994,21 +994,8 @@ function App() {
       (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')
     );
     setShowDueOrdersPopup(dueExist);
-    if (dueExist) {
-      setShowDueOrdersPanel(true);
-      const autoHide = setTimeout(() => setShowDueOrdersPanel(false), 3000);
-      if (!dueHornPlayed) {
-        const hornTimer = setTimeout(() => {
-          playHorn();
-          setDueHornPlayed(true);
-        }, 300000);
-        return () => { clearTimeout(autoHide); clearTimeout(hornTimer); };
-      }
-      return () => clearTimeout(autoHide);
-    }
     if (!dueExist) {
       setDueHornPlayed(false);
-      setShowDueOrdersPanel(false);
     }
   }, [posOrders, dueHornPlayed]);
 
