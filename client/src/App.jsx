@@ -360,6 +360,7 @@ function App() {
   const [showMobileOrdersPopup, setShowMobileOrdersPopup] = useState(false);
   const [mobilePopupType, setMobilePopupType] = useState('Takeaway');
   const [showDueOrdersPopup, setShowDueOrdersPopup] = useState(false);
+  const [showDueOrdersPanel, setShowDueOrdersPanel] = useState(false);
   const [dueOrdersTab, setDueOrdersTab] = useState('Dine-In');
   const [dueHornPlayed, setDueHornPlayed] = useState(false);
   const [showCustomerDetailsPopup, setShowCustomerDetailsPopup] = useState(false);
@@ -993,15 +994,21 @@ function App() {
       (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')
     );
     setShowDueOrdersPopup(dueExist);
-    if (dueExist && !dueHornPlayed) {
-      const timer = setTimeout(() => {
-        playHorn();
-        setDueHornPlayed(true);
-      }, 300000);
-      return () => clearTimeout(timer);
+    if (dueExist) {
+      setShowDueOrdersPanel(true);
+      const autoHide = setTimeout(() => setShowDueOrdersPanel(false), 3000);
+      if (!dueHornPlayed) {
+        const hornTimer = setTimeout(() => {
+          playHorn();
+          setDueHornPlayed(true);
+        }, 300000);
+        return () => { clearTimeout(autoHide); clearTimeout(hornTimer); };
+      }
+      return () => clearTimeout(autoHide);
     }
     if (!dueExist) {
       setDueHornPlayed(false);
+      setShowDueOrdersPanel(false);
     }
   }, [posOrders, dueHornPlayed]);
 
@@ -6864,134 +6871,134 @@ function App() {
           </button>
         )}
 
-        {/* Due Orders floating alert popup */}
+        {/* Due Orders floating alert button + popup */}
         {isMobile && showDueOrdersPopup && (
-          <div className="fixed top-14 left-2 right-2 z-[70]">
-            <div
-              onClick={() => setShowDueOrdersPopup(false)}
-              className="animate-due-alert relative flex items-center gap-3 rounded-2xl border border-red-500/60 bg-gradient-to-br from-red-900/95 via-rose-900/95 to-red-950/95 px-4 py-3 cursor-pointer"
+          <>
+            {/* Floating alert button with red glow + bounce animation */}
+            <button
+              onClick={() => setShowDueOrdersPanel(prev => !prev)}
+              className="animate-due-alert fixed bottom-36 left-4 z-[65] flex items-center gap-2 rounded-2xl bg-gradient-to-br from-red-700 to-rose-800 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(239,68,68,0.6)] active:scale-95 transition-all duration-200"
+              style={{boxShadow: '0 8px 32px rgba(239,68,68,0.5)'}}
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600/40 text-lg">🔔</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-red-200">🚨 Due Orders</span>
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
-                    {posOrders.filter(o => (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length}
-                  </span>
-                </div>
-                <p className="text-[10px] text-red-300/80 mt-0.5">Tap to view & manage due orders</p>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowDueOrdersPopup(false); }}
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-xs text-red-200 hover:bg-white/20"
-              >
-                ✕
-              </button>
-            </div>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🔔</span>
+              <span>
+                {posOrders.filter(o => (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length} Due
+              </span>
+            </button>
 
             {/* Due Orders expanded panel */}
-            <div className="mt-1 rounded-2xl border border-red-500/30 bg-slate-950/95 backdrop-blur-xl p-3 max-h-[70vh] overflow-y-auto shadow-[0_20px_60px_rgba(239,68,68,0.2)]">
-              {/* Tabs */}
-              <div className="grid grid-cols-3 gap-1.5 mb-3">
-                {[
-                  { key: 'Dine-In', icon: '🍽️', label: 'Dine In', activeCls: 'from-emerald-600 to-emerald-700', inactiveCls: 'border-slate-700 text-slate-400' },
-                  { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
-                  { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
-                ].map(({ key, icon, label, activeCls, inactiveCls }) => {
-                  const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later')).length;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setDueOrdersTab(key)}
-                      className={`relative rounded-xl py-2 text-center transition-all active:scale-95 ${
-                        dueOrdersTab === key
-                          ? `bg-gradient-to-br ${activeCls} text-white shadow-lg`
-                          : `border ${inactiveCls} bg-slate-900`
-                      }`}
-                    >
-                      <div className="text-lg">{icon}</div>
-                      <div className="text-[9px] font-bold uppercase tracking-wide mt-0.5">{label}</div>
-                      {count > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 shadow-lg ring-2 ring-slate-950">
-                          {count > 99 ? '99+' : count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Month-wise grouped due orders */}
-              {(() => {
-                const type = dueOrdersTab;
-                const dueOrders = posOrders
-                  .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later'))
-                  .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
-                if (dueOrders.length === 0) return (
-                  <div className="flex flex-col items-center justify-center py-6 text-slate-500">
-                    <div className="text-3xl mb-1.5">✅</div>
-                    <p className="text-xs">No due {type} orders</p>
-                  </div>
-                );
-
-                // Group by month
-                const monthGroups = {};
-                dueOrders.forEach(o => {
-                  const d = o.createdAt ? new Date(o.createdAt) : null;
-                  const key = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'Unknown';
-                  if (!monthGroups[key]) monthGroups[key] = [];
-                  monthGroups[key].push(o);
-                });
-
-                return Object.entries(monthGroups).map(([monthKey, orders]) => {
-                  const [year, month] = monthKey.split('-');
-                  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                  const monthName = monthNames[parseInt(month) - 1] || month;
-                  const icon = type === 'Delivery' ? '🚚' : type === 'Takeaway' ? '🛍️' : '🍽️';
-                  const borderCls = type === 'Delivery' ? 'border-sky-700' : type === 'Takeaway' ? 'border-amber-700' : 'border-emerald-700';
-
-                  return (
-                    <div key={monthKey} className="mb-2 last:mb-0">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <div className="h-px flex-1 bg-red-500/20"></div>
-                        <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">{monthName} {year}</span>
-                        <div className="h-px flex-1 bg-red-500/20"></div>
-                      </div>
-                      <div className="space-y-1.5">
-                        {orders.map(order => (
-                          <div
-                            key={order.id}
-                            className={`rounded-xl border ${borderCls} bg-slate-900 p-2.5 text-xs text-slate-200 relative overflow-hidden`}
-                            style={{ boxShadow: `0 0 10px ${type === 'Delivery' ? 'rgba(14,165,233,0.2)' : type === 'Takeaway' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}` }}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-semibold text-sm text-white">#{order.orderNumber || order.id}</span>
-                              <span className="font-bold text-sm text-rose-300">{order.total || order.amount || 0} PKR</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 leading-tight line-clamp-1 mb-1.5">
-                              {(order.items || []).map((item, idx) => (
-                                <span key={idx}><span className="text-amber-400 font-semibold">{item.quantity}x</span> {item.name}{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
-                              ))}
-                            </div>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-[10px] text-slate-500">{order.customerName || order.tableNumber || order.phone || '-'}</span>
-                              <span className="text-[10px] text-red-400 font-semibold">DUE</span>
-                            </div>
-                            <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={async (e) => { e.stopPropagation(); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
-                              <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.6] rounded-lg bg-violet-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
-                              <button onClick={(e) => { e.stopPropagation(); requestDeleteOrder(order); }} className="flex-[0.6] rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Delete</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+            {showDueOrdersPanel && (
+              <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 pt-8" onClick={() => setShowDueOrdersPanel(false)}>
+                <div className="w-full max-h-[85vh] mx-2 rounded-3xl border border-red-500/40 bg-slate-950 p-4 shadow-[0_35px_120px_-30px_rgba(239,68,68,0.4)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-red-400">Due Orders</p>
+                      <h3 className="mt-1 text-lg font-semibold text-white">🚨 Overdue payments</h3>
                     </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
+                    <button onClick={() => setShowDueOrdersPanel(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">✕</button>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="grid grid-cols-3 gap-1.5 mb-4">
+                    {[
+                      { key: 'Dine-In', icon: '🍽️', label: 'Dine In', activeCls: 'from-emerald-600 to-emerald-700', inactiveCls: 'border-slate-700 text-slate-400' },
+                      { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
+                      { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
+                    ].map(({ key, icon, label, activeCls, inactiveCls }) => {
+                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later')).length;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setDueOrdersTab(key)}
+                          className={`relative rounded-xl py-2.5 text-center transition-all active:scale-95 ${
+                            dueOrdersTab === key
+                              ? `bg-gradient-to-br ${activeCls} text-white shadow-lg`
+                              : `border ${inactiveCls} bg-slate-900`
+                          }`}
+                        >
+                          <div className="text-xl">{icon}</div>
+                          <div className="text-[9px] font-bold uppercase tracking-wide mt-0.5">{label}</div>
+                          {count > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 shadow-lg ring-2 ring-slate-950">
+                              {count > 99 ? '99+' : count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Month-wise grouped due orders */}
+                  {(() => {
+                    const type = dueOrdersTab;
+                    const dueOrders = posOrders
+                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later'))
+                      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+                    if (dueOrders.length === 0) return (
+                      <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                        <div className="text-4xl mb-2">✅</div>
+                        <p className="text-sm">No due {type} orders</p>
+                      </div>
+                    );
+
+                    const monthGroups = {};
+                    dueOrders.forEach(o => {
+                      const d = o.createdAt ? new Date(o.createdAt) : null;
+                      const key = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'Unknown';
+                      if (!monthGroups[key]) monthGroups[key] = [];
+                      monthGroups[key].push(o);
+                    });
+
+                    return Object.entries(monthGroups).map(([monthKey, orders]) => {
+                      const [year, month] = monthKey.split('-');
+                      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                      const monthName = monthNames[parseInt(month) - 1] || month;
+                      const borderCls = type === 'Delivery' ? 'border-sky-700' : type === 'Takeaway' ? 'border-amber-700' : 'border-emerald-700';
+
+                      return (
+                        <div key={monthKey} className="mb-3 last:mb-0">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="h-px flex-1 bg-red-500/20"></div>
+                            <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">{monthName} {year}</span>
+                            <div className="h-px flex-1 bg-red-500/20"></div>
+                          </div>
+                          <div className="space-y-2">
+                            {orders.map(order => (
+                              <div
+                                key={order.id}
+                                className={`rounded-2xl border ${borderCls} bg-slate-900 p-3 text-xs text-slate-200`}
+                                style={{ boxShadow: `0 0 10px ${type === 'Delivery' ? 'rgba(14,165,233,0.2)' : type === 'Takeaway' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}` }}
+                              >
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="font-semibold text-sm text-white">#{order.orderNumber || order.id}</span>
+                                  <span className="font-bold text-sm text-rose-300">{order.total || order.amount || 0} PKR</span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 leading-tight line-clamp-1 mb-1.5">
+                                  {(order.items || []).map((item, idx) => (
+                                    <span key={idx}><span className="text-amber-400 font-semibold">{item.quantity}x</span> {item.name}{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                                  ))}
+                                </div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-[10px] text-slate-500">{order.customerName || order.tableNumber || order.phone || '-'}</span>
+                                  <span className="text-[10px] text-red-400 font-semibold">DUE</span>
+                                </div>
+                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={async (e) => { e.stopPropagation(); setShowDueOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                                  <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
+                                  <button onClick={(e) => { e.stopPropagation(); requestDeleteOrder(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Delete</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Mobile orders popup */}
