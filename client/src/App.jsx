@@ -9712,9 +9712,10 @@ function App() {
                             className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
                           />
                           <div>
-                            <div className="text-base font-semibold text-white">{order.orderNumber || order.id}</div>
+                            <div className="text-base font-bold text-emerald-400 leading-tight">{order.address || 'No address'}</div>
+                            <div className="mt-1 text-[11px] font-normal text-slate-500">{order.orderNumber || order.id}</div>
                             {order.customerName && (
-                              <div className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
+                              <div className="mt-0.5 text-xs uppercase tracking-[0.25em] text-slate-500">{order.customerName}</div>
                             )}
                           </div>
                         </div>
@@ -9730,13 +9731,8 @@ function App() {
                     <div className={`mt-4 space-y-3 divide-y ${darkMode ? 'divide-slate-800' : 'divide-slate-200'} text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                       <div className="flex items-center justify-between gap-2 pb-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Items</span><span>{(order.items || []).length}</span></div>
                       <div className="flex items-center justify-between gap-2 py-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Products</span><span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span></div>
-                      <div className="flex items-center justify-between gap-2 pt-3"><span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Address</span><span className="truncate text-right">{order.address || '-'}</span></div>
                     </div>
                     <div className="space-y-4 pt-3">
-                      <div className="rounded-[24px] border border-slate-800 bg-slate-950/60 p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Delivery address</p>
-                        <div className="mt-2 text-sm font-semibold text-white">{order.address || '-'}</div>
-                      </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Phone</p>
