@@ -1632,9 +1632,15 @@ function App() {
   }
 
   async function loadMashallahSlots() {
+    const local = loadStoredMashallahSlots();
+    const hasLocalData = local.some((s) => s.productId !== null);
+    if (hasLocalData) {
+      setMashallahSlots(local);
+      return;
+    }
     try {
       const slots = await fetchJson(`${apiBase}/pos/mashallah-slots`);
-      if (Array.isArray(slots) && slots.length > 0) {
+      if (Array.isArray(slots) && slots.some((s) => s.productId !== null)) {
         const normalized = slots.slice(0, 20).map((s) => ({
           slot: s.slot,
           productId: s.productId ?? null
@@ -1642,11 +1648,9 @@ function App() {
         setMashallahSlots(normalized);
         localStorage.setItem('mashallahSlots', JSON.stringify(normalized));
       } else {
-        const local = loadStoredMashallahSlots();
         setMashallahSlots(local);
       }
     } catch {
-      const local = loadStoredMashallahSlots();
       setMashallahSlots(local);
     }
   }
