@@ -9646,7 +9646,7 @@ function App() {
                       <td className="px-2 py-2 text-xs font-semibold text-white">{order.orderNumber || order.id}</td>
                       <td className="px-2 py-2 max-w-[150px] truncate text-slate-300 text-xs">{order.address || '-'}</td>
                       <td className="px-2 py-2 text-slate-300 text-xs">{order.phone || '-'}</td>
-                      <td className="px-2 py-2 text-slate-300 text-xs">{order.serviceType || '-'}</td>
+                      <td className="px-2 py-2 text-xs font-bold text-amber-400">{order.serviceType || '-'}</td>
                       <td className="px-2 py-2 text-slate-300 text-xs">
                         <div className="flex items-center gap-2">
                           <span>{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
@@ -9742,7 +9742,7 @@ function App() {
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Service type</p>
-                          <div className="mt-2 text-sm text-slate-200">{order.serviceType || '-'}</div>
+                          <div className="mt-2 text-sm font-bold text-amber-400">{order.serviceType || '-'}</div>
                         </div>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -9840,14 +9840,14 @@ function App() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="font-semibold text-white text-sm truncate">{order.orderNumber || order.id}</div>
+                        <div className="font-bold text-emerald-400 text-sm leading-tight truncate">{order.address || 'No address'}</div>
                         <div className="font-semibold text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</div>
                       </div>
-                      <div className="mt-1 text-[11px] text-slate-400 truncate">{order.address || 'Walk-In'}</div>
+                      <div className="mt-1 text-[11px] font-normal text-slate-500 truncate">{order.orderNumber || order.id}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span className="text-[11px] text-slate-400">{order.deliveryAgent || '-'}</span>
                         <span className="text-slate-600">|</span>
-                        <span className="text-[11px] text-slate-400">{order.serviceType || '-'}</span>
+                        <span className="text-xs font-bold text-amber-400">{order.serviceType || '-'}</span>
                         <span className="text-slate-600">|</span>
                         <span className="text-[11px] text-slate-400">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
                       </div>
