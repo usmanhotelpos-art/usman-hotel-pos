@@ -6862,7 +6862,6 @@ function App() {
         {isMobile && (
           <>
             {!showDueOrdersPanel && (
-            {/* Floating alert button with red glow + bounce animation */}
             <button
               onClick={() => setShowDueOrdersPanel(prev => !prev)}
               className={`fixed bottom-36 left-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
