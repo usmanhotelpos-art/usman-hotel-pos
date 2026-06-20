@@ -11833,7 +11833,7 @@ function App() {
       )}
         <div className="mx-auto flex min-h-screen flex-col gap-2 px-3 py-2 pb-28 sm:px-6 lg:px-8"
           style={{
-            marginLeft: isSidebarOpen ? '280px' : '80px',
+            marginLeft: isMobile ? '0px' : (isSidebarOpen ? '280px' : '80px'),
             transition: 'margin-left 0.3s ease'
           }}>
           <style>{`@keyframes syncBlink { 0%,100% { opacity:1 } 50% { opacity:0.3 } } .sync-blinking { animation:syncBlink 0.8s ease-in-out infinite }`}</style>
