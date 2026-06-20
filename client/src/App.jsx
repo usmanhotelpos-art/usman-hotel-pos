@@ -4346,7 +4346,7 @@ function App() {
         return paymentStatus === 'receive cash till';
       }
       if (riderBookSubTab === 'online') {
-        if (paymentStatus === 'paid' || orderStatus === 'completed') return false;
+        if (paymentStatus === 'paid' || orderStatus === 'completed' || paymentStatus === 'due' || orderStatus === 'payment pending') return false;
         return (
           paymentStatus === 'may be online' ||
           paymentStatus === 'online' ||
