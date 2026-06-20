@@ -364,6 +364,8 @@ function App() {
   const [showDueOrdersPanel, setShowDueOrdersPanel] = useState(false);
   const [dueOrdersTab, setDueOrdersTab] = useState('Dine-In');
   const [dueHornPlayed, setDueHornPlayed] = useState(false);
+  const [showLateOrdersPanel, setShowLateOrdersPanel] = useState(false);
+  const [lateOrdersTab, setLateOrdersTab] = useState('Dine-In');
   const [showCustomerDetailsPopup, setShowCustomerDetailsPopup] = useState(false);
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
   const [popupError, setPopupError] = useState('');
@@ -1018,6 +1020,24 @@ function App() {
       setDueHornPlayed(false);
     }
   }, [posOrders, dueHornPlayed]);
+
+  const isLateOrder = (order) => {
+    if (!order.createdAt) return false;
+    const created = new Date(order.createdAt);
+    const now = Date.now();
+    const elapsedMin = (now - created.getTime()) / 60000;
+    const fourHoursAgo = now - 4 * 60 * 60 * 1000;
+    if (created.getTime() < fourHoursAgo) return false;
+    if (elapsedMin < 30) return false;
+    const type = order.orderType;
+    const s = order.status;
+    if (type === 'Dine-In') return s === 'Payment Pending' || s === 'Pay Later' || order.paymentStatus === 'Due';
+    if (type === 'Takeaway') return s === 'Pay Later' || s === 'Payment Pending' || order.paymentStatus === 'Due';
+    if (type === 'Delivery') return s !== 'Completed' && s !== 'Payment Collected' && s !== 'Delivered';
+    return false;
+  };
+
+  const hasLateOrders = posOrders.some(isLateOrder);
 
   const openBulkRiderAssignmentModal = () => {
     if (!selectedOrders.length) return;
@@ -7068,6 +7088,142 @@ function App() {
           </>
         )}
 
+        {/* Late Orders floating alert button + popup */}
+        {isMobile && (
+          <>
+            {!isAnyPopupOpen && (
+            <button
+              onClick={() => setShowLateOrdersPanel(prev => !prev)}
+              className={`fixed bottom-36 right-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
+                hasLateOrders
+                  ? 'animate-late-alert bg-gradient-to-br from-amber-700 to-orange-800'
+                  : 'bg-gradient-to-br from-slate-700 to-slate-800'
+              }`}
+              style={{boxShadow: hasLateOrders ? '0 8px 32px rgba(245,158,11,0.5)' : '0 4px 16px rgba(0,0,0,0.2)'}}
+            >
+              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
+                hasLateOrders ? 'bg-white/20' : 'bg-white/10'
+              }`}>⏰</span>
+              <span>
+                {(() => {
+                  const count = posOrders.filter(isLateOrder).length;
+                  return count > 0 ? `${count} Late` : 'No Late';
+                })()}
+              </span>
+            </button>
+            )}
+
+            {/* Late Orders expanded panel */}
+            {showLateOrdersPanel && (
+              <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 pt-8" onClick={() => setShowLateOrdersPanel(false)}>
+                <div className="w-full max-h-[85vh] mx-2 rounded-3xl border border-amber-500/40 bg-slate-950 p-4 shadow-[0_35px_120px_-30px_rgba(245,158,11,0.4)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-amber-400">Late Orders</p>
+                      <h3 className="mt-1 text-lg font-semibold text-white">⏰ Orders overdue (30+ min)</h3>
+                    </div>
+                    <button onClick={() => setShowLateOrdersPanel(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">✕</button>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="grid grid-cols-3 gap-1.5 mb-4">
+                    {[
+                      { key: 'Dine-In', icon: '🍽️', label: 'Dine In', activeCls: 'from-emerald-600 to-emerald-700', inactiveCls: 'border-slate-700 text-slate-400' },
+                      { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
+                      { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
+                    ].map(({ key, icon, label, activeCls, inactiveCls }) => {
+                      const count = posOrders.filter(o => o.orderType === key && isLateOrder(o)).length;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setLateOrdersTab(key)}
+                          className={`relative rounded-xl py-2.5 text-center transition-all active:scale-95 ${
+                            lateOrdersTab === key
+                              ? `bg-gradient-to-br ${activeCls} text-white shadow-lg`
+                              : `border ${inactiveCls} bg-slate-900`
+                          }`}
+                        >
+                          <div className="text-xl">{icon}</div>
+                          <div className="text-[9px] font-bold uppercase tracking-wide mt-0.5">{label}</div>
+                          {count > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1 shadow-lg ring-2 ring-slate-950">
+                              {count > 99 ? '99+' : count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Late order cards */}
+                  {(() => {
+                    const type = lateOrdersTab;
+                    const lateOrders = posOrders
+                      .filter(o => o.orderType === type && isLateOrder(o))
+                      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+                    if (lateOrders.length === 0) return (
+                      <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                        <div className="text-4xl mb-2">✅</div>
+                        <p className="text-sm">No late {type} orders</p>
+                      </div>
+                    );
+
+                    const now = Date.now();
+                    const formatElapsed = (createdAt) => {
+                      const elapsed = Math.floor((now - new Date(createdAt).getTime()) / 60000);
+                      const h = Math.floor(elapsed / 60);
+                      const m = elapsed % 60;
+                      if (h > 0) return `${h}h ${m}m`;
+                      return `${m}m`;
+                    };
+
+                    const borderCls = type === 'Delivery' ? 'border-sky-700' : type === 'Takeaway' ? 'border-amber-700' : 'border-emerald-700';
+
+                    return (
+                      <div className="space-y-2">
+                        {lateOrders.map(order => (
+                          <div
+                            key={order.id}
+                            className={`rounded-2xl border ${borderCls} bg-slate-900 p-3 text-xs text-slate-200 cursor-pointer hover:bg-slate-800 transition`}
+                            style={{ boxShadow: `0 0 10px ${type === 'Delivery' ? 'rgba(14,165,233,0.2)' : type === 'Takeaway' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}` }}
+                            onClick={() => { setShowLateOrdersPanel(false); openViewOrderModal(order); }}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-semibold text-sm text-white">#{order.orderNumber || order.id}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded-full">{formatElapsed(order.createdAt)} late</span>
+                                <span className="font-bold text-sm text-rose-300">{order.total || order.amount || 0} PKR</span>
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-slate-400 leading-tight line-clamp-1 mb-1.5">
+                              {(order.items || []).map((item, idx) => (
+                                <span key={idx}><span className="text-amber-400 font-semibold">{item.quantity}x</span> {item.name}{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                              ))}
+                            </div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10px] text-slate-500">{order.customerName || order.tableNumber || order.phone || order.address || '-'}</span>
+                              <span className="text-[10px] text-amber-400 font-semibold">LATE</span>
+                            </div>
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                              <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
+                              {type !== 'Delivery' && (
+                                <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Due</button>
+                              )}
+                              <button onClick={(e) => { e.stopPropagation(); requestDeleteOrder(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Mobile orders popup */}
         {showMobileOrdersPopup && (
           <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 pt-8" onClick={() => setShowMobileOrdersPopup(false)}>
@@ -11516,7 +11672,7 @@ function App() {
   const topDeliveryFeeRiders = [...riderRevenueSummary].sort((a, b) => b.deliveryFee - a.deliveryFee).slice(0, 3);
   const riderBottomList = riderRevenueSummary.length > 5 ? riderRevenueSummary.slice(-3).reverse() : [];
 
-  const isAnyPopupOpen = showMobileCart || showMobileOrdersPopup || showDueOrdersPanel ||
+  const isAnyPopupOpen = showMobileCart || showMobileOrdersPopup || showDueOrdersPanel || showLateOrdersPanel ||
     showCustomerDetailsPopup || showPaymentPopup || showShiftOrderPopup || orderModalOpen;
 
   if (cataloguePage) {
@@ -11567,6 +11723,9 @@ function App() {
         @keyframes due-alert-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         @keyframes due-alert-glow { 0%,100% { box-shadow: 0 0 20px rgba(239,68,68,0.6), 0 0 40px rgba(239,68,68,0.3), 0 0 60px rgba(239,68,68,0.1); } 50% { box-shadow: 0 0 30px rgba(239,68,68,0.9), 0 0 60px rgba(239,68,68,0.5), 0 0 80px rgba(239,68,68,0.2); } }
         .animate-due-alert { animation: due-alert-bounce 1.5s ease-in-out infinite, due-alert-glow 1.5s ease-in-out infinite; }
+        @keyframes late-alert-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes late-alert-glow { 0%,100% { box-shadow: 0 0 20px rgba(245,158,11,0.6), 0 0 40px rgba(245,158,11,0.3), 0 0 60px rgba(245,158,11,0.1); } 50% { box-shadow: 0 0 30px rgba(245,158,11,0.9), 0 0 60px rgba(245,158,11,0.5), 0 0 80px rgba(245,158,11,0.2); } }
+        .animate-late-alert { animation: late-alert-bounce 1.5s ease-in-out infinite, late-alert-glow 1.5s ease-in-out infinite; }
       `}</style>
       {!isMobile && (
       <aside className={`fixed left-0 top-3 bottom-3 z-50 flex h-[calc(100vh-24px)] flex-col transition-all duration-300 ${
