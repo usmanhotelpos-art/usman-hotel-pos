@@ -950,14 +950,33 @@ router.put('/pos/orders/:id/assign-waiter', (req, res) => {
 });
 
 router.put('/pos/orders/:id', (req, res) => {
-  const { items, customerName, phone, address, tableNumber, deliveryAgent, serviceType, deliveryFee, discount, taxPercent, serviceCharge, paymentMethod, paymentStatus, notes, status } = req.body;
+  const existingOrder = getCollection('pos_orders').find((o) => o.id === req.params.id);
+  if (!existingOrder) {
+    return res.status(404).send({ error: 'Order not found' });
+  }
+
+  const {
+    items = existingOrder.items,
+    customerName = existingOrder.customerName,
+    phone = existingOrder.phone,
+    address = existingOrder.address,
+    tableNumber = existingOrder.tableNumber,
+    deliveryAgent = existingOrder.deliveryAgent,
+    serviceType = existingOrder.serviceType,
+    deliveryFee = existingOrder.deliveryFee,
+    discount = existingOrder.discount,
+    taxPercent = existingOrder.taxPercent,
+    serviceCharge = existingOrder.serviceCharge,
+    paymentMethod = existingOrder.paymentMethod,
+    paymentStatus = existingOrder.paymentStatus,
+    notes = existingOrder.notes,
+    status = existingOrder.status
+  } = req.body;
 
   const itemsList = items || [];
   const computedSubtotal = itemsList.reduce((sum, item) => sum + (Number(item.total) || (Number(item.price || 0) * Number(item.quantity || 0))), 0);
   const discountValue = Number(discount) || 0;
   const taxValue = ((computedSubtotal - discountValue) * (Number(taxPercent) || 0)) / 100;
-  // Determine orderType: prefer provided, otherwise use existing order's type
-  const existingOrder = getCollection('pos_orders').find((o) => o.id === req.params.id) || {};
   const effectiveOrderType = req.body.orderType || existingOrder.orderType || 'Dine-In';
   const deliveryValue = effectiveOrderType === 'Delivery' ? (Number(deliveryFee) || 0) : 0;
   const serviceValue = Number(serviceCharge) || 0;
@@ -983,11 +1002,10 @@ router.put('/pos/orders/:id', (req, res) => {
     total: computedTotal,
     updatedAt: new Date().toISOString()
   });
-  if (!updated) {
-    return res.status(404).send({ error: 'Order not found' });
-  }
 
-  if ((paymentStatus || '').toLowerCase().includes('payment') || (status || '').toLowerCase().includes('payment')) {
+  const payStatus = (paymentStatus || existingOrder.paymentStatus || '').toString().toLowerCase();
+  const orderStatus = (status || existingOrder.status || '').toString().toLowerCase();
+  if (payStatus.includes('payment') || orderStatus.includes('payment')) {
     const riderOrders = getCollection('rider_orders') || [];
     const matchedOrder = riderOrders.find((order) => order.orderId === req.params.id);
     if (matchedOrder) {
