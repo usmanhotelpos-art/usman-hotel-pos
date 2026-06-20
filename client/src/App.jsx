@@ -7054,20 +7054,33 @@ function App() {
                             {orders.map(order => (
                               <div
                                 key={order.id}
-                                className={`rounded-2xl border ${borderCls} bg-slate-900 p-3 text-xs text-slate-200`}
+                                className={`rounded-2xl border ${borderCls} bg-slate-900 p-3 text-xs text-slate-200 cursor-pointer hover:bg-slate-800/80 transition`}
                                 style={{ boxShadow: `0 0 10px ${type === 'Delivery' ? 'rgba(14,165,233,0.2)' : type === 'Takeaway' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}` }}
+                                onClick={() => { setShowDueOrdersPanel(false); openViewOrderModal(order); }}
                               >
                                 <div className="flex items-center justify-between mb-1.5">
                                   <span className="font-semibold text-sm text-white">#{order.orderNumber || order.id}</span>
                                   <span className="font-bold text-sm text-rose-300">{order.total || order.amount || 0} PKR</span>
                                 </div>
+                                {type === 'Delivery' && (
+                                  <div className="space-y-1 mb-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-sky-400 font-semibold">📍</span>
+                                      <span className="text-[10px] text-slate-300 line-clamp-1">{order.address || 'No address'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-[10px] text-slate-400"><span className="text-slate-500">Rider:</span> {order.deliveryAgent || 'Unassigned'}</span>
+                                      <span className="text-[10px] text-slate-400"><span className="text-slate-500">Type:</span> {order.serviceType || 'Standard'}</span>
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="text-[10px] text-slate-400 leading-tight line-clamp-1 mb-1.5">
                                   {(order.items || []).map((item, idx) => (
                                     <span key={idx}><span className="text-amber-400 font-semibold">{item.quantity}x</span> {item.name}{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
                                   ))}
                                 </div>
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="text-[10px] text-slate-500">{order.customerName || order.tableNumber || order.phone || '-'}</span>
+                                  <span className="text-[10px] text-slate-500">{order.customerName || order.tableNumber || order.phone || order.address || '-'}</span>
                                   <span className="text-[10px] text-red-400 font-semibold">DUE</span>
                                 </div>
                                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
