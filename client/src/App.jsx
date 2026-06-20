@@ -6663,13 +6663,13 @@ function App() {
                       <button key={product.id} type="button" className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-soft transition active:scale-[0.97]" onClick={() => addToCart(product)}>
                         <div className="flex flex-col items-center text-center mb-1">
                           {product.photo ? (
-                            <img src={product.photo} alt={product.name} className="w-8 h-8 rounded-full object-cover mb-0.5 shadow-sm" />
+                            <img src={product.photo} alt={product.name} className="w-14 h-14 rounded-full object-cover mb-0.5 shadow-md" />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center mb-0.5 text-slate-400 text-sm">📦</div>
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-100 to-indigo-100 flex items-center justify-center mb-0.5 text-slate-500 text-lg shadow-md">📦</div>
                           )}
                         </div>
-                        <div className="text-[9px] font-semibold text-slate-900 leading-tight line-clamp-2 mb-0.5">{product.name}</div>
-                        <div className="text-[9px] font-bold text-emerald-600">{product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}</div>
+                        <div className="text-xs font-bold text-slate-900 leading-tight line-clamp-2 mb-0.5" style={{textShadow: '0 0 8px rgba(59,130,246,0.3)'}}>{product.name}</div>
+                        <div className="text-[11px] font-extrabold text-emerald-600" style={{textShadow: '0 0 6px rgba(16,185,129,0.4)'}}>{product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}</div>
                       </button>
                     ))}
                   </div>
@@ -6728,19 +6728,19 @@ function App() {
                     <button
                       key={product.id}
                       type="button"
-                      className="rounded-2xl border border-slate-200 bg-white p-2 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md active:scale-[0.97]"
+                      className="rounded-2xl border border-slate-200 bg-white p-3 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md active:scale-[0.97]"
                       onClick={() => addToCart(product)}
                     >
                       <div className="flex flex-col items-center text-center mb-1.5">
                         {product.photo ? (
-                          <img src={product.photo} alt={product.name} className="w-10 h-10 rounded-full object-cover mb-1 shadow-sm" />
+                          <img src={product.photo} alt={product.name} className="w-16 h-16 rounded-full object-cover mb-1 shadow-md" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center mb-1 text-slate-400 text-lg">📦</div>
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sky-100 to-indigo-100 flex items-center justify-center mb-1 text-slate-500 text-xl shadow-md">📦</div>
                         )}
                       </div>
                       <div className="text-center">
-                        <div className="text-[11px] font-semibold text-slate-900 mb-0.5 leading-tight line-clamp-2">{product.name}</div>
-                        <div className="text-xs font-bold text-emerald-600">
+                        <div className="text-sm font-bold text-slate-900 mb-0.5 leading-tight line-clamp-2" style={{textShadow: '0 0 10px rgba(59,130,246,0.35)'}}>{product.name}</div>
+                        <div className="text-sm font-extrabold text-emerald-600" style={{textShadow: '0 0 8px rgba(16,185,129,0.45)'}}>
                           {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
                         </div>
                       </div>
