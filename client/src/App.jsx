@@ -6668,8 +6668,8 @@ function App() {
                             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-100 to-indigo-100 flex items-center justify-center mb-0.5 text-slate-500 text-lg shadow-md">📦</div>
                           )}
                         </div>
-                        <div className="text-xs font-bold text-slate-900 leading-tight line-clamp-2 mb-0.5" style={{textShadow: '0 0 8px rgba(59,130,246,0.3)'}}>{product.name}</div>
-                        <div className="text-[11px] font-extrabold text-emerald-600" style={{textShadow: '0 0 6px rgba(16,185,129,0.4)'}}>{product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}</div>
+                        <div className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 leading-tight line-clamp-2 mb-0.5" style={{textShadow: '0 0 12px rgba(168,85,247,0.4), 0 0 24px rgba(236,72,153,0.2)'}}>{product.name}</div>
+                        <div className="text-xs font-extrabold text-emerald-500" style={{textShadow: '0 0 8px rgba(16,185,129,0.5)'}}>{product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}</div>
                       </button>
                     ))}
                   </div>
@@ -6739,8 +6739,8 @@ function App() {
                         )}
                       </div>
                       <div className="text-center">
-                        <div className="text-sm font-bold text-slate-900 mb-0.5 leading-tight line-clamp-2" style={{textShadow: '0 0 10px rgba(59,130,246,0.35)'}}>{product.name}</div>
-                        <div className="text-sm font-extrabold text-emerald-600" style={{textShadow: '0 0 8px rgba(16,185,129,0.45)'}}>
+                        <div className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 mb-1 leading-tight line-clamp-2" style={{textShadow: '0 0 14px rgba(168,85,247,0.5), 0 0 28px rgba(236,72,153,0.25)'}}>{product.name}</div>
+                        <div className="text-sm font-extrabold text-emerald-500" style={{textShadow: '0 0 10px rgba(16,185,129,0.5)'}}>
                           {product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}
                         </div>
                       </div>
