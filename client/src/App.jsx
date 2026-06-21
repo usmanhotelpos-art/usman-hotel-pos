@@ -8707,19 +8707,6 @@ function App() {
     return [{ name: 'All' }, ...posCategories.filter((category) => catalogueAssignedCategories.includes(category.name))];
   }
 
-  function getCataloguePreviewProducts() {
-    const assignedProductIds = getAssignedCatalogueProductIds();
-    const hasAssignments = assignedProductIds.size > 0 || catalogueAssignedCategories.length > 0;
-    let products = posProducts;
-    if (assignedProductIds.size > 0) {
-      products = products.filter((product) => assignedProductIds.has(product.id));
-    }
-    if (catalogueAssignedCategories.length > 0) {
-      products = products.filter((product) => catalogueAssignedCategories.includes(product.category));
-    }
-    return products.slice(0, Math.max(1, catalogueLayout.columns));
-  }
-
   function addToCatalogueCart(product) {
     setCatalogueCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
@@ -8878,9 +8865,8 @@ function App() {
             </div>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_0.9fr]">
-            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Layout settings</p>
+          <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+            <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Layout settings</p>
               <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Catalogue page settings</h3>
               <div className="mt-6 grid gap-4">
                 <div>
@@ -9003,35 +8989,6 @@ function App() {
                 </button>
               </div>
             </div>
-            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Preview</p>
-              <div className="mt-5 rounded-[32px] border border-slate-200/10 bg-slate-900 p-5 text-slate-300">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xl font-semibold text-white">{catalogueLayout.pageTitle}</div>
-                    <div className="text-sm text-slate-400">{catalogueLayout.pageDescription}</div>
-                  </div>
-                  <span className="rounded-full px-3 py-1 text-xs font-semibold text-white"
-                    style={{ backgroundColor: catalogueLayout.accentColor }}>{catalogueLayout.theme}</span>
-                </div>
-                <div className="mt-6 grid gap-3"
-                  style={{ gridTemplateColumns: catalogueLayout.layoutStyle === 'grid' ? `repeat(${catalogueLayout.columns}, minmax(0, 1fr))` : '1fr' }}>
-                  {getCataloguePreviewProducts().length > 0 ? getCataloguePreviewProducts().map((product) => (
-                    <div key={product.id} className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
-                      <div className="mb-2 text-lg font-semibold text-white">{product.name}</div>
-                      {catalogueLayout.showCategories && <div className="text-xs uppercase tracking-[0.2em] text-slate-500">{product.category}</div>}
-                      <div className="mt-2 text-sm text-slate-300">{product.description || ''}</div>
-                      {catalogueLayout.showPrices && <div className="mt-4 text-sm font-semibold text-white">{product.price} PKR</div>}
-                    </div>
-                  )) : (
-                    <div className="col-span-full rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-400">
-                      No products assigned yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     );
