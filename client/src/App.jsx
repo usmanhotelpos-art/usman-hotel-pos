@@ -15,7 +15,7 @@ function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
   const isHelperRoute = initialPath.startsWith('/helper');
-  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'restore', 'settings'];
+  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'qr-catalogue', 'customers', 'riders-app', 'restore', 'settings'];
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
     try {
@@ -676,6 +676,49 @@ function App() {
   }, []);
 
   const [receiptSettingsSubTab, setReceiptSettingsSubTab] = useState('app');
+  const [catalogueQrSubTab, setCatalogueQrSubTab] = useState('qr');
+  const [catalogueLayout, setCatalogueLayout] = useState({
+    theme: 'light',
+    columns: 3,
+    showPrices: true,
+    showCategories: true,
+    accentColor: '#10b981',
+    pageTitle: 'Our Menu',
+    pageDescription: 'Scan to browse our full menu and order online',
+    layoutStyle: 'grid'
+  });
+  const [catalogueHost, setCatalogueHost] = useState('');
+  const [cataloguePath, setCataloguePath] = useState('menu');
+  const [catalogueAssignedCategories, setCatalogueAssignedCategories] = useState([]);
+  const [catalogueAssignedProducts, setCatalogueAssignedProducts] = useState({});
+  const [catalogueAssignCategory, setCatalogueAssignCategory] = useState('');
+  const [catalogueAssignSearch, setCatalogueAssignSearch] = useState('');
+  const [catalogueSearch, setCatalogueSearch] = useState('');
+  const [catalogueCategory, setCatalogueCategory] = useState('All');
+  const [catalogueCart, setCatalogueCart] = useState([]);
+  const [catalogueCustomer, setCatalogueCustomer] = useState({ name: '', phone: '', address: '' });
+  const [catalogueOrderNote, setCatalogueOrderNote] = useState('');
+  const [catalogueMessage, setCatalogueMessage] = useState('');
+  const [cataloguePage, setCataloguePage] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname.toLowerCase();
+    return /\/?(menu|catalogue|qr)(\/|$|\?)/.test(path);
+  });
+
+  useEffect(() => {
+    if (cataloguePage || !settings.cataloguePath) return;
+    const path = window.location.pathname.toLowerCase();
+    const customPath = settings.cataloguePath.toLowerCase().replace(/^\/+|\/+$/g, '');
+    if (path.includes(`/${customPath}`) || path.includes(`/${customPath}/`) || path.includes(`/${customPath}?`)) {
+      setCataloguePage(true);
+    }
+  }, [settings.cataloguePath, cataloguePage]);
+
+  useEffect(() => {
+    if (!cataloguePage) return;
+    loadSettings();
+    loadPosData();
+  }, [cataloguePage]);
 
   useEffect(() => {
     if (activeTab === 'rider-root-settings') {
@@ -689,8 +732,24 @@ function App() {
     if (settings.btPrintEnabled && btInfo && !btConnected) {
       setBtPrintMode(true);
     }
-  }, [settings.btPrintEnabled]);
+    if (settings.catalogueLayout) {
+      setCatalogueLayout((prev) => ({ ...prev, ...settings.catalogueLayout }));
+    }
+    if (settings.catalogueHost) {
+      setCatalogueHost(settings.catalogueHost);
+    }
+    if (settings.cataloguePath) {
+      setCataloguePath(settings.cataloguePath);
+    }
+    if (Array.isArray(settings.catalogueAssignedCategories)) {
+      setCatalogueAssignedCategories(settings.catalogueAssignedCategories);
+    }
+    if (settings.catalogueAssignedProducts && typeof settings.catalogueAssignedProducts === 'object') {
+      setCatalogueAssignedProducts(settings.catalogueAssignedProducts);
+    }
+  }, [settings.btPrintEnabled, settings.catalogueLayout, settings.catalogueHost, settings.cataloguePath, settings.catalogueAssignedCategories, settings.catalogueAssignedProducts]);
   const defaultTabLabels = {
+    'qr-catalogue': 'QR Catalogue',
     'rider-book': 'Rider Book',
     'rider-order-requests': 'Rider Order Requests',
     restore: 'Restore',
@@ -703,6 +762,7 @@ function App() {
     staff: '👤',
     sales: '💰',
     pos: '🛒',
+    'qr-catalogue': '📱',
     customers: '👥',
     orders: '🧾',
     'rider-book': '🚴',
@@ -1279,6 +1339,8 @@ function App() {
         return 'Riders App';
       case 'settings':
         return 'Hotel Settings';
+      case 'qr-catalogue':
+        return 'QR Catalogue';
       case 'rider-book':
         return 'Rider Book';
       default:
@@ -1448,7 +1510,7 @@ function App() {
         await loadStaffMembers();
       } else if (tab === 'riders-app') {
         // Riders App is a self-contained component and does not need generic tab data loading.
-      } else if (tab === 'pos') {
+      } else if (tab === 'pos' || tab === 'qr-catalogue') {
         await loadPosData();
       } else if (tab === 'customers') {
         await loadCustomers();
@@ -8575,6 +8637,567 @@ function App() {
 
   // ---- PIN Reset Popup ----
 
+  function getCatalogueUrl() {
+    const host = catalogueHost?.trim();
+    if (host) {
+      const normalizedHost = host.startsWith('http') ? host : `${window.location.protocol}//${host}`;
+      const cleanedPath = cataloguePath.replace(/^\/+|\/+$/g, '') || 'menu';
+      return `${normalizedHost.replace(/\/$/, '')}/${cleanedPath}`;
+    }
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const cleanedPath = (cataloguePath || 'menu').replace(/^\/+|\/+$/g, '');
+    return `${window.location.origin}${basePath}/${cleanedPath}`;
+  }
+
+  function getAssignedCatalogueProductIds() {
+    return new Set(Object.values(catalogueAssignedProducts).flat());
+  }
+
+  function getCatalogueFilteredProducts() {
+    const search = catalogueSearch.toLowerCase().trim();
+    const assignedProductIds = getAssignedCatalogueProductIds();
+    const hasAssignments = assignedProductIds.size > 0 || catalogueAssignedCategories.length > 0;
+
+    return posProducts.filter((product) => {
+      const matchesCategory = catalogueCategory === 'All' || product.category === catalogueCategory;
+      const matchesSearch = !search ||
+        (product.name || '').toLowerCase().includes(search) ||
+        (product.category || '').toLowerCase().includes(search);
+      const validCategory = !catalogueAssignedCategories.length || catalogueAssignedCategories.includes(product.category);
+      const validAssignment = !hasAssignments || assignedProductIds.has(product.id);
+      return matchesCategory && matchesSearch && validCategory && validAssignment;
+    });
+  }
+
+  function toggleAssignedCategory(categoryName) {
+    setCatalogueAssignedCategories((prev) => {
+      if (prev.includes(categoryName)) {
+        const next = prev.filter((name) => name !== categoryName);
+        setCatalogueAssignedProducts((assignments) => {
+          const { [categoryName]: _, ...rest } = assignments;
+          return rest;
+        });
+        if (catalogueAssignCategory === categoryName) {
+          setCatalogueAssignCategory('');
+        }
+        return next;
+      }
+      setCatalogueAssignCategory(categoryName);
+      return [...prev, categoryName];
+    });
+  }
+
+  function toggleAssignedProduct(categoryName, productId) {
+    setCatalogueAssignedProducts((prev) => {
+      const current = Array.isArray(prev[categoryName]) ? prev[categoryName] : [];
+      const next = current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId];
+      return { ...prev, [categoryName]: next };
+    });
+  }
+
+  function openAssignCategory(categoryName) {
+    setCatalogueAssignCategory(categoryName);
+    setCatalogueAssignSearch('');
+  }
+
+  function getAssignedCategoriesForDropdown() {
+    if (!catalogueAssignedCategories.length) return [{ name: 'All' }, ...posCategories];
+    return [{ name: 'All' }, ...posCategories.filter((category) => catalogueAssignedCategories.includes(category.name))];
+  }
+
+  function getCataloguePreviewProducts() {
+    const assignedProductIds = getAssignedCatalogueProductIds();
+    const hasAssignments = assignedProductIds.size > 0 || catalogueAssignedCategories.length > 0;
+    let products = posProducts;
+    if (assignedProductIds.size > 0) {
+      products = products.filter((product) => assignedProductIds.has(product.id));
+    }
+    if (catalogueAssignedCategories.length > 0) {
+      products = products.filter((product) => catalogueAssignedCategories.includes(product.category));
+    }
+    return products.slice(0, Math.max(1, catalogueLayout.columns));
+  }
+
+  function addToCatalogueCart(product) {
+    setCatalogueCart((prev) => {
+      const existing = prev.find((item) => item.productId === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { productId: product.id, name: product.name, price: Number(product.price) || 0, quantity: 1 }];
+    });
+  }
+
+  function updateCatalogueCartItem(productId, change) {
+    setCatalogueCart((prev) =>
+      prev
+        .map((item) =>
+          item.productId === productId ? { ...item, quantity: Math.max(1, item.quantity + change) } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
+  function getCatalogueCartSummary() {
+    const subtotal = catalogueCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return { subtotal, total: subtotal };
+  }
+
+  async function saveCatalogueLayoutSettings() {
+    setLoading(true);
+    setMessage('');
+    try {
+      await fetchJson(`${apiBase}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          catalogueLayout,
+          catalogueHost,
+          cataloguePath,
+          catalogueAssignedCategories,
+          catalogueAssignedProducts
+        })
+      });
+      setMessage('Catalogue layout settings saved.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveOnlineCatalogueOrder() {
+    if (!catalogueCart.length) {
+      setCatalogueMessage('Please add at least one item to cart.');
+      return;
+    }
+    if (!catalogueCustomer.name || !catalogueCustomer.phone) {
+      setCatalogueMessage('Customer name and phone are required to place an online order.');
+      return;
+    }
+
+    const orderPayload = {
+      items: catalogueCart,
+      orderType: 'Online',
+      customerName: catalogueCustomer.name,
+      phone: catalogueCustomer.phone,
+      address: catalogueCustomer.address,
+      notes: catalogueOrderNote,
+      status: 'Pending',
+      paymentMethod: 'Online'
+    };
+
+    setLoading(true);
+    setCatalogueMessage('');
+    try {
+      const order = await fetchJson(`${apiBase}/pos/orders`, {
+        method: 'POST',
+        body: JSON.stringify(orderPayload)
+      });
+      setCatalogueMessage(`Thank you! Order ${order.orderNumber || order.id} submitted successfully.`);
+      setCatalogueCart([]);
+      setCatalogueCustomer({ name: '', phone: '', address: '' });
+      setCatalogueOrderNote('');
+      await loadPosData();
+    } catch (error) {
+      setCatalogueMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function renderCatalogueQrModule() {
+    const catalogueUrl = getCatalogueUrl();
+    const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(catalogueUrl)}`;
+
+    return (
+      <div className="space-y-6">
+        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            {['qr', 'layout'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setCatalogueQrSubTab(tab)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${catalogueQrSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {tab === 'qr' ? 'QR Code' : 'Layout & Products'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {catalogueQrSubTab === 'qr' ? (
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_0.9fr]">
+            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>QR Code</p>
+              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Scan to open menu</h3>
+              <p className={`mt-3 text-sm leading-6 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Customers scan this QR to browse products and order online.</p>
+              <div className="mt-6 rounded-[32px] border border-slate-800 bg-slate-900 p-6 text-center">
+                <img src={qrImageSrc} alt="Catalogue QR" className="mx-auto h-56 w-56 rounded-3xl border border-slate-700 bg-white p-2" />
+                <div className="mt-4 text-sm text-slate-300">Share or print this QR for tabletop display.</div>
+              </div>
+              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
+                <div className="font-semibold text-slate-100">Host</div>
+                <input value={catalogueHost} onChange={(e) => setCatalogueHost(e.target.value)}
+                  placeholder="e.g. 192.168.1.20:5173"
+                  className="mt-3 w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
+                <div className="mt-3 text-xs text-slate-400">Use your network IP or domain so phone scans open correctly.</div>
+              </div>
+              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
+                <div className="font-semibold text-slate-100">Path</div>
+                <input value={cataloguePath} onChange={(e) => setCataloguePath(e.target.value)}
+                  placeholder="menu"
+                  className="mt-3 w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
+                <div className="mt-3 text-xs text-slate-400">URL path for the catalogue page.</div>
+              </div>
+              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
+                <div className="font-semibold text-slate-100">Catalogue URL</div>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                  <input readOnly value={catalogueUrl}
+                    className="min-w-0 flex-1 rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
+                  <button onClick={() => navigator.clipboard.writeText(catalogueUrl)}
+                    className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500">
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Quick actions</p>
+              <div className="mt-5 grid gap-4">
+                <div className="rounded-3xl border border-slate-200/10 bg-slate-900 p-4">
+                  <div className="text-sm text-slate-400">Save layout settings before printing QR.</div>
+                </div>
+                <div className="rounded-3xl border border-slate-200/10 bg-slate-900 p-4">
+                  <div className="text-sm text-slate-400">Use the Layout tab to customise which products appear.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_0.9fr]">
+            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Layout settings</p>
+              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Catalogue page settings</h3>
+              <div className="mt-6 grid gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400">Page title</label>
+                  <input value={catalogueLayout.pageTitle}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, pageTitle: e.target.value }))}
+                    className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400">Description</label>
+                  <textarea value={catalogueLayout.pageDescription}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, pageDescription: e.target.value }))}
+                    rows={3}
+                    className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm text-slate-400">Theme</label>
+                    <select value={catalogueLayout.theme}
+                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, theme: e.target.value }))}
+                      className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400">Columns</label>
+                    <select value={catalogueLayout.columns}
+                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, columns: Number(e.target.value) }))}
+                      className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                      {[2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3">
+                    <input type="checkbox" checked={catalogueLayout.showPrices}
+                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, showPrices: e.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    <span className="text-sm text-slate-200">Show prices</span>
+                  </label>
+                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3">
+                    <input type="checkbox" checked={catalogueLayout.showCategories}
+                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, showCategories: e.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                    <span className="text-sm text-slate-200">Show categories</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400">Accent color</label>
+                  <input type="color" value={catalogueLayout.accentColor}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, accentColor: e.target.value }))}
+                    className="mt-2 h-12 w-full rounded-3xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400">Layout style</label>
+                  <select value={catalogueLayout.layoutStyle}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, layoutStyle: e.target.value }))}
+                    className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                    <option value="grid">Grid</option>
+                    <option value="list">List</option>
+                  </select>
+                </div>
+                <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
+                  <div className="text-sm uppercase tracking-[0.2em] text-slate-400">Assign categories</div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {posCategories.map((category) => {
+                      const assigned = catalogueAssignedCategories.includes(category.name);
+                      return (
+                        <button key={category.id || category.name}
+                          onClick={() => toggleAssignedCategory(category.name)}
+                          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${assigned ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+                          {category.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 text-xs text-slate-400">Click a category to add/remove it from the catalogue, then open it to choose products.</div>
+                </div>
+                {catalogueAssignCategory ? (
+                  <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm uppercase tracking-[0.2em] text-slate-400">Products in {catalogueAssignCategory}</div>
+                        <div className="mt-2 text-lg font-semibold text-white">{catalogueAssignCategory}</div>
+                      </div>
+                      <button onClick={() => setCatalogueAssignCategory('')}
+                        className="rounded-full border border-slate-600 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Close</button>
+                    </div>
+                    <div className="mt-4">
+                      <input value={catalogueAssignSearch}
+                        onChange={(e) => setCatalogueAssignSearch(e.target.value)}
+                        placeholder="Search products..."
+                        className="w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
+                    </div>
+                    <div className="mt-4 grid gap-3 max-h-[320px] overflow-y-auto">
+                      {posProducts.filter((p) => p.category === catalogueAssignCategory && (!catalogueAssignSearch || (p.name || '').toLowerCase().includes(catalogueAssignSearch.toLowerCase()))).map((product) => {
+                        const checked = (catalogueAssignedProducts[catalogueAssignCategory] || []).includes(product.id);
+                        return (
+                          <label key={product.id} className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3">
+                            <input type="checkbox" checked={checked}
+                              onChange={() => toggleAssignedProduct(catalogueAssignCategory, product.id)}
+                              className="h-5 w-5 rounded border-slate-600 bg-slate-900 text-emerald-500" />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-semibold text-white">{product.name}</div>
+                              <div className="truncate text-xs text-slate-500">{product.price} PKR</div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                      {!posProducts.some((p) => p.category === catalogueAssignCategory) && (
+                        <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950 p-4 text-sm text-slate-400">No products in this category.</div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                <button onClick={saveCatalogueLayoutSettings}
+                  className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">
+                  Save layout settings
+                </button>
+              </div>
+            </div>
+            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Preview</p>
+              <div className="mt-5 rounded-[32px] border border-slate-200/10 bg-slate-900 p-5 text-slate-300">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xl font-semibold text-white">{catalogueLayout.pageTitle}</div>
+                    <div className="text-sm text-slate-400">{catalogueLayout.pageDescription}</div>
+                  </div>
+                  <span className="rounded-full px-3 py-1 text-xs font-semibold text-white"
+                    style={{ backgroundColor: catalogueLayout.accentColor }}>{catalogueLayout.theme}</span>
+                </div>
+                <div className="mt-6 grid gap-3"
+                  style={{ gridTemplateColumns: catalogueLayout.layoutStyle === 'grid' ? `repeat(${catalogueLayout.columns}, minmax(0, 1fr))` : '1fr' }}>
+                  {getCataloguePreviewProducts().length > 0 ? getCataloguePreviewProducts().map((product) => (
+                    <div key={product.id} className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
+                      <div className="mb-2 text-lg font-semibold text-white">{product.name}</div>
+                      {catalogueLayout.showCategories && <div className="text-xs uppercase tracking-[0.2em] text-slate-500">{product.category}</div>}
+                      <div className="mt-2 text-sm text-slate-300">{product.description || ''}</div>
+                      {catalogueLayout.showPrices && <div className="mt-4 text-sm font-semibold text-white">{product.price} PKR</div>}
+                    </div>
+                  )) : (
+                    <div className="col-span-full rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-400">
+                      No products assigned yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderCustomerCataloguePage() {
+    const filteredProducts = getCatalogueFilteredProducts();
+    const summary = getCatalogueCartSummary();
+    const catalogueUrl = getCatalogueUrl();
+
+    return (
+      <div className="min-h-screen bg-white text-slate-900">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="space-y-6">
+            <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Online Menu</p>
+                  <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
+              <div className="space-y-6">
+                <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <select value={catalogueCategory}
+                        onChange={(e) => setCatalogueCategory(e.target.value)}
+                        className="rounded-3xl border border-slate-300 px-4 py-3 text-sm outline-none bg-white text-slate-700">
+                        {getAssignedCategoriesForDropdown().map((category) => (
+                          <option key={category.id || category.name} value={category.name}>{category.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="relative">
+                      <input value={catalogueSearch}
+                        onChange={(e) => setCatalogueSearch(e.target.value)}
+                        placeholder="Search menu..."
+                        className="rounded-3xl border border-slate-300 px-4 py-3 pr-10 text-sm outline-none bg-white text-slate-700 w-48" />
+                      <svg className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredProducts.map((product) => (
+                      <div key={product.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97]">
+                        {product.photo ? (
+                          <img src={product.photo} alt={product.name}
+                            className="w-full h-32 rounded-xl object-cover mb-3" />
+                        ) : (
+                          <div className="w-full h-32 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-3 text-slate-400 text-3xl">
+                            🍽️
+                          </div>
+                        )}
+                        {catalogueLayout.showCategories && product.category && (
+                          <div className="text-[10px] uppercase tracking-[0.15em] text-slate-400 mb-1">{product.category}</div>
+                        )}
+                        <div className="text-sm font-semibold text-slate-800 line-clamp-2 mb-1">{product.name}</div>
+                        {catalogueLayout.showPrices && (
+                          <div className="text-sm font-bold text-emerald-600">{Number(product.price) || 0} PKR</div>
+                        )}
+                        <button onClick={() => addToCatalogueCart(product)}
+                          className="mt-3 w-full rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition">
+                          Add to cart
+                        </button>
+                      </div>
+                    ))}
+                    {!filteredProducts.length && (
+                      <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-400">
+                        No items found.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <aside className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft h-fit sticky top-6">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Your cart</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-900">{catalogueCart.length} item{catalogueCart.length !== 1 ? 's' : ''}</h2>
+                </div>
+                {catalogueCart.length > 0 && (
+                  <>
+                    <div className="mt-4 space-y-3">
+                      {catalogueCart.map((item) => (
+                        <div key={item.productId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-slate-800 truncate">{item.name}</div>
+                            <div className="text-xs text-slate-500">{item.price} PKR</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => updateCatalogueCartItem(item.productId, -1)}
+                              className="rounded-full bg-slate-200 w-7 h-7 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-300">-</button>
+                            <span className="text-sm font-semibold w-6 text-center">{item.quantity}</span>
+                            <button onClick={() => updateCatalogueCartItem(item.productId, 1)}
+                              className="rounded-full bg-slate-200 w-7 h-7 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-300">+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex justify-between text-sm font-semibold text-slate-800">
+                      <span>Total</span>
+                      <span>{summary.total} PKR</span>
+                    </div>
+                  </>
+                )}
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Name *</label>
+                    <input value={catalogueCustomer.name}
+                      onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Your name"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Phone *</label>
+                    <input value={catalogueCustomer.phone}
+                      onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, phone: e.target.value }))}
+                      placeholder="Phone number"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Address</label>
+                    <textarea value={catalogueCustomer.address}
+                      onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, address: e.target.value }))}
+                      rows={2} placeholder="Delivery address"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Order note</label>
+                    <textarea value={catalogueOrderNote}
+                      onChange={(e) => setCatalogueOrderNote(e.target.value)}
+                      rows={2} placeholder="Special instructions"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Payment method</label>
+                    <select value="Online" className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none bg-white text-slate-700">
+                      <option value="Online">Online</option>
+                    </select>
+                  </div>
+                  <button onClick={saveOnlineCatalogueOrder}
+                    disabled={loading}
+                    className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition disabled:opacity-50">
+                    {loading ? 'Placing order...' : 'Place order'}
+                  </button>
+                  {catalogueMessage && (
+                    <div className={`rounded-2xl p-3 text-sm ${catalogueMessage.includes('success') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                      {catalogueMessage}
+                    </div>
+                  )}
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderCustomers() {
     const handleEditCustomer = (customer) => {
       setEditingCustomer(customer);
@@ -10874,6 +11497,10 @@ function App() {
     );
   }
 
+  if (cataloguePage) {
+    return renderCustomerCataloguePage();
+  }
+
   if (isMobileRiderRoute) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -11730,6 +12357,7 @@ function App() {
             )}
 
             {activeTab === 'pos' && renderPos()}
+            {activeTab === 'qr-catalogue' && renderCatalogueQrModule()}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'restore' && renderRestore()}
             {activeTab === 'riders-app' && <RidersApp />}
