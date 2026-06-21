@@ -5146,37 +5146,33 @@ function App() {
           </div>
         </div>
         {showRiderBookSummaryModal && riderBookSummaryData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-            <div className="w-full max-w-2xl rounded-[32px] border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm uppercase tracking-[0.24em] text-slate-400">Rider Book Summary</div>
-                  <div className="mt-2 text-3xl font-semibold text-white">{riderBookSummaryType === 'cash' ? 'Cash Summary' : 'Online Summary'}</div>
-                </div>
-                <button onClick={closeRiderBookSummaryModal} className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-200 hover:border-rose-500 hover:text-white">Close</button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={closeRiderBookSummaryModal}>
+            <div className="w-full max-w-sm rounded-2xl border border-fuchsia-300/50 bg-white p-5 shadow-[0_0_40px_rgba(191,90,242,0.30)]" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center">
+                <h3 className="text-lg font-extrabold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">{riderBookSummaryType === 'cash' ? 'Rider Book Cash Summary' : 'Rider Book Online Summary'}</h3>
               </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Order Value</div>
-                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.orderValue).toLocaleString()} Rs</div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3 shadow-md shadow-cyan-200/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Order Value</p>
+                  <p className="mt-1 text-xl font-extrabold text-cyan-600">{Number(riderBookSummaryData.orderValue).toLocaleString()} Rs</p>
                 </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Extras Total</div>
-                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.extras).toLocaleString()} Rs</div>
+                <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3 shadow-md shadow-fuchsia-200/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-fuchsia-700">Extras Total</p>
+                  <p className="mt-1 text-xl font-extrabold text-fuchsia-600">{Number(riderBookSummaryData.extras).toLocaleString()} Rs</p>
                 </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Delivery Fees</div>
-                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.serviceCharge).toLocaleString()} Rs</div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 shadow-md shadow-emerald-200/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Delivery Fees</p>
+                  <p className="mt-1 text-xl font-extrabold text-emerald-600">{Number(riderBookSummaryData.serviceCharge).toLocaleString()} Rs</p>
                 </div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Rider Amount</div>
-                  <div className="mt-3 text-2xl font-semibold text-white">{Number(riderBookSummaryData.riderAmount).toLocaleString()} Rs</div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 shadow-md shadow-amber-200/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Rider Amount</p>
+                  <p className="mt-1 text-xl font-extrabold text-amber-600">{Number(riderBookSummaryData.riderAmount).toLocaleString()} Rs</p>
                 </div>
               </div>
-              <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-300">
+              <div className="mt-4 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500 shadow-inner">
                 {riderBookSummaryType === 'cash'
-                  ? 'Cash summary shows cash collected after subtracting extras and delivery fees from the order total.'
-                  : 'Online summary shows online rider balance from extras and delivery fees owed to riders.'}
+                  ? 'Cash collected after subtracting extras & delivery fees'
+                  : 'Online rider balance from extras & delivery fees'}
               </div>
             </div>
           </div>
