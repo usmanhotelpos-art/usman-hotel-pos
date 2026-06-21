@@ -4269,8 +4269,7 @@ function App() {
     const paymentStatus = String(order.paymentStatus || '').toLowerCase();
     const paymentMethod = String(order.paymentMethod || '').toLowerCase();
     const orderStatus = String(order.status || '').toLowerCase();
-    const isPaidOrCompleted = paymentStatus === 'paid' || orderStatus === 'completed';
-    if (isPaidOrCompleted) return false;
+    if (paymentStatus === 'paid' || paymentStatus === 'due' || orderStatus === 'completed') return false;
     return paymentStatus === 'receive cash till' || paymentMethod === 'cash' || (orderStatus === 'payment collected' && paymentMethod === 'cash');
   };
 
@@ -4278,8 +4277,7 @@ function App() {
     const paymentStatus = String(order.paymentStatus || '').toLowerCase();
     const paymentMethod = String(order.paymentMethod || '').toLowerCase();
     const orderStatus = String(order.status || '').toLowerCase();
-    const isPaidOrCompleted = paymentStatus === 'paid' || orderStatus === 'completed';
-    if (isPaidOrCompleted) return false;
+    if (paymentStatus === 'paid' || paymentStatus === 'due' || orderStatus === 'completed') return false;
     return (
       paymentStatus === 'may be online' ||
       paymentStatus === 'online' ||
