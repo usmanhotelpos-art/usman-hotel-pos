@@ -1531,60 +1531,49 @@ export function RidersApp() {
         )}
       </div>
 
-      {/* Order Slip Modal */}
+      {/* Summary Modal */}
       {showSummaryModal && summaryData && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="relative rounded-[32px] border border-fuchsia-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 shadow-[0_0_48px_rgba(191,90,242,0.20)] max-w-3xl w-full max-h-[92vh] overflow-y-auto">
-            <button
-              onClick={closeSummaryModal}
-              className="absolute right-4 top-4 text-slate-300 hover:text-white rounded-full p-2 transition"
-            >
-              ✕
-            </button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={closeSummaryModal}>
+          <div className="relative rounded-2xl border border-fuchsia-300/50 bg-white p-5 shadow-[0_0_40px_rgba(191,90,242,0.30)] max-w-sm w-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
-              <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-cyan-500 to-emerald-500 shadow-[0_0_30px_rgba(127,199,255,0.45)] text-white text-3xl font-extrabold">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-cyan-500 to-emerald-500 shadow-[0_0_24px_rgba(127,199,255,0.50)] text-white text-2xl font-extrabold">
                 {formatSignedCurrency(summaryData.totalDifference)}
               </div>
-              <p className="mt-4 text-sm uppercase tracking-[0.35em] text-fuchsia-300">
+              <p className="mt-3 text-xs uppercase tracking-[0.3em] font-bold bg-gradient-to-r from-fuchsia-600 to-cyan-600 bg-clip-text text-transparent">
                 {summaryData.totalDifference < 0 ? 'RIDER HAQ' : summaryData.totalDifference > 0 ? 'USMAN HOTEL HAQ' : 'BALANCED'}
               </p>
-              <h3 className="mt-2 text-2xl font-extrabold text-white">
+              <h3 className="mt-1 text-lg font-extrabold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">
                 {summaryType === 'cash' ? 'Rider Book Cash Summary' : 'Rider Book Online Summary'}
               </h3>
-              <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                {summaryType === 'cash'
-                  ? 'Showing cash collection total excluding Extras category items and delivery fees.'
-                  : 'Showing Extras category amount plus delivery fees that should be given to riders.'}
-              </p>
             </div>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-4">
-              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-cyan-500/10">
-                <p className="text-sm text-slate-400">Order total</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summaryData.orderTotal)}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3 shadow-md shadow-cyan-200/50">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-700">Order total</p>
+                <p className="mt-1 text-xl font-extrabold text-cyan-600">{formatCurrency(summaryData.orderTotal)}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-fuchsia-500/10">
-                <p className="text-sm text-slate-400">Extras total</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summaryData.extrasTotal)}</p>
+              <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3 shadow-md shadow-fuchsia-200/50">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-fuchsia-700">Extras total</p>
+                <p className="mt-1 text-xl font-extrabold text-fuchsia-600">{formatCurrency(summaryData.extrasTotal)}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-emerald-500/10">
-                <p className="text-sm text-slate-400">Delivery fee</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summaryData.deliveryFeeTotal)}</p>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 shadow-md shadow-emerald-200/50">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Delivery fee</p>
+                <p className="mt-1 text-xl font-extrabold text-emerald-600">{formatCurrency(summaryData.deliveryFeeTotal)}</p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-slate-500/10">
-                <p className="text-sm text-slate-400">{summaryType === 'cash' ? 'Cash orders' : 'Online orders'}</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{summaryData.count}</p>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 shadow-md shadow-amber-200/50">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Orders</p>
+                <p className="mt-1 text-xl font-extrabold text-amber-600">{summaryData.count}</p>
               </div>
             </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-950/90 p-6 shadow-inner shadow-slate-950/20">
-              <div className="flex items-center justify-between text-slate-400 uppercase tracking-[0.18em] text-xs font-semibold mb-4">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-inner">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-2">
                 <span>Summary amount</span>
                 <span>{summaryType === 'cash' ? 'Total from rider' : 'Total for rider'}</span>
               </div>
-              <div className="rounded-3xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 p-5 text-center text-white shadow-[0_0_18px_rgba(56,189,248,0.35)]">
-                <p className="text-sm uppercase tracking-[0.18em]">{summaryType === 'cash' ? 'Amount taken from rider' : 'Amount to give rider'}</p>
-                <p className="mt-3 text-4xl font-extrabold">{formatCurrency(summaryData.riderAmount)}</p>
+              <div className="rounded-xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 p-4 text-center text-white shadow-[0_0_20px_rgba(56,189,248,0.40)]">
+                <p className="text-[10px] font-bold uppercase tracking-widest">{summaryType === 'cash' ? 'Amount taken from rider' : 'Amount to give rider'}</p>
+                <p className="mt-2 text-2xl font-extrabold">{formatCurrency(summaryData.riderAmount)}</p>
               </div>
             </div>
           </div>
