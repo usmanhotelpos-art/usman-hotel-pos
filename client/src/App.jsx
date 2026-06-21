@@ -1033,7 +1033,7 @@ function App() {
     const s = order.status;
     if (type === 'Dine-In') return s === 'Payment Pending' || s === 'Pay Later' || order.paymentStatus === 'Due';
     if (type === 'Takeaway') return s === 'Pay Later' || s === 'Payment Pending' || order.paymentStatus === 'Due';
-    if (type === 'Delivery') return s !== 'Completed' && s !== 'Payment Collected' && s !== 'Delivered';
+    if (type === 'Delivery') return !order.deliveryAgent && s !== 'Completed' && s !== 'Payment Collected' && s !== 'Delivered';
     return false;
   };
 
@@ -7227,7 +7227,11 @@ function App() {
                               <span className="text-xs text-amber-400 font-bold" style={{textShadow: '0 0 8px rgba(245,158,11,0.6)'}}>LATE</span>
                             </div>
                             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                              {type === 'Delivery' ? (
+                                <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); openRiderAssignmentModal(order); }} className="flex-1 rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-purple-500 active:scale-95">Assign Rider</button>
+                              ) : (
+                                <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                              )}
                               <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
                               {type !== 'Delivery' && (
                                 <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Due</button>
