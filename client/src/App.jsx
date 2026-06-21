@@ -11427,6 +11427,10 @@ function App() {
     );
   }
 
+  if (cataloguePage) {
+    return renderCustomerCataloguePage();
+  }
+
   if (!token || !user) {
     const getGreeting = () => {
       const now = new Date();
@@ -11703,10 +11707,6 @@ function App() {
 
   const isAnyPopupOpen = showMobileCart || showMobileOrdersPopup || showDueOrdersPanel || showLateOrdersPanel ||
     showCustomerDetailsPopup || showPaymentPopup || showShiftOrderPopup || orderModalOpen;
-
-  if (cataloguePage) {
-    return renderCustomerCataloguePage();
-  }
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-white text-slate-900'}`} style={appStyle}>
