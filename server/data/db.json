@@ -756,6 +756,88 @@
       "availableStock": null
     }
   ],
+  "pos_mashallah_slots": [
+    {
+      "slot": 1,
+      "productId": null
+    },
+    {
+      "slot": 2,
+      "productId": null
+    },
+    {
+      "slot": 3,
+      "productId": null
+    },
+    {
+      "slot": 4,
+      "productId": null
+    },
+    {
+      "slot": 5,
+      "productId": null
+    },
+    {
+      "slot": 6,
+      "productId": null
+    },
+    {
+      "slot": 7,
+      "productId": null
+    },
+    {
+      "slot": 8,
+      "productId": null
+    },
+    {
+      "slot": 9,
+      "productId": null
+    },
+    {
+      "slot": 10,
+      "productId": null
+    },
+    {
+      "slot": 11,
+      "productId": null
+    },
+    {
+      "slot": 12,
+      "productId": null
+    },
+    {
+      "slot": 13,
+      "productId": null
+    },
+    {
+      "slot": 14,
+      "productId": null
+    },
+    {
+      "slot": 15,
+      "productId": null
+    },
+    {
+      "slot": 16,
+      "productId": null
+    },
+    {
+      "slot": 17,
+      "productId": null
+    },
+    {
+      "slot": 18,
+      "productId": null
+    },
+    {
+      "slot": 19,
+      "productId": null
+    },
+    {
+      "slot": 20,
+      "productId": null
+    }
+  ],
   "pos_tables": [
     {
       "id": "t1",
