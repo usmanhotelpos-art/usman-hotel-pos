@@ -242,14 +242,14 @@ export function RidersApp() {
   const activeDeliveredCashOrders = useMemo(() =>
     deliveredCashOrders.filter(order => {
       const po = order.originalOrder || order;
-      return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+      return po.status !== 'Completed' && po.paymentStatus !== 'Paid' && po.paymentStatus !== 'Due';
     }),
     [deliveredCashOrders]
   );
   const activeDeliveredOnlineOrders = useMemo(() =>
     deliveredOnlineOrders.filter(order => {
       const po = order.originalOrder || order;
-      return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+      return po.status !== 'Completed' && po.paymentStatus !== 'Paid' && po.paymentStatus !== 'Due';
     }),
     [deliveredOnlineOrders]
   );
@@ -503,7 +503,7 @@ export function RidersApp() {
           // Filter out orders that have been marked as Paid (Completed) from Rider Book
           const filtered = (Array.isArray(data) ? data : []).filter(order => {
             const po = order.originalOrder || order;
-            return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+            return po.status !== 'Completed' && po.paymentStatus !== 'Paid' && po.paymentStatus !== 'Due';
           });
           setDeliveredCashOrders(deduplicateOrders(filtered));
         }
@@ -516,7 +516,7 @@ export function RidersApp() {
           // Filter out orders that have been marked as Paid (Completed) from Rider Book
           const filtered = (Array.isArray(data) ? data : []).filter(order => {
             const po = order.originalOrder || order;
-            return po.status !== 'Completed' && po.paymentStatus !== 'Paid';
+            return po.status !== 'Completed' && po.paymentStatus !== 'Paid' && po.paymentStatus !== 'Due';
           });
           setDeliveredOnlineOrders(deduplicateOrders(filtered));
         }
