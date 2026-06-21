@@ -4826,33 +4826,33 @@ function App() {
 
         {/* Mobile filters popup */}
         {showMobileRiderFilters && (
-          <div className="md:hidden fixed inset-0 z-50 flex items-start pt-12 justify-center bg-slate-950/80 p-4">
-            <div className="w-full max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+          <div className="md:hidden fixed inset-0 z-50 flex items-start pt-12 justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowMobileRiderFilters(false)}>
+            <div className="w-full max-h-[80vh] overflow-y-auto rounded-2xl border border-fuchsia-300/50 bg-white p-5 shadow-[0_0_40px_rgba(191,90,242,0.30)]" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
-                <div className="text-sm font-semibold text-white">Filters & Summary</div>
-                <button onClick={() => setShowMobileRiderFilters(false)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 hover:border-rose-500">Close</button>
+                <h3 className="text-lg font-extrabold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent">Filters & Summary</h3>
+                <button onClick={() => setShowMobileRiderFilters(false)} className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200">Close</button>
               </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-2">
                   <div
                     onClick={() => { openRiderBookSummaryModal('cash'); setShowMobileRiderFilters(false); }}
-                    className="cursor-pointer rounded-2xl border border-slate-800 bg-slate-950 p-3"
+                    className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 p-3 shadow-md shadow-emerald-200/50"
                   >
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Cash Summary</div>
-                    <div className="mt-2 text-lg font-semibold text-white">{Number(riderBookCashSummary.riderAmount).toLocaleString()} Rs</div>
-                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">Summary</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Cash Summary</div>
+                    <div className="mt-1 text-lg font-extrabold text-emerald-600">{Number(riderBookCashSummary.riderAmount).toLocaleString()} Rs</div>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">View Details</div>
                   </div>
                   <div
                     onClick={() => { openRiderBookSummaryModal('online'); setShowMobileRiderFilters(false); }}
-                    className="cursor-pointer rounded-2xl border border-slate-800 bg-slate-950 p-3"
+                    className="cursor-pointer rounded-xl border border-sky-200 bg-sky-50 p-3 shadow-md shadow-sky-200/50"
                   >
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Online Summary</div>
-                    <div className="mt-2 text-lg font-semibold text-white">{Number(riderBookOnlineSummary.riderAmount).toLocaleString()} Rs</div>
-                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white">Summary</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-sky-700">Online Summary</div>
+                    <div className="mt-1 text-lg font-extrabold text-sky-600">{Number(riderBookOnlineSummary.riderAmount).toLocaleString()} Rs</div>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">View Details</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">Difference</div>
-                    <div className="mt-2 text-lg font-semibold text-white">{Number(riderBookDifference).toLocaleString()} Rs</div>
+                  <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3 shadow-md shadow-fuchsia-200/50">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-fuchsia-700">Difference</div>
+                    <div className="mt-1 text-lg font-extrabold text-fuchsia-600">{Number(riderBookDifference).toLocaleString()} Rs</div>
                     {riderBookVisibleCashOnlineOrders.length > 0 && (
                       <button
                         onClick={async () => {
@@ -4865,7 +4865,7 @@ function App() {
                           setRiderBookSubTab('paid');
                           setShowMobileRiderFilters(false);
                         }}
-                        className="mt-2 w-full rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                        className="mt-2 w-full rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 px-3 py-2 text-xs font-semibold text-white shadow-md"
                       >
                         {riderBookDifference < 0 ? 'Pay to Rider' : 'Collect Amount from Rider'}
                       </button>
@@ -4880,7 +4880,7 @@ function App() {
                         setRiderBookMainTab(tab);
                         setRiderBookSubTab(tab === 'live' ? 'cash' : 'due');
                       }}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${riderBookMainTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${riderBookMainTab === tab ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md' : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
                     >
                       {tab === 'live' ? 'Live' : 'Sales'}
                     </button>
@@ -4891,7 +4891,7 @@ function App() {
                     <button
                       key={filter}
                       onClick={() => { setRiderBookDateFilter(filter); setRiderBookPageIndex(0); }}
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${riderBookDateFilter === filter ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${riderBookDateFilter === filter ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md' : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
                     >
                       {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'previous-5-days' ? 'Last 5 Days' : 'Custom'}
                     </button>
@@ -4899,9 +4899,9 @@ function App() {
                 </div>
                 {riderBookDateFilter === 'custom' && (
                   <div className="flex items-center gap-2">
-                    <input type="date" value={riderBookCustomDateFrom} onChange={(e) => { setRiderBookCustomDateFrom(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                    <input type="date" value={riderBookCustomDateFrom} onChange={(e) => { setRiderBookCustomDateFrom(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700" />
                     <span className="text-slate-400">to</span>
-                    <input type="date" value={riderBookCustomDateTo} onChange={(e) => { setRiderBookCustomDateTo(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200" />
+                    <input type="date" value={riderBookCustomDateTo} onChange={(e) => { setRiderBookCustomDateTo(e.target.value); setRiderBookPageIndex(0); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700" />
                   </div>
                 )}
               </div>
