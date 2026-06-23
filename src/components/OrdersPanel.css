@@ -1398,13 +1398,14 @@
 }
 
 .order-tile {
-  background: var(--op-white);
+  background: #ffffff;
   border: 1px solid var(--status-border);
   border-radius: var(--op-radius-md);
   padding: 0;
   overflow: hidden;
   transition: var(--op-transition);
   position: relative;
+  box-shadow: var(--op-shadow-sm);
 }
 
 .order-tile::before {
@@ -1418,9 +1419,10 @@
 }
 
 .order-tile:hover {
-  box-shadow: 0 8px 30px var(--status-glow);
-  transform: translateY(-3px);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 0 12px 40px var(--status-glow);
+  transform: translateY(-5px);
   border-color: var(--status-color);
+  filter: brightness(1.02);
 }
 
 .order-tile__header {
@@ -1863,12 +1865,15 @@
   border: 1px solid var(--op-border);
   border-radius: var(--op-radius-md);
   transition: var(--op-transition);
-  background: var(--op-white);
+  background: #ffffff;
+  box-shadow: var(--op-shadow-sm);
 }
 
 .rider-card:hover {
-  box-shadow: var(--op-shadow-md);
-  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8), var(--op-shadow-lg);
+  transform: translateY(-5px);
+  border-color: var(--op-accent);
+  filter: brightness(1.02);
 }
 
 .rider-card--active {
