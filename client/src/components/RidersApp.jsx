@@ -1926,7 +1926,7 @@ function OrderCard({ order, currency = 'PKR', onViewSlip, status, actions = [], 
   const deliveryFee = Number(original.deliveryCharge || original.deliveryFee || original.serviceCharge || 0);
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+    <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-white/20 hover:brightness-105">
       <div className="flex justify-between items-start mb-3">
         <div>
           <p className="text-lg font-bold text-gray-900">Order #{getDisplayOrderNumber(order)}</p>
