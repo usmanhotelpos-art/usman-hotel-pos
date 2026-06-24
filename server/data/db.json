@@ -109,6 +109,19 @@
       "address": "",
       "loginEnabled": true,
       "riderId": "rider1"
+    },
+    {
+      "id": "2fe83bcc-2a97-4606-94fe-d96974214d5a",
+      "createdAt": "2026-06-24T11:29:42.734Z",
+      "updatedAt": "2026-06-24T11:29:42.734Z",
+      "name": "Usman",
+      "username": "usman",
+      "password": "usman123",
+      "role": "Order Taker",
+      "loginEnabled": true,
+      "permissions": {
+        "order-taker-app": true
+      }
     }
   ],
   "sales": [

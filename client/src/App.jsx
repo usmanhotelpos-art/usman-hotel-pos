@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import { Lock, Bluetooth, BluetoothConnected, RefreshCw } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
+import { OrderTakerApp } from './components/OrderTakerApp';
 import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from './utils/escpos.js';
 import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter, disconnectDevice } from './utils/btPrint.js';
 import { showOrderNotification, requestNotificationPermission, resetNotificationCount, isNotificationSupported, getNotificationPermission } from './utils/notifications.js';
@@ -15,7 +16,7 @@ function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
   const isHelperRoute = initialPath.startsWith('/helper');
-  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'restore', 'settings'];
+  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'order-taker-app', 'restore', 'settings'];
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
     try {
@@ -753,6 +754,7 @@ function App() {
   const defaultTabLabels = {
     'rider-book': 'Rider Book',
     'rider-order-requests': 'Rider Order Requests',
+    'order-taker-app': 'Order Taker App',
     restore: 'Restore',
     settings: 'Settings'
   };
@@ -767,6 +769,7 @@ function App() {
     orders: '🧾',
     'rider-book': '🚴',
     'rider-order-requests': '📋',
+    'order-taker-app': '📋',
     restore: '♻️',
     settings: '⚙️'
   };
@@ -888,6 +891,7 @@ function App() {
     if (!cleanName) return 'dashboard';
     if (cleanName.includes('admin')) return 'dashboard';
     if (cleanName === 'cashier') return canAccessTab('pos') ? 'pos' : tabs.find((tab) => canAccessTab(tab));
+    if (cleanName === 'order taker') return canAccessTab('order-taker-app') ? 'order-taker-app' : tabs.find((tab) => canAccessTab(tab));
     if (canAccessTab('dashboard')) return 'dashboard';
     if (canAccessTab('pos')) return 'pos';
     return tabs.find((tab) => canAccessTab(tab)) || 'dashboard';
@@ -1140,7 +1144,8 @@ function App() {
     { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
     { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'rider-book': true, 'rider-order-requests': true, settings: false, login: true } },
     { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
-    { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } }
+    { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
+    { name: 'Order Taker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'order-taker-app': true, 'rider-book': false, 'rider-order-requests': false, settings: false, login: true } }
   ];
   const [roles, setRoles] = useState(() => {
     if (typeof window === 'undefined') return defaultRoles;
@@ -1338,6 +1343,8 @@ function App() {
         return 'Customer Management';
       case 'riders-app':
         return 'Riders App';
+      case 'order-taker-app':
+        return 'Order Taker App';
       case 'settings':
         return 'Hotel Settings';
       case 'rider-book':
@@ -1509,6 +1516,8 @@ function App() {
         await loadStaffMembers();
       } else if (tab === 'riders-app') {
         // Riders App is a self-contained component and does not need generic tab data loading.
+      } else if (tab === 'order-taker-app') {
+        // Order Taker App is a self-contained component and does not need generic tab data loading.
       } else if (tab === 'pos') {
         await loadPosData();
       } else if (tab === 'customers') {
@@ -12484,6 +12493,7 @@ function App() {
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'restore' && renderRestore()}
             {activeTab === 'riders-app' && <RidersApp />}
+            {activeTab === 'order-taker-app' && <OrderTakerApp />}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'rider-book' && renderRiderBook()}

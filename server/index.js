@@ -4,7 +4,7 @@
 import express from 'express';
 import cors from 'cors';
 import { router } from './routes.js';
-import { initDatabase, readDb } from './db.js';
+import { initDatabase, readDb, getCollection, createRecord } from './db.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { join } from 'path';
@@ -33,6 +33,23 @@ app.use((err, req, res, next) => {
 try {
   await initDatabase();
   readDb();
+
+  // Seed default Order Taker staff member if none exists
+  const staffMembers = getCollection('staff') || [];
+  const orderTakerExists = staffMembers.some(
+    (s) => (s.role || '').toString().trim() === 'Order Taker' && (s.username || '').toString() === 'usman'
+  );
+  if (!orderTakerExists) {
+    createRecord('staff', {
+      name: 'Usman',
+      username: 'usman',
+      password: 'usman123',
+      role: 'Order Taker',
+      loginEnabled: true,
+      permissions: { 'order-taker-app': true },
+    });
+    console.log('Default Order Taker staff created: usman / usman123');
+  }
 } catch (startupError) {
   console.error('Failed to initialize database on startup:', startupError);
   process.exit(1);
