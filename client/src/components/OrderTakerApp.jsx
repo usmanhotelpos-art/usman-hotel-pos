@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 
-const API = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:4000/api` : '/api';
+const API = '/api';
 
 function fetchJson(url, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };

@@ -58,6 +58,11 @@ try {
 // Serve static frontend files
 app.use(express.static(join(__dirname, '../client/dist')));
 
+// Direct route for Order Taker App
+app.get('/order-taker', (req, res) => {
+  res.sendFile(join(__dirname, '../client/dist/index.html'));
+});
+
 // SPA fallback - serve index.html for all other routes
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../client/dist/index.html'));
