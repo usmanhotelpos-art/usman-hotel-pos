@@ -4896,14 +4896,22 @@ function App() {
         </div>
         {riderBookSelectedOrders.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4 p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-200 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
-            <button onClick={markRiderCash} className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:shadow-[0_0_12px_rgba(16,185,129,0.2)] hover:border-emerald-400">Mark Cash</button>
-            <button onClick={markRiderOnline} className="rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:shadow-[0_0_12px_rgba(14,165,233,0.2)] hover:border-sky-400">Mark Online</button>
-            <button onClick={markRiderPaid} className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:shadow-[0_0_12px_rgba(16,185,129,0.2)] hover:border-emerald-400">Mark Paid</button>
-            <button onClick={markCustomerPending} className="rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition hover:shadow-[0_0_12px_rgba(251,191,36,0.2)] hover:border-amber-400">Mark Pending Due</button>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 w-full mb-2">
+              <span>Selected: <strong>{riderBookSelectedOrders.length}</strong></span>
+              <span>Extras: <strong className="text-amber-600">{displayTotals.extras} Rs</strong></span>
+              <span>Delivery Charges: <strong className="text-emerald-600">{displayTotals.serviceType} Rs</strong></span>
+              <span>Rider Amount: <strong className="text-cyan-600">{displayTotals.excluded} Rs</strong></span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={markRiderCash} className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:shadow-[0_0_12px_rgba(16,185,129,0.2)] hover:border-emerald-400">Mark Cash</button>
+              <button onClick={markRiderOnline} className="rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:shadow-[0_0_12px_rgba(14,165,233,0.2)] hover:border-sky-400">Mark Online</button>
+              <button onClick={markRiderPaid} className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:shadow-[0_0_12px_rgba(16,185,129,0.2)] hover:border-emerald-400">Mark Paid</button>
+              <button onClick={markCustomerPending} className="rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition hover:shadow-[0_0_12px_rgba(251,191,36,0.2)] hover:border-amber-400">Mark Pending Due</button>
+            </div>
           </div>
         )}
         <div className="rounded-[32px] border border-slate-200 bg-white p-4 shadow-[0_0_30px_rgba(16,185,129,0.08)] overflow-x-auto">
-          <div className="hidden md:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 text-[10px] uppercase tracking-[0.24em] text-slate-500 border-b border-slate-200 pb-3 mb-3">
+          <div className="hidden md:grid grid-cols-[40px_1.2fr_1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 text-[10px] uppercase tracking-[0.24em] text-slate-500 border-b border-slate-200 pb-3 mb-3">
             <span></span>
             <span>Order #</span>
             <span>Delivery Address</span>
@@ -4911,6 +4919,7 @@ function App() {
             <span>Service Type</span>
             <span>Products</span>
             <span>Total</span>
+            <span>Del. Charge</span>
             <span>Rider</span>
             <span>Payment</span>
             <span>Date</span>
@@ -4928,7 +4937,7 @@ function App() {
               return (
                 <div key={order.id}>
                   {/* Desktop order row */}
-                  <div className="hidden md:grid grid-cols-[40px_2.7fr_1fr_1.2fr_1.2fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 rounded-3xl border border-slate-200 bg-white p-3 text-xs text-slate-700 items-center transition hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-300">
+                  <div className="hidden md:grid grid-cols-[40px_2.7fr_1fr_1.2fr_1.2fr_1fr_1fr_1fr_1.2fr_1.2fr_1.5fr] gap-3 rounded-3xl border border-slate-200 bg-white p-3 text-xs text-slate-700 items-center transition hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-300">
                     <input type="checkbox" checked={isSelected} onChange={() => toggleRiderBookOrderSelection(order.id)} className="h-4 w-4 rounded border-slate-300 bg-white text-emerald-600 focus:ring-emerald-500" />
                     <div className="min-w-0">
                       <div className="font-bold text-emerald-400 text-[13px] leading-tight truncate">{order.address || 'No address'}</div>
@@ -4938,6 +4947,7 @@ function App() {
                     <div className="text-[11px] text-slate-600">{order.serviceType || '-'}</div>
                     <div className="text-[11px] text-slate-600">{itemCount} item{itemCount !== 1 ? 's' : ''}</div>
                     <div className="font-semibold text-gray-900">{Number(order.total || order.amount || 0)} Rs</div>
+                    <div className="font-semibold text-emerald-600 text-[11px]">{Number(order.deliveryFee || order.deliveryCharge || 0)} Rs</div>
                     <div className="text-[11px] text-slate-600">{order.deliveryAgent || '-'}</div>
                     <div className="px-2 py-2">
                       <div className={`inline-flex items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold ${isPaidStatus ? 'border-emerald-500 bg-emerald-100 text-emerald-700' : isDueStatus ? 'border-rose-500 bg-rose-100 text-rose-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}>
@@ -5032,6 +5042,8 @@ function App() {
                           <span className="text-[11px] text-slate-500">{order.deliveryAgent || '-'}</span>
                           <span className="text-slate-300">|</span>
                           <span className="text-[11px] text-slate-500">{order.serviceType || '-'}</span>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-[11px] font-semibold text-emerald-600">Del: {Number(order.deliveryFee || order.deliveryCharge || 0)} Rs</span>
                           <span className="text-slate-300">|</span>
                           <span className="text-[11px] text-slate-500">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
                         </div>
@@ -7041,6 +7053,10 @@ function App() {
                                       <span className="text-[11px] text-slate-300"><span className="text-slate-400">Rider:</span> {order.deliveryAgent || 'Unassigned'}</span>
                                       <span className="text-[11px] font-bold text-amber-300" style={{textShadow: '0 0 6px rgba(245,158,11,0.4)'}}>{order.serviceType || 'Standard'}</span>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] text-slate-400">Delivery Charge:</span>
+                                      <span className="text-[11px] font-bold text-emerald-400">{Number(order.deliveryFee || order.deliveryCharge || 0)} PKR</span>
+                                    </div>
                                   </div>
                                 )}
                                 <div className="text-xs font-bold text-slate-200 leading-tight line-clamp-2 mb-1" style={{textShadow: '0 0 6px rgba(255,255,255,0.15)'}}>
@@ -7054,6 +7070,7 @@ function App() {
                                 </div>
                                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={async (e) => { e.stopPropagation(); setShowDueOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setShowDueOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
                                   <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
                                   <button onClick={(e) => { e.stopPropagation(); requestDeleteOrder(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Delete</button>
                                 </div>
@@ -7186,6 +7203,10 @@ function App() {
                                   <span className="text-[11px] text-slate-300"><span className="text-slate-400">Rider:</span> {order.deliveryAgent || 'Unassigned'}</span>
                                   <span className="text-[11px] font-bold text-amber-300" style={{textShadow: '0 0 6px rgba(245,158,11,0.4)'}}>{order.serviceType || 'Standard'}</span>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-slate-400">Delivery Charge:</span>
+                                  <span className="text-[11px] font-bold text-emerald-400">{Number(order.deliveryFee || order.deliveryCharge || 0)} PKR</span>
+                                </div>
                               </div>
                             )}
                             <div className="text-xs font-bold text-slate-200 leading-tight line-clamp-2 mb-1" style={{textShadow: '0 0 6px rgba(255,255,255,0.15)'}}>
@@ -7198,14 +7219,11 @@ function App() {
                               <span className="text-xs text-amber-400 font-bold" style={{textShadow: '0 0 8px rgba(245,158,11,0.6)'}}>LATE</span>
                             </div>
                             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                              {type === 'Delivery' ? (
-                                <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); openRiderAssignmentModal(order); }} className="flex-1 rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-purple-500 active:scale-95">Assign Rider</button>
-                              ) : (
-                                <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
-                              )}
+                              <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
+                              <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
                               <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
-                              {type !== 'Delivery' && (
-                                <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Due</button>
+                              {type === 'Delivery' && (
+                                <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); openRiderAssignmentModal(order); }} className="flex-[0.5] rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-purple-500 active:scale-95">Rider</button>
                               )}
                               <button onClick={(e) => { e.stopPropagation(); requestDeleteOrder(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Delete</button>
                             </div>
@@ -7319,6 +7337,10 @@ function App() {
                                     <span className="text-[11px] text-slate-300"><span className="text-slate-400">Rider:</span> {order.deliveryAgent || 'Unassigned'}</span>
                                     <span className="text-[11px] font-bold text-amber-300" style={{textShadow: '0 0 6px rgba(245,158,11,0.4)'}}>{order.serviceType || 'Standard'}</span>
                                   </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-slate-400">Delivery Charge:</span>
+                                    <span className="text-[11px] font-bold text-emerald-400">{Number(order.deliveryFee || order.deliveryCharge || 0)} PKR</span>
+                                  </div>
                                 </div>
                               )}
                               {type !== 'Delivery' && (
@@ -7349,15 +7371,13 @@ function App() {
                                   );
                                 })()}
                               </div>
-                              {(type === 'Takeaway' || type === 'Dine-In') && !['Payment Collected', 'Completed'].includes(order.status) && (
+                              {!['Payment Collected', 'Completed'].includes(order.status) && (
                                 <div className="mt-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={async (e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); await confirmMarkPaid(order); }} className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
                                   <button onClick={(e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); confirmMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
-                                </div>
-                              )}
-                              {type === 'Delivery' && !order.deliveryAgent && (
-                                <div className="mt-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                  <button onClick={() => { openRiderAssignmentModal(order); setShowMobileOrdersPopup(false); }} className="rounded-full bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-500">Assign Rider</button>
+                                  {type === 'Delivery' && !order.deliveryAgent && (
+                                    <button onClick={() => { openRiderAssignmentModal(order); setShowMobileOrdersPopup(false); }} className="rounded-full bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-500">Rider</button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -9868,6 +9888,7 @@ function App() {
                     <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Service type</th>
                     <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Products</th>
                     <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Total</th>
+                    <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Del. Charge</th>
                     <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Rider</th>
                     <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Payment</th>
                     <th className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">Date</th>
@@ -9898,6 +9919,7 @@ function App() {
                         </div>
                       </td>
                       <td className="px-2 py-2 font-semibold text-white text-xs">{order.total || order.amount || 0} Rs</td>
+                      <td className="px-2 py-2 font-semibold text-emerald-400 text-xs">{Number(order.deliveryFee || order.deliveryCharge || 0)} Rs</td>
                       <td className="px-2 py-2 text-slate-300 text-xs">{order.deliveryAgent || 'Unassigned'}</td>
                       <td className="px-2 py-2">
                         <div className="inline-flex items-center gap-0.5 rounded-xl border border-slate-700 bg-slate-950 px-1.5 py-0.5 text-[10px] font-medium text-slate-200 group">
@@ -9996,6 +10018,10 @@ function App() {
                           <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Total</p>
                           <div className="mt-2 text-sm font-semibold text-white">{order.total || order.amount || 0} Rs</div>
                         </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Del. Charge</p>
+                          <div className="mt-2 text-sm font-semibold text-emerald-400">{Number(order.deliveryFee || order.deliveryCharge || 0)} Rs</div>
+                        </div>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
@@ -10090,6 +10116,8 @@ function App() {
                         <span className="text-[11px] text-slate-400">{order.deliveryAgent || '-'}</span>
                         <span className="text-slate-600">|</span>
                         <span className="text-xs font-bold text-amber-400">{order.serviceType || '-'}</span>
+                        <span className="text-slate-600">|</span>
+                        <span className="text-[11px] font-bold text-emerald-400">Del: {Number(order.deliveryFee || order.deliveryCharge || 0)} Rs</span>
                         <span className="text-slate-600">|</span>
                         <span className="text-[11px] text-slate-400">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
                       </div>
@@ -12905,6 +12933,12 @@ function App() {
                     </div>
                   ))}
                 </div>
+                {quickOrderDetail.orderType === 'Delivery' && (
+                  <div className="flex items-center justify-between pt-1 mb-2">
+                    <span className="text-[10px] text-slate-400">Delivery Charge</span>
+                    <span className="text-xs font-bold text-emerald-600">{Number(quickOrderDetail.deliveryFee || quickOrderDetail.deliveryCharge || 0)} PKR</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-200 mb-3">
                   <span className="text-[10px] text-slate-400">Total</span>
                   <span className="text-sm font-bold text-slate-800">{quickOrderDetail.total || quickOrderDetail.amount || 0} PKR</span>
