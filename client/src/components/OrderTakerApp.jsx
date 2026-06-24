@@ -15,7 +15,7 @@ function fetchJson(url, opts = {}) {
 export function OrderTakerApp() {
   const [token, setToken] = useState('');
   const [orderTaker, setOrderTaker] = useState(null);
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -236,10 +236,10 @@ export function OrderTakerApp() {
             <p className="text-sm text-slate-400 mt-1">Login to start taking orders</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input type="text" value={loginForm.username} onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })} placeholder="Username" className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" required />
+            <input type="text" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="Username" className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" required />
             <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="Password" className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" required />
             {message && <p className="text-xs text-rose-400 text-center">{message}</p>}
-            <button type="submit" disabled={loading || !loginForm.username || !loginForm.password} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
+            <button type="submit" disabled={loading || !loginForm.email || !loginForm.password} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>

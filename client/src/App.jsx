@@ -15,6 +15,7 @@ const apiBase = envApiBase
 function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
+  const initialTabFromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
   const isHelperRoute = initialPath.startsWith('/helper');
   const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'order-taker-app', 'restore', 'settings'];
   const [tabs, setTabs] = useState(() => {
@@ -30,7 +31,7 @@ function App() {
       return defaultTabs;
     }
   });
-  const [activeTab, setActiveTab] = useState(isMobileRiderRoute ? 'riders-app' : isHelperRoute ? 'pos' : 'dashboard');
+  const [activeTab, setActiveTab] = useState(initialTabFromUrl ? initialTabFromUrl : isMobileRiderRoute ? 'riders-app' : isHelperRoute ? 'pos' : 'dashboard');
   const [isMobile, setIsMobile] = useState(false);
   const [helperRouteVisited, setHelperRouteVisited] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -8735,6 +8736,18 @@ function App() {
             </span>
           </div>
         </div>
+
+        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>📋 Order Taker App</h3>
+          <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Direct link for Order Takers to take orders.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/?tab=order-taker-app`} className={`flex-1 min-w-[200px] rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
+            <button onClick={() => { const link = `${window.location.origin}/?tab=order-taker-app`; navigator.clipboard.writeText(link); setMessage('Order Taker link copied'); }} className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-500 active:scale-95 transition-all">
+              Copy Link
+            </button>
+          </div>
+        </div>
+
         {/* Reset Orders Data */}
         <div className="mt-8 border-t border-red-800/40 pt-6">
           <h3 className={`text-lg font-semibold text-red-400`}>Danger Zone</h3>
