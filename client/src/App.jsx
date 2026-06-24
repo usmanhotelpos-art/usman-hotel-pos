@@ -20,10 +20,10 @@ function App() {
     if (typeof window === 'undefined') return defaultTabs;
     try {
       const saved = window.localStorage.getItem('posTabs');
-      const base = saved ? JSON.parse(saved) : defaultTabs;
+      const base = saved ? JSON.parse(saved) : [...defaultTabs];
       if (!base.includes('restore')) base.push('restore');
       if (!base.includes('settings')) base.push('settings');
-      return base;
+      return base.filter(t => t !== 'qr-catalogue');
     } catch {
       return defaultTabs;
     }
