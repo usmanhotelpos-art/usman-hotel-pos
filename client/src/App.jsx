@@ -24,6 +24,7 @@ function App() {
       const base = saved ? JSON.parse(saved) : [...defaultTabs];
       if (!base.includes('restore')) base.push('restore');
       if (!base.includes('settings')) base.push('settings');
+      if (!base.includes('order-taker-app')) base.push('order-taker-app');
       return base.filter(t => t !== 'qr-catalogue');
     } catch {
       return defaultTabs;
@@ -779,6 +780,7 @@ function App() {
       const saved = window.localStorage.getItem('posTabIcons');
       const base = saved ? JSON.parse(saved) : defaultTabIcons;
       if (!base.restore) base.restore = '♻️';
+      if (!base['order-taker-app']) base['order-taker-app'] = '📋';
       return base;
     } catch {
       return defaultTabIcons;
@@ -790,6 +792,7 @@ function App() {
       const saved = window.localStorage.getItem('posTabLabels');
       const base = saved ? JSON.parse(saved) : defaultTabLabels;
       if (!base.restore) base.restore = 'Restore';
+      if (!base['order-taker-app']) base['order-taker-app'] = 'Order Taker App';
       return base;
     } catch {
       return defaultTabLabels;
