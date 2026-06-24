@@ -15,14 +15,13 @@ function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
   const isHelperRoute = initialPath.startsWith('/helper');
-  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'qr-catalogue', 'customers', 'riders-app', 'restore', 'settings'];
+  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'restore', 'settings'];
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
     try {
       const saved = window.localStorage.getItem('posTabs');
       const base = saved ? JSON.parse(saved) : defaultTabs;
       if (!base.includes('restore')) base.push('restore');
-      if (!base.includes('qr-catalogue')) base.push('qr-catalogue');
       if (!base.includes('settings')) base.push('settings');
       return base;
     } catch {
@@ -752,7 +751,6 @@ function App() {
     }
   }, [settings.btPrintEnabled, settings.catalogueLayout, settings.catalogueHost, settings.cataloguePath, settings.catalogueAssignedCategories, settings.catalogueAssignedProducts]);
   const defaultTabLabels = {
-    'qr-catalogue': 'QR Catalogue',
     'rider-book': 'Rider Book',
     'rider-order-requests': 'Rider Order Requests',
     restore: 'Restore',
@@ -765,7 +763,6 @@ function App() {
     staff: '👤',
     sales: '💰',
     pos: '🛒',
-    'qr-catalogue': '📱',
     customers: '👥',
     orders: '🧾',
     'rider-book': '🚴',
@@ -879,7 +876,7 @@ function App() {
     if (!user) return false;
     const roleName = (user.role || '').toString().trim();
     if (!roleName) return false;
-    if (tab === 'settings' || tab === 'qr-catalogue') return true;
+    if (tab === 'settings') return true;
     if (roleName.toLowerCase().includes('admin')) return true;
     const roleObj = roles.find((r) => (r.name || '').toString().trim().toLowerCase() === roleName.toLowerCase());
     if (!roleObj) return false;
@@ -1343,8 +1340,6 @@ function App() {
         return 'Riders App';
       case 'settings':
         return 'Hotel Settings';
-      case 'qr-catalogue':
-        return 'QR Catalogue';
       case 'rider-book':
         return 'Rider Book';
       default:
@@ -1514,7 +1509,7 @@ function App() {
         await loadStaffMembers();
       } else if (tab === 'riders-app') {
         // Riders App is a self-contained component and does not need generic tab data loading.
-      } else if (tab === 'pos' || tab === 'qr-catalogue') {
+      } else if (tab === 'pos') {
         await loadPosData();
       } else if (tab === 'customers') {
         await loadCustomers();
@@ -8903,204 +8898,6 @@ function App() {
     }
   }
 
-  function renderCatalogueQrModule() {
-    const catalogueUrl = getCatalogueUrl();
-    const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(catalogueUrl)}`;
-
-    return (
-      <div className="space-y-6">
-        <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-          <div className="flex flex-wrap items-center gap-3">
-            {['qr', 'layout'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setCatalogueQrSubTab(tab)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${catalogueQrSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-              >
-                {tab === 'qr' ? 'QR Code' : 'Layout & Products'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {catalogueQrSubTab === 'qr' ? (
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_0.9fr]">
-            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>QR Code</p>
-              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Scan to open menu</h3>
-              <p className={`mt-3 text-sm leading-6 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Customers scan this QR to browse products and order online.</p>
-              <div className="mt-6 rounded-[32px] border border-slate-800 bg-slate-900 p-6 text-center">
-                <img src={qrImageSrc} alt="Catalogue QR" className="mx-auto h-56 w-56 rounded-3xl border border-slate-700 bg-white p-2" />
-                <div className="mt-4 text-sm text-slate-300">Share or print this QR for tabletop display.</div>
-              </div>
-              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-                <div className="font-semibold text-slate-100">Host</div>
-                <input value={catalogueHost} onChange={(e) => setCatalogueHost(e.target.value)}
-                  placeholder="e.g. 192.168.1.20:5173"
-                  className="mt-3 w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
-                <div className="mt-3 text-xs text-slate-400">Use your network IP or domain so phone scans open correctly.</div>
-              </div>
-              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-                <div className="font-semibold text-slate-100">Path</div>
-                <input value={cataloguePath} onChange={(e) => setCataloguePath(e.target.value)}
-                  placeholder="menu"
-                  className="mt-3 w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
-                <div className="mt-3 text-xs text-slate-400">URL path for the catalogue page.</div>
-              </div>
-              <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-                <div className="font-semibold text-slate-100">Catalogue URL</div>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                  <input readOnly value={catalogueUrl}
-                    className="min-w-0 flex-1 rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
-                  <button onClick={() => navigator.clipboard.writeText(catalogueUrl)}
-                    className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500">
-                    Copy
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Quick actions</p>
-              <div className="mt-5 grid gap-4">
-                <div className="rounded-3xl border border-slate-200/10 bg-slate-900 p-4">
-                  <div className="text-sm text-slate-400">Save layout settings before printing QR.</div>
-                </div>
-                <div className="rounded-3xl border border-slate-200/10 bg-slate-900 p-4">
-                  <div className="text-sm text-slate-400">Use the Layout tab to customise which products appear.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
-            <p className={`text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Layout settings</p>
-              <h3 className={`mt-2 text-2xl font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>Catalogue page settings</h3>
-              <div className="mt-6 grid gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400">Page title</label>
-                  <input value={catalogueLayout.pageTitle}
-                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, pageTitle: e.target.value }))}
-                    className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400">Description</label>
-                  <textarea value={catalogueLayout.pageDescription}
-                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, pageDescription: e.target.value }))}
-                    rows={3}
-                    className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm text-slate-400">Theme</label>
-                    <select value={catalogueLayout.theme}
-                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, theme: e.target.value }))}
-                      className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                      <option value="light">Light</option>
-                      <option value="dark">Dark</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400">Columns</label>
-                    <select value={catalogueLayout.columns}
-                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, columns: Number(e.target.value) }))}
-                      className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                      {[2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3">
-                    <input type="checkbox" checked={catalogueLayout.showPrices}
-                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, showPrices: e.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
-                    <span className="text-sm text-slate-200">Show prices</span>
-                  </label>
-                  <label className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3">
-                    <input type="checkbox" checked={catalogueLayout.showCategories}
-                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, showCategories: e.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500" />
-                    <span className="text-sm text-slate-200">Show categories</span>
-                  </label>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400">Accent color</label>
-                  <input type="color" value={catalogueLayout.accentColor}
-                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, accentColor: e.target.value }))}
-                    className="mt-2 h-12 w-full rounded-3xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400">Layout style</label>
-                  <select value={catalogueLayout.layoutStyle}
-                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, layoutStyle: e.target.value }))}
-                    className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
-                    <option value="grid">Grid</option>
-                    <option value="list">List</option>
-                  </select>
-                </div>
-                <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
-                  <div className="text-sm uppercase tracking-[0.2em] text-slate-400">Assign categories</div>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {posCategories.map((category) => {
-                      const assigned = catalogueAssignedCategories.includes(category.name);
-                      return (
-                        <button key={category.id || category.name}
-                          onClick={() => toggleAssignedCategory(category.name)}
-                          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${assigned ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-                          {category.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 text-xs text-slate-400">Click a category to add/remove it from the catalogue, then open it to choose products.</div>
-                </div>
-                {catalogueAssignCategory ? (
-                  <div className="rounded-3xl border border-slate-700 bg-slate-950 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm uppercase tracking-[0.2em] text-slate-400">Products in {catalogueAssignCategory}</div>
-                        <div className="mt-2 text-lg font-semibold text-white">{catalogueAssignCategory}</div>
-                      </div>
-                      <button onClick={() => setCatalogueAssignCategory('')}
-                        className="rounded-full border border-slate-600 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Close</button>
-                    </div>
-                    <div className="mt-4">
-                      <input value={catalogueAssignSearch}
-                        onChange={(e) => setCatalogueAssignSearch(e.target.value)}
-                        placeholder="Search products..."
-                        className="w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none" />
-                    </div>
-                    <div className="mt-4 grid gap-3 max-h-[320px] overflow-y-auto">
-                      {posProducts.filter((p) => p.category === catalogueAssignCategory && (!catalogueAssignSearch || (p.name || '').toLowerCase().includes(catalogueAssignSearch.toLowerCase()))).map((product) => {
-                        const checked = (catalogueAssignedProducts[catalogueAssignCategory] || []).includes(product.id);
-                        return (
-                          <label key={product.id} className="flex items-center gap-3 rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3">
-                            <input type="checkbox" checked={checked}
-                              onChange={() => toggleAssignedProduct(catalogueAssignCategory, product.id)}
-                              className="h-5 w-5 rounded border-slate-600 bg-slate-900 text-emerald-500" />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-semibold text-white">{product.name}</div>
-                              <div className="truncate text-xs text-slate-500">{product.price} PKR</div>
-                            </div>
-                          </label>
-                        );
-                      })}
-                      {!posProducts.some((p) => p.category === catalogueAssignCategory) && (
-                        <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950 p-4 text-sm text-slate-400">No products in this category.</div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-                <button onClick={saveCatalogueLayoutSettings}
-                  className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 transition">
-                  Save layout settings
-                </button>
-              </div>
-            </div>
-        )}
-      </div>
-    );
-  }
-
   function renderCustomerCataloguePage() {
     const filteredProducts = getCatalogueFilteredProducts();
     const summary = getCatalogueCartSummary();
@@ -12627,7 +12424,6 @@ function App() {
             )}
 
             {activeTab === 'pos' && renderPos()}
-            {activeTab === 'qr-catalogue' && renderCatalogueQrModule()}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'restore' && renderRestore()}
             {activeTab === 'riders-app' && <RidersApp />}
