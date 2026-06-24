@@ -3447,6 +3447,34 @@ function App() {
     setMarkDueMethod(order.paymentMethod || 'Cash');
   }
 
+  async function quickMarkDue(order) {
+    setLoading(true);
+    setMessage('');
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'Payment Pending', paymentStatus: 'Due', tableNumber: order.tableNumber || '' })
+      });
+      const tableLabel = order.tableNumber;
+      if (tableLabel) {
+        const table = posTables.find((item) => item.label === tableLabel || item.name === tableLabel || item.number === tableLabel);
+        if (table) {
+          await fetchJson(`${apiBase}/pos/tables/${table.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'available' })
+          });
+        }
+      }
+      setMessage('Order marked as Due.');
+      await loadOrdersData();
+      await loadPosData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleMarkPaid() {
     if (!markPaidOrder) return;
     setLoading(true);
@@ -7070,7 +7098,7 @@ function App() {
                                 </div>
                                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={async (e) => { e.stopPropagation(); setShowDueOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
-                                  <button onClick={(e) => { e.stopPropagation(); setShowDueOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
+                                  <button onClick={async (e) => { e.stopPropagation(); setShowDueOrdersPanel(false); await quickMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
                                   <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
                                   <button onClick={(e) => { e.stopPropagation(); requestDeleteOrder(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Delete</button>
                                 </div>
@@ -7220,7 +7248,7 @@ function App() {
                             </div>
                             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                               <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await confirmMarkPaid(order); }} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
-                              <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); confirmMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
+                              <button onClick={async (e) => { e.stopPropagation(); setShowLateOrdersPanel(false); await quickMarkDue(order); }} className="flex-[0.5] rounded-lg bg-rose-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
                               <button onClick={(e) => { e.stopPropagation(); printReceipt(order); }} className="flex-[0.5] rounded-lg bg-violet-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-500 active:scale-95">Print</button>
                               {type === 'Delivery' && (
                                 <button onClick={(e) => { e.stopPropagation(); setShowLateOrdersPanel(false); openRiderAssignmentModal(order); }} className="flex-[0.5] rounded-lg bg-purple-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-purple-500 active:scale-95">Rider</button>
@@ -7374,7 +7402,7 @@ function App() {
                               {!['Payment Collected', 'Completed'].includes(order.status) && (
                                 <div className="mt-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={async (e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); await confirmMarkPaid(order); }} className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
-                                  <button onClick={(e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); confirmMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
+                                  <button onClick={async (e) => { e.stopPropagation(); setShowMobileOrdersPopup(false); await quickMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
                                   {type === 'Delivery' && !order.deliveryAgent && (
                                     <button onClick={() => { openRiderAssignmentModal(order); setShowMobileOrdersPopup(false); }} className="rounded-full bg-purple-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-purple-500">Rider</button>
                                   )}
@@ -12890,7 +12918,7 @@ function App() {
                             {(type === 'Takeaway' || type === 'Dine-In') && !['Payment Collected', 'Completed'].includes(order.status) && (
                               <div className="flex gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
                                 <button onClick={async (e) => { e.stopPropagation(); setShowQuickOrdersPopup(false); await confirmMarkPaid(order); }} className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-500 active:scale-95">Mark Paid</button>
-                                <button onClick={(e) => { e.stopPropagation(); setShowQuickOrdersPopup(false); confirmMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
+                                 <button onClick={async (e) => { e.stopPropagation(); setShowQuickOrdersPopup(false); await quickMarkDue(order); }} className="rounded-full bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-rose-500 active:scale-95">Mark Due</button>
                               </div>
                             )}
                             {type === 'Delivery' && !order.deliveryAgent && (
