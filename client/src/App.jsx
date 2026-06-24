@@ -3397,14 +3397,26 @@ function App() {
     setMessage('');
     try {
       const tableLabel = order.tableNumber;
+      const updatedFields = {
+        status: 'Payment Collected',
+        paymentStatus: 'Paid',
+        items: order.items || [],
+        customerName: order.customerName || '',
+        phone: order.phone || '',
+        address: order.address || '',
+        tableNumber: order.tableNumber || '',
+        deliveryAgent: order.deliveryAgent || '',
+        serviceType: order.serviceType || '',
+        deliveryFee: order.deliveryFee || 0,
+        discount: order.discount || 0,
+        taxPercent: order.taxPercent || 0,
+        serviceCharge: order.serviceCharge || 0,
+        paymentMethod: order.paymentMethod || 'Cash',
+        notes: order.notes || ''
+      };
       await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
         method: 'PUT',
-        body: JSON.stringify({
-          status: 'Payment Collected',
-          items: order.items || [],
-          customerName: order.customerName || '',
-          tableNumber: order.tableNumber || ''
-        })
+        body: JSON.stringify(updatedFields)
       });
       const amount = Number(order.total || order.amount || 0);
       if (amount) {
@@ -3453,7 +3465,23 @@ function App() {
     try {
       await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ status: 'Payment Pending', paymentStatus: 'Due', tableNumber: order.tableNumber || '' })
+        body: JSON.stringify({
+          status: 'Payment Pending',
+          paymentStatus: 'Due',
+          tableNumber: order.tableNumber || '',
+          items: order.items || [],
+          customerName: order.customerName || '',
+          phone: order.phone || '',
+          address: order.address || '',
+          deliveryAgent: order.deliveryAgent || '',
+          serviceType: order.serviceType || '',
+          deliveryFee: order.deliveryFee || 0,
+          discount: order.discount || 0,
+          taxPercent: order.taxPercent || 0,
+          serviceCharge: order.serviceCharge || 0,
+          paymentMethod: order.paymentMethod || 'Cash',
+          notes: order.notes || ''
+        })
       });
       const tableLabel = order.tableNumber;
       if (tableLabel) {
@@ -3485,9 +3513,20 @@ function App() {
         method: 'PUT',
         body: JSON.stringify({
           status: 'Payment Collected',
+          paymentStatus: 'Paid',
           items: markPaidOrder.items || [],
           customerName: markPaidOrder.customerName || '',
-          tableNumber: markPaidOrder.tableNumber || ''
+          phone: markPaidOrder.phone || '',
+          address: markPaidOrder.address || '',
+          tableNumber: markPaidOrder.tableNumber || '',
+          deliveryAgent: markPaidOrder.deliveryAgent || '',
+          serviceType: markPaidOrder.serviceType || '',
+          deliveryFee: markPaidOrder.deliveryFee || 0,
+          discount: markPaidOrder.discount || 0,
+          taxPercent: markPaidOrder.taxPercent || 0,
+          serviceCharge: markPaidOrder.serviceCharge || 0,
+          paymentMethod: markPaidMethod,
+          notes: markPaidOrder.notes || ''
         })
       });
       if (markPaidAmount) {
@@ -3534,7 +3573,23 @@ function App() {
       // Update order: set to Payment Pending / Due and clear tableNumber so table becomes free
       await fetchJson(`${apiBase}/pos/orders/${markDueOrder.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ status: 'Payment Pending', paymentStatus: 'Due', tableNumber: '' })
+        body: JSON.stringify({
+          status: 'Payment Pending',
+          paymentStatus: 'Due',
+          tableNumber: '',
+          items: markDueOrder.items || [],
+          customerName: markDueOrder.customerName || '',
+          phone: markDueOrder.phone || '',
+          address: markDueOrder.address || '',
+          deliveryAgent: markDueOrder.deliveryAgent || '',
+          serviceType: markDueOrder.serviceType || '',
+          deliveryFee: markDueOrder.deliveryFee || 0,
+          discount: markDueOrder.discount || 0,
+          taxPercent: markDueOrder.taxPercent || 0,
+          serviceCharge: markDueOrder.serviceCharge || 0,
+          paymentMethod: markDueOrder.paymentMethod || 'Cash',
+          notes: markDueOrder.notes || ''
+        })
       });
 
       // If any amount was collected now, record a payment (partial)
