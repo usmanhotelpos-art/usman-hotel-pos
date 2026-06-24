@@ -12430,10 +12430,51 @@ function App() {
 
             {activeTab === 'dashboard' && isMobile && (
               <>
-                <div className="px-2 py-1">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Dashboard</p>
-                  <h2 className="text-xl font-bold text-white">Sales Overview</h2>
+                <div className="px-2 py-1 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Dashboard</p>
+                    <h2 className="text-xl font-bold text-white">Sales Overview</h2>
+                  </div>
+                  <div className="relative" ref={dateDropdownRef}>
+                    <button
+                      onClick={() => setShowDatePickerDropdown(!showDatePickerDropdown)}
+                      className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-900"
+                    >
+                      <span>📅</span>
+                      <span>
+                        {datePreset === 'today' && 'Today'}
+                        {datePreset === 'yesterday' && 'Yesterday'}
+                        {datePreset === '5days' && '5 Days'}
+                        {datePreset === 'custom' && (dashboardFilters.start && dashboardFilters.end ? `${dashboardFilters.start}` : 'Custom')}
+                      </span>
+                      <span className="text-[10px] text-slate-400">▼</span>
+                    </button>
+                    {showDatePickerDropdown && (
+                      <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-2xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl">
+                        {['today','yesterday','5days','custom'].map((preset) => (
+                          <button key={preset} onClick={() => {
+                            if (preset === 'custom') { setDatePreset('custom'); setShowDatePickerDropdown(false); }
+                            else handlePresetSelect(preset);
+                            setShowDatePickerDropdown(false);
+                          }} className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-xs font-semibold transition ${datePreset === preset ? 'bg-emerald-600 text-slate-950' : 'text-slate-300 hover:bg-slate-900'}`}>
+                            {preset === 'today' && 'Today'}
+                            {preset === 'yesterday' && 'Yesterday'}
+                            {preset === '5days' && 'Last 5 Days'}
+                            {preset === 'custom' && 'Custom Range'}
+                          </button>
+                        ))}
+                        {datePreset === 'custom' && (
+                          <div className="mt-2 flex flex-col gap-1.5 p-1">
+                            <input type="date" value={dashboardFilters.start || ''} onChange={(e) => setDashboardFilters(f => ({...f, start: e.target.value}))} className="rounded-lg bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none [color-scheme:dark]" />
+                            <input type="date" value={dashboardFilters.end || ''} onChange={(e) => setDashboardFilters(f => ({...f, end: e.target.value}))} className="rounded-lg bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none [color-scheme:dark]" />
+                            <button onClick={() => loadTab('dashboard')} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Apply</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3 px-2">
                   {[
                     { key: 'total', label: 'Total Revenue', value: dashboard?.totalRevenue ?? 0, orders: dashboard?.totalOrders ?? 0, icon: '💰', gradient: 'from-emerald-400 to-cyan-500', shadow: 'rgba(52,211,153,0.5)' },
@@ -12460,6 +12501,69 @@ function App() {
                   ))}
                 </div>
 
+                <div className="px-2 space-y-3">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Revenue Trend</p>
+                        <h3 className="text-sm font-semibold text-white">Daily Sales</h3>
+                      </div>
+                      <span className="rounded-2xl bg-slate-950 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] text-slate-400">{dashboard?.salesSeries?.dates?.length || 0} days</span>
+                    </div>
+                    <div className="h-24">
+                      <MiniLineChart lines={[
+                        dashboard?.salesSeries?.Delivery || [],
+                        dashboard?.salesSeries?.Takeaway || [],
+                        dashboard?.salesSeries?.Dine || []
+                      ]} />
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {['Delivery', 'Takeaway', 'Dine'].map((type, index) => (
+                        <div key={type} className="rounded-2xl bg-slate-950 p-2.5">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">{type}</p>
+                          <p className="mt-1 text-sm font-semibold text-white">{dashboard?.orderTypeSummary?.[type]?.revenue ?? 0}</p>
+                          <div className="mt-1.5 h-1.5 rounded-full bg-slate-800">
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, [65, 53, 46][index]))}%`, background: ['#60A5FA', '#F59E0B', '#34D399'][index] }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">Rider Summary</p>
+                    {riderTopList.length > 0 ? (
+                      <div className="space-y-2">
+                        {riderTopList.map((rider, index) => (
+                          <div key={rider.riderName} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] font-bold text-slate-500 w-4 shrink-0">{index + 1}.</span>
+                              <span className="text-xs font-semibold text-white truncate">{rider.riderName}</span>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-[10px] text-slate-400">{rider.orderCount} ord</span>
+                              <span className="text-xs font-semibold text-emerald-400">{rider.revenue}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-500">No rider data available</div>
+                    )}
+                    {topDeliveryFeeRiders.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-slate-800">
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 mb-2">Top Rider Fees</p>
+                        {topDeliveryFeeRiders.map((rider) => (
+                          <div key={rider.riderName} className="flex items-center justify-between rounded-xl bg-slate-950 p-2.5 mb-1.5 last:mb-0">
+                            <div className="text-xs font-semibold text-white">{rider.riderName}</div>
+                            <div className="text-right text-xs font-semibold text-amber-400">{rider.deliveryFee}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {mobileDashboardPopupType && (
                   <div className="fixed inset-0 z-50 bg-black/60 p-2 flex items-center justify-center" onClick={() => setMobileDashboardPopupType(null)}>
                     <div className="relative w-full max-w-sm max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -12472,6 +12576,7 @@ function App() {
                             {mobileDashboardPopupType === 'total'
                               ? `All orders • ${dashboard?.totalOrders ?? 0} total`
                               : `${dashboard?.orderTypeSummary?.[mobileDashboardPopupType]?.count ?? 0} orders • ${dashboard?.orderTypeSummary?.[mobileDashboardPopupType]?.revenue ?? 0} PKR`}
+                            {dashboardFilters.start && dashboardFilters.end && ` • ${dashboardFilters.start} to ${dashboardFilters.end}`}
                           </p>
                         </div>
                         <button onClick={() => setMobileDashboardPopupType(null)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
@@ -12479,7 +12584,13 @@ function App() {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                        {(posOrders || []).filter(o => mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => (
+                        {(posOrders || []).filter(o => {
+                          const d = o.createdAt ? new Date(o.createdAt) : null;
+                          if (!d) return mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType;
+                          if (dashboardFilters.start && d < new Date(dashboardFilters.start)) return false;
+                          if (dashboardFilters.end && d > new Date(dashboardFilters.end + 'T23:59:59')) return false;
+                          return mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType;
+                        }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => (
                           <div key={order.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-indigo-600">#{order.orderNumber || order.id}</span>
@@ -12499,8 +12610,14 @@ function App() {
                             </div>
                           </div>
                         ))}
-                        {(posOrders || []).filter(o => mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType).length === 0 && (
-                          <div className="text-center py-8 text-slate-400 text-sm">No orders found</div>
+                        {(posOrders || []).filter(o => {
+                          const d = o.createdAt ? new Date(o.createdAt) : null;
+                          if (!d) return mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType;
+                          if (dashboardFilters.start && d < new Date(dashboardFilters.start)) return false;
+                          if (dashboardFilters.end && d > new Date(dashboardFilters.end + 'T23:59:59')) return false;
+                          return mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType;
+                        }).length === 0 && (
+                          <div className="text-center py-8 text-slate-400 text-sm">No orders found for selected date</div>
                         )}
                       </div>
                     </div>
