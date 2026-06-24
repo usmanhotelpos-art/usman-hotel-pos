@@ -12273,92 +12273,149 @@ function App() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 px-2">
-                  {[
-                    { key: 'total', label: 'Total Revenue', value: dashboard?.totalRevenue ?? 0, orders: dashboard?.totalOrders ?? 0, icon: '💰', gradient: 'from-emerald-400 to-cyan-500', shadow: 'rgba(52,211,153,0.5)' },
-                    { key: 'Delivery', label: 'Delivery', value: dashboard?.orderTypeSummary?.Delivery?.revenue ?? 0, orders: dashboard?.orderTypeSummary?.Delivery?.count ?? 0, icon: '🚚', gradient: 'from-sky-400 to-blue-500', shadow: 'rgba(56,189,248,0.5)' },
-                    { key: 'Takeaway', label: 'Takeaway', value: dashboard?.orderTypeSummary?.Takeaway?.revenue ?? 0, orders: dashboard?.orderTypeSummary?.Takeaway?.count ?? 0, icon: '🛍️', gradient: 'from-amber-400 to-orange-500', shadow: 'rgba(245,158,11,0.5)' },
-                    { key: 'Dine', label: 'Dine In', value: dashboard?.orderTypeSummary?.Dine?.revenue ?? 0, orders: dashboard?.orderTypeSummary?.Dine?.count ?? 0, icon: '🍽️', gradient: 'from-emerald-400 to-teal-500', shadow: 'rgba(16,185,129,0.5)' },
-                  ].map(({ key, label, value, orders, icon, gradient, shadow }) => (
-                    <div
-                      key={key}
-                      onClick={() => setMobileDashboardPopupType(key)}
-                      className={`relative cursor-pointer rounded-2xl bg-white p-4 transition-all active:scale-95 overflow-hidden`}
-                      style={{ boxShadow: `0 0 20px ${shadow}, 0 0 40px ${shadow}` }}
-                    >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20`} />
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl">{icon}</span>
-                          <span className="text-xs font-semibold text-slate-400">{orders} orders</span>
+                  {(() => {
+                    const types = ['Delivery', 'Takeaway', 'Dine'];
+                    const typeRevenues = types.map(t => dashboard?.orderTypeSummary?.[t]?.revenue ?? 0);
+                    const maxRevenue = Math.max(...typeRevenues);
+                    return [
+                      { key: 'total', label: 'Total Revenue', value: dashboard?.totalRevenue ?? 0, orders: dashboard?.totalOrders ?? 0, icon: '💰', gradient: 'from-emerald-400 to-cyan-500', shadow: 'rgba(52,211,153,0.5)' },
+                      { key: 'Delivery', label: 'Delivery', value: typeRevenues[0], orders: dashboard?.orderTypeSummary?.Delivery?.count ?? 0, icon: '🚚', gradient: 'from-sky-400 to-blue-500', shadow: 'rgba(56,189,248,0.5)' },
+                      { key: 'Takeaway', label: 'Takeaway', value: typeRevenues[1], orders: dashboard?.orderTypeSummary?.Takeaway?.count ?? 0, icon: '🛍️', gradient: 'from-amber-400 to-orange-500', shadow: 'rgba(245,158,11,0.5)' },
+                      { key: 'Dine', label: 'Dine In', value: typeRevenues[2], orders: dashboard?.orderTypeSummary?.Dine?.count ?? 0, icon: '🍽️', gradient: 'from-emerald-400 to-teal-500', shadow: 'rgba(16,185,129,0.5)' },
+                    ].map(({ key, label, value, orders, icon, gradient, shadow }) => {
+                      const isMax = key !== 'total' && value === maxRevenue && maxRevenue > 0;
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => setMobileDashboardPopupType(key)}
+                          className={`relative cursor-pointer rounded-2xl bg-white p-4 transition-all active:scale-95 overflow-hidden`}
+                          style={{ boxShadow: `0 0 20px ${shadow}, 0 0 40px ${shadow}` }}
+                        >
+                          <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20`} />
+                          <div className="relative z-10">
+                            <div className="flex items-center justify-between">
+                              <span className="text-2xl">{icon}</span>
+                              <span className="text-xs font-semibold text-slate-400">{orders} orders</span>
+                            </div>
+                            <p className="mt-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+                            <p className="mt-1 text-xl font-bold text-slate-800">{value} PKR</p>
+                            {key !== 'total' && (
+                              <span className={`mt-1 inline-flex items-center gap-0.5 text-[10px] font-bold ${isMax ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {isMax ? '▲' : '▼'} {isMax ? 'Top' : 'Down'}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <p className="mt-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-                        <p className="mt-1 text-xl font-bold text-slate-800">{value} PKR</p>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
 
                 <div className="px-2 space-y-3">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Revenue Trend</p>
-                        <h3 className="text-sm font-semibold text-white">Daily Sales</h3>
-                      </div>
-                      <span className="rounded-2xl bg-slate-950 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] text-slate-400">{dashboard?.salesSeries?.dates?.length || 0} days</span>
-                    </div>
-                    <div className="h-24">
-                      <MiniLineChart lines={[
-                        dashboard?.salesSeries?.Delivery || [],
-                        dashboard?.salesSeries?.Takeaway || [],
-                        dashboard?.salesSeries?.Dine || []
-                      ]} />
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {['Delivery', 'Takeaway', 'Dine'].map((type, index) => (
-                        <div key={type} className="rounded-2xl bg-slate-950 p-2.5">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">{type}</p>
-                          <p className="mt-1 text-sm font-semibold text-white">{dashboard?.orderTypeSummary?.[type]?.revenue ?? 0}</p>
-                          <div className="mt-1.5 h-1.5 rounded-full bg-slate-800">
-                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, [65, 53, 46][index]))}%`, background: ['#60A5FA', '#F59E0B', '#34D399'][index] }} />
+                  {(() => {
+                    const chartTypes = ['Delivery', 'Takeaway', 'Dine'];
+                    const chartRevenues = chartTypes.map(t => dashboard?.orderTypeSummary?.[t]?.revenue ?? 0);
+                    const chartMax = Math.max(...chartRevenues);
+                    return (
+                      <div className="rounded-2xl bg-white p-4" style={{ boxShadow: '0 0 20px rgba(52,211,153,0.4), 0 0 40px rgba(56,189,248,0.3)' }}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Revenue Trend</p>
+                            <h3 className="text-sm font-bold text-slate-800">Daily Sales</h3>
                           </div>
+                          <span className="rounded-2xl bg-slate-100 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] text-slate-500 font-semibold">{dashboard?.salesSeries?.dates?.length || 0} days</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div className="h-24">
+                          <MiniLineChart lines={[
+                            dashboard?.salesSeries?.Delivery || [],
+                            dashboard?.salesSeries?.Takeaway || [],
+                            dashboard?.salesSeries?.Dine || []
+                          ]} />
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {chartTypes.map((type, index) => {
+                            const rev = chartRevenues[index];
+                            const isMaxType = rev === chartMax && chartMax > 0;
+                            const colors = ['#60A5FA', '#F59E0B', '#34D399'];
+                            const textColors = ['text-sky-600', 'text-amber-600', 'text-emerald-600'];
+                            return (
+                              <div key={type} className="rounded-2xl bg-slate-50 border border-slate-200 p-2.5">
+                                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold">{type}</p>
+                                <p className={`mt-1 text-sm font-bold ${textColors[index]}`}>{rev}</p>
+                                <div className="mt-1.5 flex items-center gap-1">
+                                  <span className={`text-xs font-bold ${isMaxType ? 'text-emerald-500' : 'text-rose-500'}`}>{isMaxType ? '▲' : '▼'}</span>
+                                  <div className="flex-1 h-1.5 rounded-full bg-slate-200">
+                                    <div className="h-full rounded-full" style={{ width: `${chartMax > 0 ? (rev / chartMax) * 100 : 0}%`, background: colors[index] }} />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">Rider Summary</p>
-                    {riderTopList.length > 0 ? (
-                      <div className="space-y-2">
-                        {riderTopList.map((rider, index) => (
-                          <div key={rider.riderName} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] font-bold text-slate-500 w-4 shrink-0">{index + 1}.</span>
-                              <span className="text-xs font-semibold text-white truncate">{rider.riderName}</span>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-[10px] text-slate-400">{rider.orderCount} ord</span>
-                              <span className="text-xs font-semibold text-emerald-400">{rider.revenue}</span>
-                            </div>
+                  {(() => {
+                    const topFeeRider = topDeliveryFeeRiders.length > 0 ? topDeliveryFeeRiders[0] : null;
+                    return (
+                      <div className="rounded-2xl bg-white p-4" style={{ boxShadow: '0 0 20px rgba(245,158,11,0.4), 0 0 40px rgba(239,68,68,0.3)' }}>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 font-semibold mb-3">Rider Summary</p>
+                        {riderTopList.length > 0 ? (
+                          <div className="space-y-2">
+                            {(() => {
+                              const maxOrders = Math.max(...riderTopList.map(r => r.orderCount));
+                              return riderTopList.map((rider, index) => {
+                                const isTopRider = rider.orderCount === maxOrders && maxOrders > 0;
+                                const isTopFee = topFeeRider && rider.riderName === topFeeRider.riderName;
+                                return (
+                                  <div key={rider.riderName} className={`flex items-center justify-between rounded-xl border p-2.5 transition-all ${isTopFee ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-orange-50 shadow-lg animate-pulse' : 'border-slate-200 bg-slate-50'}`}
+                                    style={isTopFee ? { boxShadow: '0 0 16px rgba(245,158,11,0.5), 0 0 32px rgba(245,158,11,0.2)' } : {}}>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`text-[10px] font-bold w-4 shrink-0 ${isTopRider ? 'text-emerald-500' : 'text-slate-400'}`}>{index + 1}.</span>
+                                      <span className={`text-xs font-semibold truncate ${isTopFee ? 'text-amber-700 font-bold' : isTopRider ? 'text-emerald-700' : 'text-slate-700'}`}>
+                                        {isTopFee ? '🏆 ' : ''}{rider.riderName}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 shrink-0">
+                                      <span className="text-[10px] text-slate-400">{rider.orderCount} ord</span>
+                                      <span className={`text-xs font-bold ${isTopRider ? 'text-emerald-600' : 'text-slate-600'}`}>{rider.revenue}</span>
+                                      <span className={`text-[10px] font-bold ${isTopRider ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {rider.orderCount === maxOrders && maxOrders > 0 ? '▲' : '▼'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-500">No rider data available</div>
-                    )}
-                    {topDeliveryFeeRiders.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-slate-800">
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 mb-2">Top Rider Fees</p>
-                        {topDeliveryFeeRiders.map((rider) => (
-                          <div key={rider.riderName} className="flex items-center justify-between rounded-xl bg-slate-950 p-2.5 mb-1.5 last:mb-0">
-                            <div className="text-xs font-semibold text-white">{rider.riderName}</div>
-                            <div className="text-right text-xs font-semibold text-amber-400">{rider.deliveryFee}</div>
+                        ) : (
+                          <div className="text-xs text-slate-400">No rider data available</div>
+                        )}
+                        {topDeliveryFeeRiders.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-200">
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-2">Top Rider Fees</p>
+                            {topDeliveryFeeRiders.map((rider, idx) => {
+                              const isTop = idx === 0;
+                              return (
+                                <div key={rider.riderName} className={`flex items-center justify-between rounded-xl p-2.5 mb-1.5 last:mb-0 ${isTop ? 'bg-amber-50 border border-amber-300' : 'bg-slate-50 border border-slate-200'}`}
+                                  style={isTop ? { boxShadow: '0 0 12px rgba(245,158,11,0.4)' } : {}}>
+                                  <div className={`text-xs font-bold ${isTop ? 'text-amber-700' : 'text-slate-600'}`}>
+                                    {isTop ? '🏆 ' : ''}{rider.riderName}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-bold ${isTop ? 'text-amber-600' : 'text-slate-600'}`}>{rider.deliveryFee}</span>
+                                    {isTop && <span className="text-emerald-500 text-[10px]">▲</span>}
+                                    {!isTop && <span className="text-rose-500 text-[10px]">▼</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {mobileDashboardPopupType && (
