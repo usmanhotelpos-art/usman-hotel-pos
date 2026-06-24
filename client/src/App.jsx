@@ -12313,6 +12313,67 @@ function App() {
 
                 <div className="px-2 space-y-3">
                   {(() => {
+                    const topFeeRider = topDeliveryFeeRiders.length > 0 ? topDeliveryFeeRiders[0] : null;
+                    const riderRevenues = riderTopList.map(r => Number(r.revenue) || 0);
+                    const maxRiderRevenue = Math.max(...riderRevenues);
+                    return (
+                      <div className="rounded-2xl p-4" style={{ boxShadow: '0 0 20px rgba(245,158,11,0.4), 0 0 40px rgba(239,68,68,0.3)', background: '#0f172a' }}>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-semibold mb-3">Rider Summary</p>
+                        {riderTopList.length > 0 ? (
+                          <div className="space-y-2.5">
+                            {riderTopList.map((rider, index) => {
+                              const isTopSales = rider.revenue === maxRiderRevenue && maxRiderRevenue > 0;
+                              const isTopFee = topFeeRider && rider.riderName === topFeeRider.riderName;
+                              const isHighlighted = isTopSales || isTopFee;
+                              const glowColor = isTopSales ? 'rgba(52,211,153,0.6)' : isTopFee ? 'rgba(245,158,11,0.6)' : 'transparent';
+                              return (
+                                <div key={rider.riderName} className={`flex items-center justify-between rounded-xl border p-3 transition-all ${isHighlighted ? 'bg-slate-900 border-slate-600' : 'bg-slate-800/50 border-slate-700'}`}
+                                  style={isHighlighted ? { boxShadow: `0 0 18px ${glowColor}, 0 0 36px ${glowColor}` } : {}}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`text-xs font-bold w-5 shrink-0 ${isTopSales ? 'text-emerald-400' : isTopFee ? 'text-amber-400' : 'text-slate-500'}`}>{index + 1}.</span>
+                                    <span className={`truncate ${isHighlighted ? 'text-base font-extrabold text-white' : 'text-sm font-bold text-slate-200'}`}>
+                                      {isTopFee ? '🏆 ' : isTopSales ? '⭐ ' : ''}{rider.riderName}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <span className={`${isHighlighted ? 'text-xs font-bold text-slate-300' : 'text-[11px] text-slate-400'}`}>{rider.orderCount} ord</span>
+                                    <span className={`${isHighlighted ? 'text-sm font-extrabold' : 'text-xs font-bold'} ${isTopSales ? 'text-emerald-400' : isTopFee ? 'text-amber-400' : 'text-slate-300'}`}>{rider.revenue}</span>
+                                    <span className={`text-xs font-bold ${isTopSales ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      {rider.revenue === maxRiderRevenue && maxRiderRevenue > 0 ? '▲' : '▼'}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-400">No rider data available</div>
+                        )}
+                        {topDeliveryFeeRiders.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-700">
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-2">Top Rider Fees</p>
+                            {topDeliveryFeeRiders.map((rider, idx) => {
+                              const isTop = idx === 0;
+                              return (
+                                <div key={rider.riderName} className={`flex items-center justify-between rounded-xl p-3 mb-1.5 last:mb-0 ${isTop ? 'bg-slate-900 border border-slate-600' : 'bg-slate-800/50 border border-slate-700'}`}
+                                  style={isTop ? { boxShadow: '0 0 18px rgba(245,158,11,0.6), 0 0 36px rgba(245,158,11,0.3)' } : {}}>
+                                  <div className={`${isTop ? 'text-base font-extrabold text-white' : 'text-sm font-bold text-slate-200'}`}>
+                                    {isTop ? '🏆 ' : ''}{rider.riderName}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`${isTop ? 'text-sm font-extrabold text-amber-400' : 'text-xs font-bold text-slate-300'}`}>{rider.deliveryFee}</span>
+                                    {isTop ? <span className="text-emerald-400 text-xs font-bold">▲</span> : <span className="text-rose-400 text-xs font-bold">▼</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {(() => {
                     const chartTypes = ['Delivery', 'Takeaway', 'Dine'];
                     const chartRevenues = chartTypes.map(t => dashboard?.orderTypeSummary?.[t]?.revenue ?? 0);
                     const chartMax = Math.max(...chartRevenues);
@@ -12352,67 +12413,6 @@ function App() {
                             );
                           })}
                         </div>
-                      </div>
-                    );
-                  })()}
-
-                  {(() => {
-                    const topFeeRider = topDeliveryFeeRiders.length > 0 ? topDeliveryFeeRiders[0] : null;
-                    return (
-                      <div className="rounded-2xl bg-white p-4" style={{ boxShadow: '0 0 20px rgba(245,158,11,0.4), 0 0 40px rgba(239,68,68,0.3)' }}>
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 font-semibold mb-3">Rider Summary</p>
-                        {riderTopList.length > 0 ? (
-                          <div className="space-y-2">
-                            {(() => {
-                              const maxOrders = Math.max(...riderTopList.map(r => r.orderCount));
-                              return riderTopList.map((rider, index) => {
-                                const isTopRider = rider.orderCount === maxOrders && maxOrders > 0;
-                                const isTopFee = topFeeRider && rider.riderName === topFeeRider.riderName;
-                                return (
-                                  <div key={rider.riderName} className={`flex items-center justify-between rounded-xl border p-2.5 transition-all ${isTopFee ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-orange-50 shadow-lg animate-pulse' : 'border-slate-200 bg-slate-50'}`}
-                                    style={isTopFee ? { boxShadow: '0 0 16px rgba(245,158,11,0.5), 0 0 32px rgba(245,158,11,0.2)' } : {}}>
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className={`text-[10px] font-bold w-4 shrink-0 ${isTopRider ? 'text-emerald-500' : 'text-slate-400'}`}>{index + 1}.</span>
-                                      <span className={`text-xs font-semibold truncate ${isTopFee ? 'text-amber-700 font-bold' : isTopRider ? 'text-emerald-700' : 'text-slate-700'}`}>
-                                        {isTopFee ? '🏆 ' : ''}{rider.riderName}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-3 shrink-0">
-                                      <span className="text-[10px] text-slate-400">{rider.orderCount} ord</span>
-                                      <span className={`text-xs font-bold ${isTopRider ? 'text-emerald-600' : 'text-slate-600'}`}>{rider.revenue}</span>
-                                      <span className={`text-[10px] font-bold ${isTopRider ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                        {rider.orderCount === maxOrders && maxOrders > 0 ? '▲' : '▼'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              });
-                            })()}
-                          </div>
-                        ) : (
-                          <div className="text-xs text-slate-400">No rider data available</div>
-                        )}
-                        {topDeliveryFeeRiders.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-slate-200">
-                            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-2">Top Rider Fees</p>
-                            {topDeliveryFeeRiders.map((rider, idx) => {
-                              const isTop = idx === 0;
-                              return (
-                                <div key={rider.riderName} className={`flex items-center justify-between rounded-xl p-2.5 mb-1.5 last:mb-0 ${isTop ? 'bg-amber-50 border border-amber-300' : 'bg-slate-50 border border-slate-200'}`}
-                                  style={isTop ? { boxShadow: '0 0 12px rgba(245,158,11,0.4)' } : {}}>
-                                  <div className={`text-xs font-bold ${isTop ? 'text-amber-700' : 'text-slate-600'}`}>
-                                    {isTop ? '🏆 ' : ''}{rider.riderName}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-xs font-bold ${isTop ? 'text-amber-600' : 'text-slate-600'}`}>{rider.deliveryFee}</span>
-                                    {isTop && <span className="text-emerald-500 text-[10px]">▲</span>}
-                                    {!isTop && <span className="text-rose-500 text-[10px]">▼</span>}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
                     );
                   })()}
