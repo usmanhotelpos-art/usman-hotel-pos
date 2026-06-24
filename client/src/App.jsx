@@ -12818,7 +12818,7 @@ function App() {
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="grid grid-cols-2 gap-3">
                     {posOrders.filter((o) => o.orderType === 'Takeaway').filter((o) => {
-                      if (quickTakeawayTab === 'pay-later') return o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later';
+                      if (quickTakeawayTab === 'pay-later') return o.status === 'Pay Later';
                       if (quickTakeawayTab === 'paid') return o.status === 'Completed' || o.status === 'Payment Collected';
                       return true;
                     }).filter((o) => {
@@ -12845,7 +12845,7 @@ function App() {
                       </div>
                     ))}
                     {posOrders.filter((o) => o.orderType === 'Takeaway').filter((o) => {
-                      if (quickTakeawayTab === 'pay-later') return o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later';
+                      if (quickTakeawayTab === 'pay-later') return o.status === 'Pay Later';
                       if (quickTakeawayTab === 'paid') return o.status === 'Completed' || o.status === 'Payment Collected';
                       return true;
                     }).filter((o) => {
@@ -12922,7 +12922,7 @@ function App() {
                       filtered = filtered.filter(o => !['Completed', 'Payment Collected'].includes(o.status));
                     } else if (type === 'Takeaway') {
                       filtered = filtered.filter(o => {
-                        if (quickOrdersTakeawaySubTab === 'pay-later') return o.status === 'Payment Pending' || o.paymentStatus === 'Due' || o.status === 'Pay Later';
+                        if (quickOrdersTakeawaySubTab === 'pay-later') return o.status === 'Pay Later';
                         if (quickOrdersTakeawaySubTab === 'paid') return o.status === 'Completed' || o.status === 'Payment Collected';
                         return true;
                       });
