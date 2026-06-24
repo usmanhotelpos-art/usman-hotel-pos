@@ -22,6 +22,8 @@ function App() {
       const saved = window.localStorage.getItem('posTabs');
       const base = saved ? JSON.parse(saved) : defaultTabs;
       if (!base.includes('restore')) base.push('restore');
+      if (!base.includes('qr-catalogue')) base.push('qr-catalogue');
+      if (!base.includes('settings')) base.push('settings');
       return base;
     } catch {
       return defaultTabs;
@@ -877,6 +879,7 @@ function App() {
     if (!user) return false;
     const roleName = (user.role || '').toString().trim();
     if (!roleName) return false;
+    if (tab === 'settings' || tab === 'qr-catalogue') return true;
     if (roleName.toLowerCase().includes('admin')) return true;
     const roleObj = roles.find((r) => (r.name || '').toString().trim().toLowerCase() === roleName.toLowerCase());
     if (!roleObj) return false;
