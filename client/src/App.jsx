@@ -558,6 +558,7 @@ function App() {
   const [quickOrdersTakeawaySubTab, setQuickOrdersTakeawaySubTab] = useState('pay-later');
   const [quickOrderDateFrom, setQuickOrderDateFrom] = useState('');
   const [quickOrderDateTo, setQuickOrderDateTo] = useState('');
+  const [mobileDashboardPopupType, setMobileDashboardPopupType] = useState(null);
   const [quickOrderDetail, setQuickOrderDetail] = useState(null);
   const [onlineActionOpen, setOnlineActionOpen] = useState(null);
   const [takeawayViewMode, setTakeawayViewMode] = useState('table');
@@ -12089,7 +12090,7 @@ function App() {
 
             {message && <div className="rounded-[24px] border border-emerald-500 bg-emerald-900/40 px-4 py-3 text-sm text-emerald-200">{message}</div>}
 
-            {activeTab === 'dashboard' && (
+            {activeTab === 'dashboard' && !isMobile && (
               <section className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div className="space-y-2">
@@ -12422,6 +12423,87 @@ function App() {
                   </div>
                 </div>
               </section>
+            )}
+
+            {activeTab === 'dashboard' && isMobile && (
+              <>
+                <div className="px-2 py-1">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Dashboard</p>
+                  <h2 className="text-xl font-bold text-white">Sales Overview</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3 px-2">
+                  {[
+                    { key: 'total', label: 'Total Revenue', value: dashboard?.totalRevenue ?? 0, orders: dashboard?.totalOrders ?? 0, icon: '💰', gradient: 'from-emerald-400 to-cyan-500', shadow: 'rgba(52,211,153,0.5)' },
+                    { key: 'Delivery', label: 'Delivery', value: dashboard?.orderTypeSummary?.Delivery?.revenue ?? 0, orders: dashboard?.orderTypeSummary?.Delivery?.count ?? 0, icon: '🚚', gradient: 'from-sky-400 to-blue-500', shadow: 'rgba(56,189,248,0.5)' },
+                    { key: 'Takeaway', label: 'Takeaway', value: dashboard?.orderTypeSummary?.Takeaway?.revenue ?? 0, orders: dashboard?.orderTypeSummary?.Takeaway?.count ?? 0, icon: '🛍️', gradient: 'from-amber-400 to-orange-500', shadow: 'rgba(245,158,11,0.5)' },
+                    { key: 'Dine', label: 'Dine In', value: dashboard?.orderTypeSummary?.Dine?.revenue ?? 0, orders: dashboard?.orderTypeSummary?.Dine?.count ?? 0, icon: '🍽️', gradient: 'from-emerald-400 to-teal-500', shadow: 'rgba(16,185,129,0.5)' },
+                  ].map(({ key, label, value, orders, icon, gradient, shadow }) => (
+                    <div
+                      key={key}
+                      onClick={() => setMobileDashboardPopupType(key)}
+                      className={`relative cursor-pointer rounded-2xl bg-white p-4 transition-all active:scale-95 overflow-hidden`}
+                      style={{ boxShadow: `0 0 20px ${shadow}, 0 0 40px ${shadow}` }}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20`} />
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">{icon}</span>
+                          <span className="text-xs font-semibold text-slate-400">{orders} orders</span>
+                        </div>
+                        <p className="mt-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+                        <p className="mt-1 text-xl font-bold text-slate-800">{value} PKR</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {mobileDashboardPopupType && (
+                  <div className="fixed inset-0 z-50 bg-black/60 p-2 flex items-center justify-center" onClick={() => setMobileDashboardPopupType(null)}>
+                    <div className="relative w-full max-w-sm max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-800">
+                            {mobileDashboardPopupType === 'total' ? '💰 Total Revenue' : mobileDashboardPopupType === 'Delivery' ? '🚚 Delivery' : mobileDashboardPopupType === 'Takeaway' ? '🛍️ Takeaway' : '🍽️ Dine In'}
+                          </h3>
+                          <p className="text-xs text-slate-400">
+                            {mobileDashboardPopupType === 'total'
+                              ? `All orders • ${dashboard?.totalOrders ?? 0} total`
+                              : `${dashboard?.orderTypeSummary?.[mobileDashboardPopupType]?.count ?? 0} orders • ${dashboard?.orderTypeSummary?.[mobileDashboardPopupType]?.revenue ?? 0} PKR`}
+                          </p>
+                        </div>
+                        <button onClick={() => setMobileDashboardPopupType(null)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+                          <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="currentColor"/></svg>
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        {(posOrders || []).filter(o => mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => (
+                          <div key={order.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-indigo-600">#{order.orderNumber || order.id}</span>
+                              <span className="text-xs font-semibold text-emerald-600">{order.total || order.amount || 0} PKR</span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
+                              <span>{order.orderType || 'N/A'}</span>
+                              <span>•</span>
+                              <span>{order.customerName || order.tableNumber || 'Walk-In'}</span>
+                              <span>•</span>
+                              <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="mt-1.5 text-[10px] text-slate-500 line-clamp-2">
+                              {(order.items || []).map((item, idx) => (
+                                <span key={idx}><span className="text-amber-600 font-semibold">{item.quantity}x</span> {item.name}{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {(posOrders || []).filter(o => mobileDashboardPopupType === 'total' || o.orderType === mobileDashboardPopupType).length === 0 && (
+                          <div className="text-center py-8 text-slate-400 text-sm">No orders found</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {activeTab === 'pos' && renderPos()}
