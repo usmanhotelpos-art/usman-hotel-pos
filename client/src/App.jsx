@@ -12089,7 +12089,7 @@ function App() {
 
             {message && <div className="rounded-[24px] border border-emerald-500 bg-emerald-900/40 px-4 py-3 text-sm text-emerald-200">{message}</div>}
 
-            {activeTab === 'dashboard' && !isMobile && (
+            {activeTab === 'dashboard' && (
               <section className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div className="space-y-2">

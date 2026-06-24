@@ -98,7 +98,8 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getProducts() =>
       _fetchList('$_baseUrl/pos/products');
 
-  static Future<List<Map<String, dynamic>>> getRiders() =>
+  static Future<List<Map<String, dynamic>>> getRide
+  rs() =>
       _fetchList('$_baseUrl/riders');
 
   static Future<void> markOrderDelivered(
