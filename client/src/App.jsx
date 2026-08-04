@@ -1144,6 +1144,8 @@ function App() {
   const [staffSubTab, setStaffSubTab] = useState('list');
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [revealedStaffPasswords, setRevealedStaffPasswords] = useState(() => new Set());
+  const [showStaffPassword, setShowStaffPassword] = useState(false);
   const [staffForm, setStaffForm] = useState({
     name: '',
     otherName: '',
@@ -1165,7 +1167,7 @@ function App() {
     { name: 'Cashier', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, settings: false, login: true } },
     { name: 'Manager', permissions: { dashboard: true, tables: true, inventory: true, staff: false, sales: true, pos: true, orders: true, restore: true, settings: true, login: true } },
     { name: 'Biker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
-    { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, settings: false, login: true } },
+    { name: 'Waiter', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: true, 'order-taker-app': true, settings: false, login: true } },
     { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'rider-book': true, 'rider-order-requests': true, settings: false, login: true } },
     { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
     { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
@@ -6446,7 +6448,28 @@ function App() {
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-slate-400 mt-1">{member.username}</div>
+                  <div className="text-sm text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span>{member.username}</span>
+                    {member.password && (
+                      <>
+                        <button
+                          onClick={() => setRevealedStaffPasswords((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(member.id)) next.delete(member.id);
+                            else next.add(member.id);
+                            return next;
+                          })}
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+                          title={revealedStaffPasswords.has(member.id) ? 'Hide password' : 'Show password'}
+                        >
+                          {revealedStaffPasswords.has(member.id) ? <EyeOff size={12} /> : <Eye size={12} />}
+                        </button>
+                        {revealedStaffPasswords.has(member.id) && (
+                          <span className="font-mono text-xs text-emerald-400">{member.password}</span>
+                        )}
+                      </>
+                    )}
+                  </div>
                   {member.phone && <div className="text-sm text-slate-400">{member.phone}</div>}
                 </div>
                 <span className={`rounded-full px-3 py-1 text-sm text-slate-100 ${member.status === 'active' ? 'bg-emerald-600' : 'bg-slate-700'}`}>{member.status}</span>
@@ -6475,13 +6498,21 @@ function App() {
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
-                    type="password"
+                    type={showStaffPassword ? 'text' : 'password'}
                     value={staffForm.password}
                     onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
                     placeholder={editingStaff ? 'Password (leave blank to keep current)' : 'Password *'}
-                    className="rounded-3xl border border-slate-800 bg-slate-950 px-11 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500"
+                    className="rounded-3xl border border-slate-800 bg-slate-950 px-11 pr-10 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500"
                     required={!editingStaff}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                    title={showStaffPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showStaffPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                 </div>
                 <p className="text-xs text-slate-500">{editingStaff ? 'Leave blank to keep the existing password.' : 'Password is required for login access.'}</p>
                 <select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })} className="rounded-3xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-emerald-500">

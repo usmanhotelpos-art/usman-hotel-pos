@@ -84,7 +84,7 @@ export function OrderTakerApp() {
         method: 'POST',
         body: JSON.stringify(loginForm),
       });
-      if (!data.user || data.user.role !== 'Order Taker') {
+      if (!data.user || !['Order Taker', 'Waiter', 'Helper'].includes(data.user.role)) {
         throw new Error('Invalid Order Taker credentials');
       }
       setToken(data.token);
