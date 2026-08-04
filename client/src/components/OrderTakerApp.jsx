@@ -96,19 +96,19 @@ export function OrderTakerApp() {
   async function loadData() {
     try {
       const [cats, prods, tbls, ords, sets, slots] = await Promise.all([
-        fetchJson(`${apiBase}/pos/categories`),
-        fetchJson(`${apiBase}/pos/products`),
-        fetchJson(`${apiBase}/pos/tables`),
-        fetchJson(`${apiBase}/pos/orders`, { token }),
-        fetchJson(`${apiBase}/settings`),
-        fetchJson(`${apiBase}/pos/mashallah-slots`).catch(() => []),
+        fetchJson(`${apiBase}/pos/categories`, { token }).catch(() => null),
+        fetchJson(`${apiBase}/pos/products`, { token }).catch(() => null),
+        fetchJson(`${apiBase}/pos/tables`, { token }).catch(() => null),
+        fetchJson(`${apiBase}/pos/orders`, { token }).catch(() => null),
+        fetchJson(`${apiBase}/settings`).catch(() => null),
+        fetchJson(`${apiBase}/pos/mashallah-slots`, { token }).catch(() => null),
       ]);
-      setCategories(Array.isArray(cats) ? cats : []);
-      setProducts(Array.isArray(prods) ? prods : []);
-      setTables(Array.isArray(tbls) ? tbls : []);
-      setOrders(Array.isArray(ords) ? ords : []);
-      setSettings(sets || {});
-      setMashallahSlots(Array.isArray(slots) ? slots : []);
+      if (Array.isArray(cats)) setCategories(cats);
+      if (Array.isArray(prods)) setProducts(prods);
+      if (Array.isArray(tbls)) setTables(tbls);
+      if (Array.isArray(ords)) setOrders(ords);
+      if (sets) setSettings(sets);
+      if (Array.isArray(slots)) setMashallahSlots(slots);
     } catch (e) { setMessage(e.message); }
   }
 
@@ -166,6 +166,15 @@ export function OrderTakerApp() {
   const cartTotal = cart.reduce((s, i) => s + (Number(i.price) || 0) * i.quantity, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
+  const mashallahProducts = useMemo(() => {
+    return (mashallahSlots || [])
+      .map((slot) => {
+        const product = products.find((item) => item.id === slot.productId);
+        return product ? product : null;
+      })
+      .filter(Boolean);
+  }, [mashallahSlots, products]);
+
   const filteredProducts = useMemo(() => {
     const searchTerm = search.toLowerCase().trim();
     const matchesSearch = (p) =>
@@ -187,15 +196,6 @@ export function OrderTakerApp() {
     const names = (categories || []).map((c) => c.name).filter(Boolean);
     return ['All', MASHALLAH_CATEGORY, ...names];
   }, [categories]);
-
-  const mashallahProducts = useMemo(() => {
-    return (mashallahSlots || [])
-      .map((slot) => {
-        const product = products.find((item) => item.id === slot.productId);
-        return product ? product : null;
-      })
-      .filter(Boolean);
-  }, [mashallahSlots, products]);
 
   // Tables data
   const tablesList = useMemo(() => {
