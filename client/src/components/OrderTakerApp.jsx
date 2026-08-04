@@ -22,7 +22,7 @@ const CATEGORY_ICONS = {
   'Seafood': '🦐', 'Platter': '🍽️', 'Family': '👨‍👩‍👧‍👦', 'Deal': '💥', 'Addon': '➕', 'Extra': '➕', 'Dips': '🥫',
   'Sauce': '🥫', 'Topping': '🧀', 'Cheese': '🧀', 'Mashallah': '🌟', 'ناشتے کی آئٹمز': '🍳', 'چکن کڑاہی مینیو': '🍲',
   'سیخ کباب': '🥙', 'بوٹی آئٹمز': '🥩', 'چکن پیسز': '🍗', 'نان اور روٹی': '🫓', 'اسپیشل نان': '🫓',
-  'Karahi': '🍲', 'Fast Food': '🍟'
+  'Karahi': '🍲', 'Fast Food': '🍟', 'مَا شَاءَ ٱللَّٰهُ': '🌟'
 };
 
 function getCatIcon(name) {
@@ -40,6 +40,8 @@ function getCatIcon(name) {
 
 const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
 
+const MASHALLAH_CATEGORY = 'مَا شَاءَ ٱللَّٰهُ';
+
 export function OrderTakerApp() {
   const [token, setToken] = useState('');
   const [orderTaker, setOrderTaker] = useState(null);
@@ -53,6 +55,7 @@ export function OrderTakerApp() {
   const [tables, setTables] = useState([]);
   const [orders, setOrders] = useState([]);
   const [settings, setSettings] = useState({});
+  const [mashallahSlots, setMashallahSlots] = useState([]);
 
   // POS state
   const [activeType, setActiveType] = useState('Dine-In');
@@ -92,18 +95,20 @@ export function OrderTakerApp() {
 
   async function loadData() {
     try {
-      const [cats, prods, tbls, ords, sets] = await Promise.all([
+      const [cats, prods, tbls, ords, sets, slots] = await Promise.all([
         fetchJson(`${apiBase}/pos/categories`),
         fetchJson(`${apiBase}/pos/products`),
         fetchJson(`${apiBase}/pos/tables`),
         fetchJson(`${apiBase}/pos/orders`, { token }),
         fetchJson(`${apiBase}/settings`),
+        fetchJson(`${apiBase}/pos/mashallah-slots`).catch(() => []),
       ]);
       setCategories(Array.isArray(cats) ? cats : []);
       setProducts(Array.isArray(prods) ? prods : []);
       setTables(Array.isArray(tbls) ? tbls : []);
       setOrders(Array.isArray(ords) ? ords : []);
       setSettings(sets || {});
+      setMashallahSlots(Array.isArray(slots) ? slots : []);
     } catch (e) { setMessage(e.message); }
   }
 
@@ -163,17 +168,34 @@ export function OrderTakerApp() {
 
   const filteredProducts = useMemo(() => {
     const searchTerm = search.toLowerCase().trim();
+    const matchesSearch = (p) =>
+      !searchTerm ||
+      (p.name || '').toLowerCase().includes(searchTerm) ||
+      (p.category || '').toLowerCase().includes(searchTerm) ||
+      (p.code || '').toLowerCase().includes(searchTerm) ||
+      (p.id || '').toLowerCase().includes(searchTerm);
+    if (category === MASHALLAH_CATEGORY) {
+      return mashallahProducts.filter(matchesSearch);
+    }
     return products.filter(p => {
       if (category !== 'All' && p.category !== category) return false;
-      if (searchTerm && !(p.name || '').toLowerCase().includes(searchTerm) && !(p.code || '').toLowerCase().includes(searchTerm)) return false;
-      return true;
+      return matchesSearch(p);
     });
-  }, [products, category, search]);
+  }, [products, category, search, mashallahProducts]);
 
   const allCategories = useMemo(() => {
-    const cats = [...new Set(products.map(p => p.category).filter(Boolean))];
-    return ['All', ...cats];
-  }, [products]);
+    const names = (categories || []).map((c) => c.name).filter(Boolean);
+    return ['All', MASHALLAH_CATEGORY, ...names];
+  }, [categories]);
+
+  const mashallahProducts = useMemo(() => {
+    return (mashallahSlots || [])
+      .map((slot) => {
+        const product = products.find((item) => item.id === slot.productId);
+        return product ? product : null;
+      })
+      .filter(Boolean);
+  }, [mashallahSlots, products]);
 
   // Tables data
   const tablesList = useMemo(() => {
@@ -330,17 +352,24 @@ export function OrderTakerApp() {
       {/* Categories left + Products right */}
       <div className="flex gap-2 px-3">
         <div className="w-16 shrink-0 overflow-y-auto max-h-[70vh] space-y-1.5">
-          {allCategories.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)}
-              className={`flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[9px] font-medium transition-all duration-200 min-h-[52px] w-full ${
-                category === cat
-                  ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50 scale-105'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}>
-              <span className="text-xl mb-0.5">{getCatIcon(cat)}</span>
-              <span className="leading-tight text-center font-semibold truncate w-full">{cat}</span>
-            </button>
-          ))}
+          {allCategories.map(cat => {
+            const catObj = (categories || []).find((c) => c.name === cat);
+            return (
+              <button key={cat} onClick={() => setCategory(cat)}
+                className={`flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[9px] font-medium transition-all duration-200 min-h-[52px] w-full ${
+                  category === cat
+                    ? cat === MASHALLAH_CATEGORY ? 'bg-amber-600 text-white shadow-lg ring-2 ring-amber-400/50 scale-105' : 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50 scale-105'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}>
+                {catObj?.icon ? (
+                  <img src={catObj.icon} alt="" className="w-5 h-5 rounded-full object-cover mb-0.5 shadow-sm" />
+                ) : (
+                  <span className="text-xl mb-0.5">{getCatIcon(cat)}</span>
+                )}
+                <span className="leading-tight text-center font-semibold truncate w-full">{cat}</span>
+              </button>
+            );
+          })}
         </div>
         <div className="flex-1 min-w-0">
           {filteredProducts.length === 0 ? (
