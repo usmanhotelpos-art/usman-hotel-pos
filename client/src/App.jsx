@@ -618,6 +618,14 @@ function App() {
       return false;
     }
   });
+  const [mobileFloatHidden, setMobileFloatHidden] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('posMobileFloatHidden') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [riderAssignmentModal, setRiderAssignmentModal] = useState(null);
 
   useEffect(() => {
@@ -7006,11 +7014,11 @@ function App() {
           </div>
         </section>
 
-        {isMobile && cart.length > 0 && !showMobileCart && (
+        {isMobile && !mobileFloatHidden && cart.length > 0 && !showMobileCart && (
           <button
             onClick={() => setShowMobileCart(true)}
-            className="fixed bottom-20 right-4 z-[60] flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(16,185,129,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(16,185,129,0.7)]"
-            style={{boxShadow: '0 8px 32px rgba(16,185,129,0.5)'}}
+            className="fixed right-4 z-[60] flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(16,185,129,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(16,185,129,0.7)]"
+            style={{bottom: mobileFloatBottom, boxShadow: '0 8px 32px rgba(16,185,129,0.5)'}}
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🛒</span>
             <span>{cart.reduce((sum, it) => sum + (it.quantity || 0), 0)} items · {cart.reduce((sum, it) => sum + (Number(it.price) || 0) * (it.quantity || 0), 0)} PKR</span>
@@ -7018,11 +7026,11 @@ function App() {
         )}
 
         {/* Mobile orders floating button */}
-        {isMobile && !isAnyPopupOpen && (
+        {isMobile && !mobileFloatHidden && !isAnyPopupOpen && (
           <button
             onClick={() => setShowMobileOrdersPopup(true)}
-            className="fixed bottom-20 left-4 z-[60] flex items-center gap-2 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(139,92,246,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(139,92,246,0.7)]"
-            style={{boxShadow: '0 8px 32px rgba(139,92,246,0.5)'}}
+            className="fixed left-4 z-[60] flex items-center gap-2 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(139,92,246,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(139,92,246,0.7)]"
+            style={{bottom: mobileFloatBottom, boxShadow: '0 8px 32px rgba(139,92,246,0.5)'}}
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">📋</span>
             <span>
@@ -7044,15 +7052,15 @@ function App() {
         {/* Due Orders floating alert button + popup */}
         {isMobile && (
           <>
-            {!isAnyPopupOpen && (
+            {!isAnyPopupOpen && !mobileFloatHidden && (
             <button
               onClick={() => setShowDueOrdersPanel(prev => !prev)}
-              className={`fixed bottom-36 left-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
+              className={`fixed left-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
                 showDueOrdersPopup
                   ? 'animate-due-alert bg-gradient-to-br from-red-700 to-rose-800'
                   : 'bg-gradient-to-br from-slate-700 to-slate-800'
               }`}
-              style={{boxShadow: showDueOrdersPopup ? '0 8px 32px rgba(239,68,68,0.5)' : '0 4px 16px rgba(0,0,0,0.2)'}}
+              style={{bottom: mobileFloatBottomUp, boxShadow: showDueOrdersPopup ? '0 8px 32px rgba(239,68,68,0.5)' : '0 4px 16px rgba(0,0,0,0.2)'}}
             >
               <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
                 showDueOrdersPopup ? 'bg-white/20' : 'bg-white/10'
@@ -7200,15 +7208,15 @@ function App() {
         {/* Late Orders floating alert button + popup */}
         {isMobile && (
           <>
-            {!isAnyPopupOpen && (
+            {!isAnyPopupOpen && !mobileFloatHidden && (
             <button
               onClick={() => setShowLateOrdersPanel(prev => !prev)}
-              className={`fixed bottom-36 right-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
+              className={`fixed right-4 z-[65] flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white active:scale-95 transition-all duration-200 ${
                 hasLateOrders
                   ? 'animate-late-alert bg-gradient-to-br from-amber-700 to-orange-800'
                   : 'bg-gradient-to-br from-slate-700 to-slate-800'
               }`}
-              style={{boxShadow: hasLateOrders ? '0 8px 32px rgba(245,158,11,0.5)' : '0 4px 16px rgba(0,0,0,0.2)'}}
+              style={{bottom: mobileFloatBottomUp, boxShadow: hasLateOrders ? '0 8px 32px rgba(245,158,11,0.5)' : '0 4px 16px rgba(0,0,0,0.2)'}}
             >
               <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
                 hasLateOrders ? 'bg-white/20' : 'bg-white/10'
@@ -11636,6 +11644,9 @@ function App() {
   }
 
   const isSidebarOpen = !isMobile && sidebarExpanded;
+  const mobileFloatLift = isMobile && !mobileNavHidden;
+  const mobileFloatBottom = mobileFloatLift ? 200 : 80;
+  const mobileFloatBottomUp = mobileFloatLift ? 264 : 144;
   const appStyle = {
     background: darkMode ? '#020617' : '#ffffff'
   };
@@ -13332,20 +13343,36 @@ function App() {
           <div className="mx-auto flex max-w-[1400px] flex-col">
             <div className="mb-1 flex items-center justify-between px-1">
               <span className="text-[9px] uppercase tracking-widest text-slate-500">{mobileNavHidden ? '' : 'Menu'}</span>
-              <button
-                type="button"
-                onClick={() => setMobileNavHidden((prev) => {
-                  const next = !prev;
-                  try {
-                    window.localStorage.setItem('posMobileNavHidden', next ? '1' : '0');
-                  } catch {}
-                  return next;
-                })}
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-slate-300 transition hover:bg-slate-700 hover:text-white"
-                title={mobileNavHidden ? 'Show navigation' : 'Hide navigation'}
-              >
-                {mobileNavHidden ? <Eye size={13} /> : <EyeOff size={13} />}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setMobileFloatHidden((prev) => {
+                    const next = !prev;
+                    try {
+                      window.localStorage.setItem('posMobileFloatHidden', next ? '1' : '0');
+                    } catch {}
+                    return next;
+                  })}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+                  title={mobileFloatHidden ? 'Show floating buttons' : 'Hide floating buttons'}
+                >
+                  {mobileFloatHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileNavHidden((prev) => {
+                    const next = !prev;
+                    try {
+                      window.localStorage.setItem('posMobileNavHidden', next ? '1' : '0');
+                    } catch {}
+                    return next;
+                  })}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+                  title={mobileNavHidden ? 'Show navigation' : 'Hide navigation'}
+                >
+                  {mobileNavHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                </button>
+              </div>
             </div>
             {!mobileNavHidden && (
               <div className="flex flex-wrap items-center gap-2 px-1">
