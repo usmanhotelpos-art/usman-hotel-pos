@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import { Lock, Bluetooth, BluetoothConnected, RefreshCw } from 'lucide-react';
+import { Lock, Bluetooth, BluetoothConnected, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
 import { OrderTakerApp } from './components/OrderTakerApp';
 import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from './utils/escpos.js';
@@ -22,12 +22,14 @@ function App() {
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
     try {
-      const saved = window.localStorage.getItem('posTabs');
-      const base = saved ? JSON.parse(saved) : [...defaultTabs];
+      let saved = window.localStorage.getItem('posTabs');
+      let base = saved ? JSON.parse(saved) : [...defaultTabs];
+      base = base.filter(t => t !== 'catalogue' && t !== 'qr-catalogue');
       if (!base.includes('restore')) base.push('restore');
       if (!base.includes('settings')) base.push('settings');
       if (!base.includes('order-taker-app')) base.push('order-taker-app');
-      return base.filter(t => t !== 'qr-catalogue');
+      window.localStorage.setItem('posTabs', JSON.stringify(base));
+      return base;
     } catch {
       return defaultTabs;
     }
@@ -608,6 +610,14 @@ function App() {
     };}
   });
   const [isMobileSidebar, setIsMobileSidebar] = useState(false);
+  const [mobileNavHidden, setMobileNavHidden] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('posMobileNavHidden') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [riderAssignmentModal, setRiderAssignmentModal] = useState(null);
 
   useEffect(() => {
@@ -906,6 +916,7 @@ function App() {
     const k = (key || '').toString().trim();
     if (!k) return setMessage('Tab key is required');
     if (tabs.includes(k)) return setMessage('Tab key already exists');
+    if (k === 'catalogue' || k === 'qr-catalogue') return setMessage('This tab is not available');
     setTabs((prev) => [...prev, k]);
     setTabLabels((prev) => ({ ...prev, [k]: label || k.replace('-', ' ') }));
     setTabIcons((prev) => ({ ...prev, [k]: '•' }));
@@ -1174,8 +1185,11 @@ function App() {
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem('posRoles', JSON.stringify(roles));
-      window.localStorage.setItem('posTabs', JSON.stringify(tabs));
-      window.localStorage.setItem('posTabLabels', JSON.stringify(tabLabels));
+      const cleanLabels = { ...tabLabels };
+      delete cleanLabels.catalogue;
+      delete cleanLabels['qr-catalogue'];
+      window.localStorage.setItem('posTabs', JSON.stringify(tabs.filter(t => t !== 'catalogue' && t !== 'qr-catalogue')));
+      window.localStorage.setItem('posTabLabels', JSON.stringify(cleanLabels));
       window.localStorage.setItem('posTabIcons', JSON.stringify(tabIcons));
     } catch {
       // ignore storage errors
@@ -1419,7 +1433,7 @@ function App() {
         const savedRoles = window.localStorage.getItem('posRoles');
         if (savedRoles) setRoles(JSON.parse(savedRoles));
         const savedTabs = window.localStorage.getItem('posTabs');
-        if (savedTabs) setTabs(JSON.parse(savedTabs));
+        if (savedTabs) setTabs(JSON.parse(savedTabs).filter(t => t !== 'catalogue' && t !== 'qr-catalogue'));
         const savedTabLabels = window.localStorage.getItem('posTabLabels');
         if (savedTabLabels) setTabLabels(JSON.parse(savedTabLabels));
         const savedTabIcons = window.localStorage.getItem('posTabIcons');
@@ -1450,7 +1464,7 @@ function App() {
         const savedRoles = window.localStorage.getItem('posRoles');
         if (savedRoles) setRoles(JSON.parse(savedRoles));
         const savedTabs = window.localStorage.getItem('posTabs');
-        if (savedTabs) setTabs(JSON.parse(savedTabs));
+        if (savedTabs) setTabs(JSON.parse(savedTabs).filter(t => t !== 'catalogue' && t !== 'qr-catalogue'));
         const savedTabLabels = window.localStorage.getItem('posTabLabels');
         if (savedTabLabels) setTabLabels(JSON.parse(savedTabLabels));
         const savedTabIcons = window.localStorage.getItem('posTabIcons');
@@ -13315,18 +13329,39 @@ function App() {
 
       {isMobile && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 px-2 py-2 backdrop-blur-xl sm:hidden">
-          <div className="mx-auto flex max-w-[1400px] items-center gap-2 overflow-x-auto whitespace-nowrap px-2">
-            {tabs.filter(t => t !== 'dashboard' && t !== 'pos' && canAccessTab(t)).map((tab) => (
+          <div className="mx-auto flex max-w-[1400px] flex-col">
+            <div className="mb-1 flex items-center justify-between px-1">
+              <span className="text-[9px] uppercase tracking-widest text-slate-500">{mobileNavHidden ? '' : 'Menu'}</span>
               <button
-                key={tab}
                 type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`inline-flex min-w-[80px] items-center justify-center rounded-3xl px-3 py-2 text-center text-[11px] font-semibold transition ${activeTab === tab ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+                onClick={() => setMobileNavHidden((prev) => {
+                  const next = !prev;
+                  try {
+                    window.localStorage.setItem('posMobileNavHidden', next ? '1' : '0');
+                  } catch {}
+                  return next;
+                })}
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+                title={mobileNavHidden ? 'Show navigation' : 'Hide navigation'}
               >
-                <span className="block text-lg">{tabIcons[tab] || (tab === 'riders-app' ? '🚴' : '•')}</span>
-                <span className="mt-1 block truncate">{tabLabels[tab] || formatTabName(tab)}</span>
+                {mobileNavHidden ? <Eye size={13} /> : <EyeOff size={13} />}
               </button>
-            ))}
+            </div>
+            {!mobileNavHidden && (
+              <div className="flex flex-wrap items-center gap-2 px-1">
+                {tabs.filter(t => t !== 'dashboard' && t !== 'pos' && canAccessTab(t)).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`inline-flex min-w-[80px] flex-col items-center justify-center rounded-3xl px-3 py-2 text-center text-[11px] font-semibold transition ${activeTab === tab ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+                  >
+                    <span className="block text-lg">{tabIcons[tab] || (tab === 'riders-app' ? '🚴' : '•')}</span>
+                    <span className="mt-1 block max-w-[90px] leading-tight break-words">{tabLabels[tab] || formatTabName(tab)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
