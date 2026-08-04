@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 const API = '/api';
 
@@ -76,6 +76,11 @@ export function OrderTakerApp() {
   // Edit
   const [editOrder, setEditOrder] = useState(null);
   const [editCart, setEditCart] = useState([]);
+
+  // Payment request photo
+  const [requestOrderId, setRequestOrderId] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const fileInputRef = useRef(null);
 
   const apiBase = API;
 
@@ -284,6 +289,60 @@ export function OrderTakerApp() {
   function openEditOrder(order) {
     setEditOrder(order);
     setEditCart((order.items || []).map(i => ({ ...i, id: i.productId || i.id, itemId: `${i.productId || i.id}-edit` })));
+  }
+
+  function openRequestCamera(orderId) {
+    setRequestOrderId(orderId);
+    setTimeout(() => fileInputRef.current?.click(), 50);
+  }
+
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const maxDim = 900;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            const ratio = Math.min(maxDim / width, maxDim / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleRequestImage(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !requestOrderId) return;
+    setLoading(true);
+    try {
+      const image = await compressImage(file);
+      await fetchJson(`${apiBase}/pos/orders/${requestOrderId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          paymentRequestImage: image,
+          paymentRequestedAt: new Date().toISOString(),
+          orderTaker: orderTaker?.name || orderTaker?.username || '',
+        }),
+        token
+      });
+      setRequestOrderId(null);
+      setMessage('Payment request sent with photo');
+      await loadData();
+    } catch (err) { setMessage(err.message); setRequestOrderId(null); } finally { setLoading(false); }
   }
 
   if (!token || !orderTaker) {
@@ -537,11 +596,34 @@ export function OrderTakerApp() {
                     <span>•</span>
                     <span className={`font-semibold ${order.status === 'Completed' || order.status === 'Payment Collected' ? 'text-emerald-400' : 'text-amber-400'}`}>{order.status}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 mb-2 line-clamp-2">
+                  <div className="mt-1 space-y-1 border-t border-slate-800 pt-1.5">
                     {(order.items || []).map((item, idx) => (
-                      <span key={idx}><span className="text-amber-400 font-semibold">{item.quantity}x</span> {item.name}{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
+                      <div key={idx} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-slate-200 min-w-0"><span className="text-amber-400 font-bold">{item.quantity}x</span> <span className="truncate">{item.name}</span></span>
+                        <span className="text-slate-400 shrink-0">{Number(item.price) || 0} × {item.quantity} = <span className="text-emerald-400 font-bold">{Number(item.total) || ((Number(item.price) || 0) * item.quantity)}</span></span>
+                      </div>
                     ))}
+                    {order.subtotal ? <div className="flex items-center justify-between border-t border-slate-800 pt-1 text-[11px]"><span className="text-slate-400">Total</span><span className="font-bold text-emerald-400">{order.total || order.amount || 0} PKR</span></div> : null}
                   </div>
+                  {order.orderType === 'Dine-In' && (
+                    <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950 p-2">
+                      {order.paymentRequestImage ? (
+                        <div className="flex items-center gap-2">
+                          <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-amber-400">📷 Payment Request Sent</p>
+                            <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
+                          </div>
+                          <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => openRequestCamera(order.id)} disabled={loading}
+                          className="w-full rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                          📷 Request Payment (Take Photo)
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-emerald-400">{order.total || order.amount || 0} PKR</span>
                     <div className="flex gap-1.5">
@@ -587,6 +669,15 @@ export function OrderTakerApp() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleRequestImage} />
+
+      {previewImage && (
+        <div className="fixed inset-0 z-[90] bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <img src={previewImage} alt="Payment request" className="max-w-full max-h-full rounded-xl shadow-2xl" />
+          <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">✕ Close</button>
         </div>
       )}
 

@@ -263,6 +263,19 @@ function App() {
       setMessage(`Unable to copy order taker link. Use: ${link}`);
     }
   };
+
+  async function refreshOrderNumbers() {
+    setLoading(true);
+    setMessage('');
+    try {
+      await fetchJson(`${apiBase}/settings/reset-order-numbers`, { method: 'POST' });
+      setMessage('Order numbers refreshed - next order will start from #1');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
   const [posCategories, setPosCategories] = useState([]);
   const [posProducts, setPosProducts] = useState([]);
   const [posTables, setPosTables] = useState([]);
@@ -1155,6 +1168,7 @@ function App() {
   const [markPaidOrder, setMarkPaidOrder] = useState(null);
   const [markPaidAmount, setMarkPaidAmount] = useState('');
   const [markPaidMethod, setMarkPaidMethod] = useState('Cash');
+  const [paymentRequestPreview, setPaymentRequestPreview] = useState(null);
   const [markDueOrder, setMarkDueOrder] = useState(null);
   const [markDueAmount, setMarkDueAmount] = useState(0);
   const [markDueMethod, setMarkDueMethod] = useState('Cash');
@@ -8815,12 +8829,18 @@ function App() {
 
         <div className={`rounded-[32px] border p-6 shadow-soft ${darkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
           <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>📋 Order Taker App</h3>
-          <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Direct link for Order Takers to take orders.</p>
+          <p className={`mt-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Direct link for Order Takers to take orders. Order numbers start from #1 daily and auto-reset every day.</p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/order-taker`} className={`flex-1 min-w-[200px] rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`} />
             <button onClick={() => { const link = `${window.location.origin}/order-taker`; navigator.clipboard.writeText(link); setMessage('Order Taker link copied'); }} className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-500 active:scale-95 transition-all">
               Copy Link
             </button>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-700/40 pt-4">
+            <button onClick={refreshOrderNumbers} disabled={loading} className="rounded-3xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500 active:scale-95 transition-all disabled:opacity-50">
+              🔄 Refresh Order Numbers
+            </button>
+            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Reset order numbering - the next order will start from #1.</p>
           </div>
         </div>
 
@@ -10979,6 +10999,16 @@ function App() {
                                 </div>
                                 <div className="mt-2 font-semibold text-white">Total: {tableOrder.total || tableOrder.amount || 0} PKR</div>
                               </div>
+                              {tableOrder.paymentRequestImage && (
+                                <div className="rounded-xl border border-amber-600/40 bg-amber-900/40 p-3 flex items-center gap-3">
+                                  <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-14 w-14 rounded-lg object-cover cursor-pointer border border-amber-600/40" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-amber-400">📷 Payment Request</p>
+                                    <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                  </div>
+                                  <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition">✓ OK - Mark Paid</button>
+                                </div>
+                              )}
                               <div className="flex items-center gap-2">
                                 <label className="text-xs text-slate-400">Waiter:</label>
                                 <select
@@ -11054,6 +11084,16 @@ function App() {
                                 </div>
                                 <div className="mt-2 font-semibold text-white">Total: {tableOrder.total || tableOrder.amount || 0} PKR</div>
                               </div>
+                              {tableOrder.paymentRequestImage && (
+                                <div className="rounded-xl border border-amber-600/40 bg-amber-900/40 p-3 flex items-center gap-3">
+                                  <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-14 w-14 rounded-lg object-cover cursor-pointer border border-amber-600/40" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-amber-400">📷 Payment Request</p>
+                                    <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                  </div>
+                                  <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition">✓ OK - Mark Paid</button>
+                                </div>
+                              )}
                               <div className="flex items-center gap-2">
                                 <label className="text-xs text-slate-400">Waiter:</label>
                                 <select
@@ -11230,6 +11270,15 @@ function App() {
                                 ))}
                               </div>
                               <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
+                              {tableOrder.paymentRequestImage && (
+                                <div className="rounded-lg border border-amber-600/40 bg-amber-900/40 p-1.5 flex items-center gap-1.5">
+                                  <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-8 w-8 rounded object-cover cursor-pointer border border-amber-600/40 shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request</p>
+                                  </div>
+                                  <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-2 py-1 text-[9px] font-bold text-white">✓ OK</button>
+                                </div>
+                              )}
                               <div className="flex justify-end pt-1 border-t border-slate-800">
                                 <div className="relative" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={() => setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id)} className="rounded-lg bg-slate-800 px-2 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 flex items-center gap-1">
@@ -11311,6 +11360,15 @@ function App() {
                                 ))}
                               </div>
                               <div className="text-xs font-semibold text-white">{tableOrder.total || tableOrder.amount || 0} PKR</div>
+                              {tableOrder.paymentRequestImage && (
+                                <div className="rounded-lg border border-amber-600/40 bg-amber-900/40 p-1.5 flex items-center gap-1.5">
+                                  <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-8 w-8 rounded object-cover cursor-pointer border border-amber-600/40 shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request</p>
+                                  </div>
+                                  <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-2 py-1 text-[9px] font-bold text-white">✓ OK</button>
+                                </div>
+                              )}
                               <div className="flex justify-end pt-1 border-t border-slate-800">
                                 <div className="relative" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={() => setTableOrderAddOpen(tableOrderAddOpen === tableOrder.id ? null : tableOrder.id)} className="rounded-lg bg-slate-800 px-2 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 flex items-center gap-1">
@@ -11394,6 +11452,18 @@ function App() {
                           <span className="text-slate-600">|</span>
                           <span className="text-[11px] text-slate-400">{(order.items || []).reduce((c, it) => c + Number(it.quantity || 0), 0)} items</span>
                         </div>
+                        {order.paymentRequestImage && (
+                          <div className="mt-2 rounded-xl border border-amber-600/40 bg-amber-950/40 p-2 flex items-center gap-2">
+                            <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-10 w-10 rounded-lg object-cover cursor-pointer border border-amber-600/40 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] font-bold text-amber-400">📷 Payment Request</p>
+                              <p className="text-[9px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                            </div>
+                            {order.status !== 'Completed' && order.status !== 'Payment Collected' && (
+                              <button onClick={() => confirmMarkPaid(order)} className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-500 active:scale-95 transition-all">✓ OK - Mark Paid</button>
+                            )}
+                          </div>
+                        )}
                         <div className="mt-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
@@ -12880,6 +12950,12 @@ function App() {
                     <div className="text-sm text-slate-400">Table: {markPaidOrder.tableNumber || 'N/A'}</div>
                     <div className="text-sm text-slate-400">Customer: {markPaidOrder.customerName || 'TABLE'}</div>
                   </div>
+                  {markPaidOrder.paymentRequestImage && (
+                    <div className="rounded-3xl border border-amber-600/40 bg-amber-950/40 p-4">
+                      <p className="text-sm font-bold text-amber-400">📷 Payment Request Photo</p>
+                      <img src={markPaidOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(markPaidOrder.paymentRequestImage)} className="mt-3 w-full rounded-2xl object-cover cursor-pointer" />
+                    </div>
+                  )}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm text-slate-300 mb-2">Amount collected</label>
@@ -12898,6 +12974,13 @@ function App() {
                   <button onClick={handleMarkPaid} className="rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Confirm Paid</button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {paymentRequestPreview && (
+            <div className="fixed inset-0 z-[90] bg-black/95 p-4 flex items-center justify-center" onClick={() => setPaymentRequestPreview(null)}>
+              <img src={paymentRequestPreview} alt="Payment request" className="max-w-full max-h-full rounded-2xl shadow-2xl" />
+              <button onClick={() => setPaymentRequestPreview(null)} className="absolute top-4 right-4 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">✕ Close</button>
             </div>
           )}
 
@@ -12939,6 +13022,13 @@ function App() {
                             <span key={idx}><span className="text-amber-600 font-semibold">{item.quantity}x</span> <span className="text-slate-700">{item.name}</span>{idx < (order.items||[]).length - 1 ? ', ' : ''}</span>
                           ))}
                         </div>
+                        {order.paymentRequestImage && (
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-6 w-6 rounded object-cover border border-amber-500 shrink-0" />
+                            <span className="text-[9px] font-bold text-amber-600">📷 Payment Request</span>
+                            <button onClick={() => confirmMarkPaid(order)} className="ml-auto shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white">✓ OK - Paid</button>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-100">
                           <span className="text-[10px] text-slate-400">{order.waiter || '-'}</span>
                           <span className="text-xs font-bold text-rose-600">{order.total || order.amount || 0} PKR</span>

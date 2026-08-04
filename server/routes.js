@@ -38,6 +38,30 @@ function safe(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
 
+function getPkDateString() {
+  try {
+    const now = new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' });
+    return new Date(now).toISOString().slice(0, 10);
+  } catch (error) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function getNextOrderNumber() {
+  const db = readDb();
+  const settings = db.settings || {};
+  const counter = settings.orderNumberCounter || {};
+  const today = getPkDateString();
+  if (counter.date !== today) {
+    counter.date = today;
+    counter.count = 0;
+  }
+  counter.count = (Number(counter.count) || 0) + 1;
+  db.settings = { ...settings, orderNumberCounter: counter };
+  writeDb(db);
+  return counter.count;
+}
+
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -432,6 +456,13 @@ router.put('/settings', (req, res) => {
   res.send(db.settings);
 });
 
+router.post('/settings/reset-order-numbers', (req, res) => {
+  const db = readDb();
+  db.settings = { ...(db.settings || {}), orderNumberCounter: { date: getPkDateString(), count: 0 } };
+  writeDb(db);
+  res.send({ success: true, nextOrderNumber: 1 });
+});
+
 collections.forEach((collection) => {
   router.get(`/${collection}`, (req, res) => {
     res.send(getCollection(collection));
@@ -746,7 +777,7 @@ router.post('/pos/orders', (req, res) => {
 
   const orderStatus = req.body.status || (orderType === 'Delivery' ? (deliveryAgent ? 'Riders Assigned' : 'Pending') : 'New');
   const order = createRecord('pos_orders', {
-    orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
+    orderNumber: `ORD-${getNextOrderNumber()}`,
     orderType,
     customerName,
     phone,
@@ -970,7 +1001,9 @@ router.put('/pos/orders/:id', (req, res) => {
     paymentMethod = existingOrder.paymentMethod,
     paymentStatus = existingOrder.paymentStatus,
     notes = existingOrder.notes,
-    status = existingOrder.status
+    status = existingOrder.status,
+    paymentRequestImage = existingOrder.paymentRequestImage,
+    paymentRequestedAt = existingOrder.paymentRequestedAt
   } = req.body;
 
   const itemsList = items || [];
@@ -998,6 +1031,8 @@ router.put('/pos/orders/:id', (req, res) => {
     paymentStatus: paymentStatus || '',
     notes: notes || '',
     status: status || 'New',
+    paymentRequestImage: paymentRequestImage || '',
+    paymentRequestedAt: paymentRequestedAt || '',
     subtotal: computedSubtotal,
     total: computedTotal,
     updatedAt: new Date().toISOString()
