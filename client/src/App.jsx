@@ -244,6 +244,25 @@ function App() {
       setMessage(`Unable to copy rider link. Use: ${link}`);
     }
   };
+
+  const copyOrderTakerAppLink = async () => {
+    const link = `${window.location.origin}/order-taker`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setMessage(`Order Taker app link copied to clipboard: ${link}`);
+    } catch (error) {
+      setMessage(`Unable to copy order taker link. Use: ${link}`);
+    }
+  };
   const [posCategories, setPosCategories] = useState([]);
   const [posProducts, setPosProducts] = useState([]);
   const [posTables, setPosTables] = useState([]);
@@ -7932,6 +7951,9 @@ function App() {
               <button onClick={copyRiderAppLink} className={`rounded-full border border-emerald-500 bg-emerald-500/10 px-4 py-2 text-sm font-semibold transition hover:bg-emerald-500/20 ${darkMode ? 'text-emerald-100' : 'text-emerald-700'}`}>
                 Copy Rider Link
               </button>
+              <button onClick={copyOrderTakerAppLink} className={`rounded-full border border-violet-500 bg-violet-500/10 px-4 py-2 text-sm font-semibold transition hover:bg-violet-500/20 ${darkMode ? 'text-violet-100' : 'text-violet-700'}`}>
+                Copy Order Taker App Link
+              </button>
             </div>
           </div>
 
@@ -11453,6 +11475,14 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100">
         <RidersApp />
+      </div>
+    );
+  }
+
+  if (isOrderTakerRoute) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <OrderTakerApp />
       </div>
     );
   }
