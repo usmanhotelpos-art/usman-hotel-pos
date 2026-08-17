@@ -211,7 +211,10 @@ export function OrderTakerApp() {
   }, [orders]);
 
   const availableDineInTables = useMemo(() => {
-    return (tables || []).filter(table => !tablesList.occupied.has(getTableLabel(table)));
+    return (tables || []).map(table => ({
+      ...table,
+      isOccupied: tablesList.occupied.has(getTableLabel(table)),
+    }));
   }, [tables, tablesList]);
 
   // Orders by this order taker only
@@ -228,15 +231,15 @@ export function OrderTakerApp() {
     try {
       const payload = {
         items: cart.map(i => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity, code: i.code || '' })),
-        orderType: activeType,
-        customerName: customerName || (activeType === 'Takeaway' ? 'Takeaway' : ''),
+        orderType: 'Dine-In',
+        customerName: customerName || '',
         phone,
-        tableNumber: activeType === 'Dine-In' ? tableNumber : '',
+        tableNumber,
         notes,
         orderTaker: orderTaker?.name || orderTaker?.username || '',
         waiter: orderTaker?.name || orderTaker?.username || '',
-        status: activeType === 'Takeaway' ? 'Pay Later' : 'Pending',
-        paymentStatus: activeType === 'Takeaway' ? 'Due' : 'Pending',
+        status: 'Pending',
+        paymentStatus: 'Pending',
         serviceType: '',
         deliveryFee: 0,
         discount: 0,
@@ -386,20 +389,6 @@ export function OrderTakerApp() {
         </div>
       </div>
 
-      {/* Order type tabs */}
-      <div className="grid grid-cols-2 gap-2 px-3 py-3">
-        {['Dine-In', 'Takeaway'].map(type => (
-          <button key={type} onClick={() => setActiveType(type)}
-            className={`rounded-xl py-3 text-sm font-bold text-center transition-all active:scale-95 ${
-              activeType === type
-                ? type === 'Dine-In' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-            }`}>
-            {type === 'Dine-In' ? '🍽️ Dine In' : '🛍️ Take Away'}
-          </button>
-        ))}
-      </div>
-
       {/* Search */}
       <div className="px-3 pb-2">
         <div className="relative">
@@ -479,29 +468,23 @@ export function OrderTakerApp() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Order details</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">{activeType === 'Dine-In' ? '🍽️ Dine-In' : '🛍️ Takeaway'} order</h3>
+                <h3 className="mt-2 text-xl font-semibold text-white">🍽️ Dine-In order</h3>
               </div>
               <button onClick={() => setShowDetails(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">✕</button>
             </div>
             <div className="mt-6 space-y-4">
-              {activeType === 'Dine-In' && (
-                <div className="grid gap-3">
-                  <label className="text-sm text-slate-400">Table / Room</label>
-                  <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
-                    <option value="">Select table or room</option>
-                    {availableDineInTables.length ? availableDineInTables.map((table) => (
-                      <option key={table.id} value={getTableLabel(table)}>{getTableLabel(table)}</option>
-                    )) : <option value="" disabled>No free tables available</option>}
-                  </select>
-                  {!tableNumber && <p className="text-xs text-amber-400">Select a table to continue</p>}
-                </div>
-              )}
-              {activeType === 'Takeaway' && (
-                <div className="grid gap-3">
-                  <label className="text-sm text-slate-400">Customer name <span className="text-slate-500">(optional)</span></label>
-                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
-                </div>
-              )}
+              <div className="grid gap-3">
+                <label className="text-sm text-slate-400">Table / Room</label>
+                <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
+                  <option value="">Select table or room</option>
+                  {availableDineInTables.length ? availableDineInTables.map((table) => (
+                    <option key={table.id} value={getTableLabel(table)}>
+                      {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
+                    </option>
+                  )) : <option value="" disabled>No tables found</option>}
+                </select>
+                {!tableNumber && <p className="text-xs text-amber-400">Select a table to continue</p>}
+              </div>
               <div className="grid gap-3">
                 <label className="text-sm text-slate-400">Phone <span className="text-slate-500">(optional)</span></label>
                 <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
@@ -533,8 +516,7 @@ export function OrderTakerApp() {
             </div>
           </div>
           <div className="px-4 py-2 border-b border-slate-100 text-xs text-slate-500 space-y-0.5">
-            {activeType === 'Dine-In' && <p>🍽️ Dine-In {tableNumber && <span className="font-semibold text-slate-700">• Table: {tableNumber}</span>}</p>}
-            {activeType === 'Takeaway' && <p>🛍️ Takeaway {customerName && <span className="font-semibold text-slate-700">• {customerName}</span>}</p>}
+            <p>🍽️ Dine-In {tableNumber && <span className="font-semibold text-slate-700">• Table: {tableNumber}</span>}</p>
             {phone && <p>📞 {phone}</p>}
             {notes && <p className="truncate">📝 {notes}</p>}
           </div>
@@ -567,7 +549,7 @@ export function OrderTakerApp() {
               <span className="text-lg font-bold text-emerald-600">{cartTotal} PKR</span>
             </div>
             <button onClick={createOrder} disabled={loading || !cart.length} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50 active:scale-[0.99]">
-              {loading ? 'Creating...' : `Place ${activeType === 'Dine-In' ? '🍽️ Dine-In' : '🛍️ Takeaway'} Order`}
+              {loading ? 'Creating...' : 'Place 🍽️ Dine-In Order'}
             </button>
           </div>
         </div>
