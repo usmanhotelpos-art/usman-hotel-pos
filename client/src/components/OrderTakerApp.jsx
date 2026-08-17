@@ -222,12 +222,10 @@ export function OrderTakerApp() {
     }));
   }, [tables, tablesList]);
 
-  // Orders by this order taker only
-  const myOrders = useMemo(() => {
-    const name = orderTaker?.name || '';
-    const username = orderTaker?.username || '';
-    return orders.filter(o => o.orderTaker === name || o.orderTaker === username || o.waiter === name || o.waiter === username);
-  }, [orders, orderTaker]);
+  // All dine-in orders (not just this order taker's)
+  const dineInOrders = useMemo(() => {
+    return (orders || []).filter(o => o.orderType === 'Dine-In');
+  }, [orders]);
 
   async function createOrder() {
     if (!cart.length) { setMessage('Cart is empty'); return; }
@@ -417,7 +415,7 @@ export function OrderTakerApp() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowOrdersPopup(true)} className="relative rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
-            📋 Orders {myOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({myOrders.length})</span>}
+            📋 Orders {dineInOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({dineInOrders.length})</span>}
           </button>
           <button onClick={handleLogout} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Logout</button>
         </div>
@@ -594,12 +592,12 @@ export function OrderTakerApp() {
         <div className="fixed inset-0 z-[60] bg-black/70 px-2 py-4 flex items-start justify-center pt-12" onClick={() => setShowOrdersPopup(false)}>
           <div className="relative w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white">📋 My Orders ({myOrders.length})</h3>
+              <h3 className="text-base font-bold text-white">📋 Orders ({dineInOrders.length})</h3>
               <button onClick={() => setShowOrdersPopup(false)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {myOrders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No orders yet</p>}
-              {[...myOrders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => {
+              {dineInOrders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No dine-in orders yet</p>}
+              {[...dineInOrders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => {
                 const isExpanded = expandedOrderId === order.id;
                 const { subtotal, total } = orderTotals(order);
                 const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid' || (order.status || '').toLowerCase() === 'payment collected' || (order.status || '').toLowerCase() === 'completed';
