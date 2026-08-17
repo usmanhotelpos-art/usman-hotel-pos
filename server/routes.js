@@ -742,7 +742,9 @@ router.post('/pos/orders', (req, res) => {
     serviceCharge = 0,
     paymentMethod = 'Cash',
     paymentStatus = '',
-    notes = ''
+    notes = '',
+    orderTaker = '',
+    waiter = ''
   } = req.body;
 
   if (!items || !items.length) {
@@ -845,6 +847,8 @@ router.post('/pos/orders', (req, res) => {
     total,
     status: orderStatus,
     customerId,
+    orderTaker,
+    waiter,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
@@ -1051,7 +1055,9 @@ router.put('/pos/orders/:id', (req, res) => {
     notes = existingOrder.notes,
     status = existingOrder.status,
     paymentRequestImage = existingOrder.paymentRequestImage,
-    paymentRequestedAt = existingOrder.paymentRequestedAt
+    paymentRequestedAt = existingOrder.paymentRequestedAt,
+    orderTaker = existingOrder.orderTaker,
+    waiter = existingOrder.waiter
   } = req.body;
 
   const itemsList = items || [];
@@ -1083,6 +1089,8 @@ router.put('/pos/orders/:id', (req, res) => {
     paymentRequestedAt: paymentRequestedAt || '',
     subtotal: computedSubtotal,
     total: computedTotal,
+    orderTaker,
+    waiter,
     updatedAt: new Date().toISOString()
   });
 
