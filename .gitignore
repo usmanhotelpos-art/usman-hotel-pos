@@ -31,6 +31,7 @@ server/.env
 server/.env.*
 !server/.env.example
 server/.jwt-secret
+users.txt
 *.pem
 *.key
 *.p12
