@@ -222,10 +222,17 @@ export function OrderTakerApp() {
     }));
   }, [tables, tablesList]);
 
-  // All dine-in orders (not just this order taker's)
-  const dineInOrders = useMemo(() => {
-    return (orders || []).filter(o => o.orderType === 'Dine-In');
-  }, [orders]);
+  // Only this order taker's NEW dine-in orders (completed/payment-collected hidden)
+  const myOrders = useMemo(() => {
+    const name = orderTaker?.name || '';
+    const username = orderTaker?.username || '';
+    const hiddenStatuses = ['completed', 'payment collected', 'paid'];
+    return (orders || []).filter(o =>
+      o.orderType === 'Dine-In' &&
+      (o.orderTaker === name || o.orderTaker === username || o.waiter === name || o.waiter === username) &&
+      !hiddenStatuses.includes((o.status || o.paymentStatus || '').toLowerCase())
+    );
+  }, [orders, orderTaker]);
 
   async function createOrder() {
     if (!cart.length) { setMessage('Cart is empty'); return; }
@@ -265,23 +272,39 @@ export function OrderTakerApp() {
 
   async function saveEditOrder() {
     if (!editOrder) return;
+    if (!editCart.length) {
+      setMessage('Order must have at least one item.');
+      return;
+    }
+    if (!editOrder.tableNumber) {
+      setMessage('Please select a table or room for Dine-In orders.');
+      return;
+    }
     setLoading(true);
     try {
+      const subtotal = editCart.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 1), 0);
+      const discountValue = Number(editOrder.discount) || 0;
+      const taxValue = ((subtotal - discountValue) * (Number(editOrder.taxPercent) || 0)) / 100;
+      const serviceValue = Number(editOrder.serviceCharge) || 0;
+      const total = Math.max(0, subtotal - discountValue + taxValue + serviceValue);
       const payload = {
-        items: editCart.map(i => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity, code: i.code || '' })),
+        items: editCart,
+        orderType: 'Dine-In',
         customerName: editOrder.customerName || '',
         phone: editOrder.phone || '',
         tableNumber: editOrder.tableNumber || '',
-        deliveryAgent: editOrder.deliveryAgent || '',
-        serviceType: editOrder.serviceType || '',
-        deliveryFee: editOrder.deliveryFee || 0,
-        discount: editOrder.discount || 0,
-        taxPercent: editOrder.taxPercent || 0,
-        serviceCharge: editOrder.serviceCharge || 0,
+        deliveryAgent: '',
+        serviceType: '',
+        deliveryFee: 0,
+        discount: discountValue,
+        taxPercent: Number(editOrder.taxPercent) || 0,
+        serviceCharge: serviceValue,
         paymentMethod: editOrder.paymentMethod || 'Cash',
-        paymentStatus: editOrder.paymentStatus || 'Pending',
+        paymentStatus: editOrder.paymentStatus || '',
         notes: editOrder.notes || '',
         status: editOrder.status || 'Pending',
+        subtotal,
+        total,
         orderTaker: orderTaker?.name || orderTaker?.username || '',
       };
       await fetchJson(`${apiBase}/pos/orders/${editOrder.id}`, { method: 'PUT', body: JSON.stringify(payload), token });
@@ -294,7 +317,10 @@ export function OrderTakerApp() {
 
   function openEditOrder(order) {
     setEditOrder(order);
-    setEditCart((order.items || []).map(i => ({ ...i, id: i.productId || i.id, itemId: `${i.productId || i.id}-edit` })));
+    setEditCart((order.items || []).map((item) => ({
+      ...item,
+      itemId: item.itemId || `${item.productId || item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    })));
   }
 
   function openRequestCamera(orderId) {
@@ -415,7 +441,7 @@ export function OrderTakerApp() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowOrdersPopup(true)} className="relative rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
-            📋 Orders {dineInOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({dineInOrders.length})</span>}
+            📋 Orders {myOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({myOrders.length})</span>}
           </button>
           <button onClick={handleLogout} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Logout</button>
         </div>
@@ -592,12 +618,12 @@ export function OrderTakerApp() {
         <div className="fixed inset-0 z-[60] bg-black/70 px-2 py-4 flex items-start justify-center pt-12" onClick={() => setShowOrdersPopup(false)}>
           <div className="relative w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white">📋 Orders ({dineInOrders.length})</h3>
+              <h3 className="text-base font-bold text-white">📋 My Orders ({myOrders.length})</h3>
               <button onClick={() => setShowOrdersPopup(false)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {dineInOrders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No dine-in orders yet</p>}
-              {[...dineInOrders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => {
+              {myOrders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No new dine-in orders yet</p>}
+              {[...myOrders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => {
                 const isExpanded = expandedOrderId === order.id;
                 const { subtotal, total } = orderTotals(order);
                 const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid' || (order.status || '').toLowerCase() === 'payment collected' || (order.status || '').toLowerCase() === 'completed';
@@ -721,6 +747,13 @@ export function OrderTakerApp() {
               <button onClick={() => { setEditOrder(null); setEditCart([]); }} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <select value={editOrder.tableNumber || ''} onChange={(e) => setEditOrder({ ...editOrder, tableNumber: e.target.value })}
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none">
+                <option value="">Select table or room</option>
+                {availableDineInTables.map((table) => (
+                  <option key={table.id} value={getTableLabel(table)}>{getTableLabel(table)}{table.isOccupied && editOrder.tableNumber !== getTableLabel(table) ? ' (Busy)' : ''}</option>
+                ))}
+              </select>
               <input type="text" value={editOrder.notes || ''} onChange={(e) => setEditOrder({ ...editOrder, notes: e.target.value })} placeholder="Notes" className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none" />
               {editCart.map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-3">
@@ -736,7 +769,15 @@ export function OrderTakerApp() {
             <div className="px-4 py-3 border-t border-slate-800">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-slate-400">Total</span>
-                <span className="text-lg font-bold text-emerald-400">{editCart.reduce((s, i) => s + (Number(i.price) || 0) * i.quantity, 0)} PKR</span>
+                <span className="text-lg font-bold text-emerald-400">
+                  {(() => {
+                    const subtotal = editCart.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
+                    const discount = Number(editOrder.discount) || 0;
+                    const tax = ((subtotal - discount) * (Number(editOrder.taxPercent) || 0)) / 100;
+                    const service = Number(editOrder.serviceCharge) || 0;
+                    return `${Math.max(0, subtotal - discount + tax + service)} PKR`;
+                  })()}
+                </span>
               </div>
               <button onClick={saveEditOrder} disabled={loading} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
                 {loading ? 'Saving...' : 'Save Changes'}
