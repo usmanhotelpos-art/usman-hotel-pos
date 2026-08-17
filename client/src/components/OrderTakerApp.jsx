@@ -101,9 +101,11 @@ export function OrderTakerApp() {
   useEffect(() => {
     if (!token || !orderTaker) return;
     loadData();
+    const id = setInterval(() => loadData(true), 20000);
+    return () => clearInterval(id);
   }, [token, orderTaker]);
 
-  async function loadData() {
+  async function loadData(silent = false) {
     try {
       const [cats, prods, tbls, ords, sets, slots] = await Promise.all([
         fetchJson(`${apiBase}/pos/categories`, { token }).catch(() => null),
@@ -119,7 +121,8 @@ export function OrderTakerApp() {
       if (Array.isArray(ords)) setOrders(ords);
       if (sets) setSettings(sets);
       if (Array.isArray(slots)) setMashallahSlots(slots);
-    } catch (e) { setMessage(e.message); }
+      if (!silent && tbls === null) setMessage('Could not load tables from server - check connection or re-login');
+    } catch (e) { if (!silent) setMessage(e.message); }
   }
 
   async function handleLogin(e) {
@@ -218,7 +221,7 @@ export function OrderTakerApp() {
   const availableDineInTables = useMemo(() => {
     return (tables || []).map(table => ({
       ...table,
-      isOccupied: tablesList.occupied.has(getTableLabel(table)),
+      isOccupied: tablesList.occupied.has(getTableLabel(table)) || ['occupied', 'reserved'].includes((table.status || '').toLowerCase()),
     }));
   }, [tables, tablesList]);
 
