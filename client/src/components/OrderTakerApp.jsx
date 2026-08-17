@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from '../utils/escpos.js';
+import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter, disconnectDevice } from '../utils/btPrint.js';
 
 const API = '/api';
 
@@ -85,6 +87,12 @@ export function OrderTakerApp() {
   // Orders list UX
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
+  // Bluetooth printer
+  const [btDevice, setBtDevice] = useState(null);
+  const [btConnected, setBtConnected] = useState(false);
+  const [btInfo, setBtInfo] = useState(null);
+  const [btConnecting, setBtConnecting] = useState(false);
+
   const apiBase = API;
 
   useEffect(() => {
@@ -154,6 +162,157 @@ export function OrderTakerApp() {
     localStorage.removeItem('orderTakerUser');
     setCart([]);
     setEditOrder(null);
+  }
+
+  async function handleBtConnect() {
+    if (btConnected && btDevice) {
+      await disconnectDevice(btDevice);
+      setBtDevice(null);
+      setBtConnected(false);
+      setBtInfo(null);
+      clearPrinterInfo();
+      return;
+    }
+    setBtConnecting(true);
+    try {
+      let device, info;
+      const savedPrinter = getSavedPrinterInfo();
+      if (savedPrinter?.id) {
+        try {
+          const result = await autoConnectSavedPrinter();
+          device = result.device;
+          info = result.info;
+        } catch (err) {
+          console.warn('Auto-reconnect failed, showing manual pairing:', err.message);
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          info = result.info;
+        }
+      } else {
+        const result = await requestBluetoothPrinter();
+        device = result.device;
+        info = result.info;
+      }
+      setBtDevice(device);
+      setBtInfo(info);
+      setBtConnected(true);
+      setMessage(`Bluetooth printer connected: ${info.name}`);
+    } catch (err) {
+      console.warn('Bluetooth connection failed:', err.message);
+      setMessage(err.message);
+    } finally {
+      setBtConnecting(false);
+    }
+  }
+
+  async function printOrderBT(order) {
+    let device = btDevice;
+
+    if (!btConnected || !device) {
+      try {
+        const result = await autoConnectSavedPrinter();
+        device = result.device;
+        setBtDevice(device);
+        setBtConnected(true);
+      } catch (err) {
+        console.warn('Auto-reconnect failed, requesting printer pairing:', err.message);
+        try {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          setBtDevice(device);
+          setBtConnected(true);
+          setBtInfo(result.info);
+        } catch (pairErr) {
+          console.warn('Printer pairing cancelled or failed:', pairErr.message);
+          return null;
+        }
+      }
+    }
+
+    if (!device) return null;
+
+    const doPrint = async (data) => {
+      await printToBluetooth(device, data);
+    };
+
+    const doBitmapPrint = async () => {
+      const canvas = renderReceiptToCanvas(order, settings);
+      const rasterData = canvasToEscposRaster(canvas);
+      const cutCmd = new Uint8Array(CMD.CUT);
+      const feedCmd = new Uint8Array(CMD.FEED_LINES(8));
+      const finalData = new Uint8Array(rasterData.length + feedCmd.length + cutCmd.length);
+      let offset = 0;
+      finalData.set(rasterData, offset); offset += rasterData.length;
+      finalData.set(feedCmd, offset); offset += feedCmd.length;
+      finalData.set(cutCmd, offset);
+      await printToBluetooth(device, finalData);
+    };
+
+    const attemptPrint = async () => {
+      if (settings.btEncoding === 'bmp') {
+        await doBitmapPrint();
+      } else {
+        try {
+          const escposData = buildEscposReceipt(order, settings);
+          await doPrint(escposData);
+        } catch (textErr) {
+          console.warn('Text BT print failed, trying bitmap:', textErr.message);
+          await doBitmapPrint();
+        }
+      }
+
+      const shouldPrintTokenSlip = settings.tokenSlipEnabled && (
+        (order.orderType === 'Dine-In' && settings.btTokenSlipDineIn !== false) ||
+        (order.orderType === 'Takeaway' && settings.btTokenSlipTakeaway !== false) ||
+        (order.orderType === 'Delivery' && settings.btTokenSlipDelivery !== false) ||
+        (!order.orderType && settings.btTokenSlipDineIn !== false)
+      );
+      if (shouldPrintTokenSlip) {
+        const tokenOrder = { ...order, items: [] };
+        await new Promise((r) => setTimeout(r, 500));
+        if (settings.btEncoding === 'bmp') {
+          const tokenCanvas = renderReceiptToCanvas(tokenOrder, { ...settings, _tokenOnly: true });
+          const tokenRaster = canvasToEscposRaster(tokenCanvas);
+          const tokenFeed = new Uint8Array(CMD.FEED_LINES(8));
+          const tokenCut = new Uint8Array(CMD.CUT);
+          const tokenFinal = new Uint8Array(tokenRaster.length + tokenFeed.length + tokenCut.length);
+          let to = 0;
+          tokenFinal.set(tokenRaster, to); to += tokenRaster.length;
+          tokenFinal.set(tokenFeed, to); to += tokenFeed.length;
+          tokenFinal.set(tokenCut, to);
+          await printToBluetooth(device, tokenFinal);
+        } else {
+          const tokenData = buildEscposReceipt(tokenOrder, { ...settings, _tokenOnly: true });
+          await printToBluetooth(device, tokenData);
+        }
+      }
+    };
+
+    try {
+      await attemptPrint();
+      return true;
+    } catch (err) {
+      console.warn('BT print attempt failed, reconnecting and retrying:', err.message);
+      try { await disconnectDevice(device); } catch {}
+      try {
+        const result = await autoConnectSavedPrinter();
+        device = result.device;
+        setBtDevice(device);
+        setBtConnected(true);
+      } catch {
+        try {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          setBtDevice(device);
+          setBtConnected(true);
+          setBtInfo(result.info);
+        } catch {
+          throw err;
+        }
+      }
+      await attemptPrint();
+      return true;
+    }
   }
 
   function addToCart(product) {
@@ -258,7 +417,7 @@ export function OrderTakerApp() {
         serviceCharge: 0,
         paymentMethod: 'Cash',
       };
-      await fetchJson(`${apiBase}/pos/orders`, { method: 'POST', body: JSON.stringify(payload), token });
+      const createdOrder = await fetchJson(`${apiBase}/pos/orders`, { method: 'POST', body: JSON.stringify(payload), token });
       setCart([]);
       setCustomerName('');
       setPhone('');
@@ -267,6 +426,14 @@ export function OrderTakerApp() {
       setShowCart(false);
       setShowDetails(false);
       setMessage('Order created successfully');
+      if (btConnected || btInfo || settings.btPrintEnabled) {
+        const printOrder = { ...createdOrder, date: createdOrder.createdAt || new Date().toISOString() };
+        printOrderBT(printOrder)
+          .then((ok) => {
+            if (ok) setMessage('Order created & printed via Bluetooth');
+          })
+          .catch((err) => setMessage(`Order created but Bluetooth print failed: ${err.message}`));
+      }
       await loadData();
     } catch (e) { setMessage(e.message); } finally { setLoading(false); }
   }
@@ -441,6 +608,10 @@ export function OrderTakerApp() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={handleBtConnect} disabled={btConnecting}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${btConnected ? 'bg-emerald-600 text-white' : 'bg-sky-100 text-sky-700 hover:bg-sky-200'}`}>
+            {btConnecting ? 'Connecting...' : btConnected ? `🖨️ ${btInfo?.name || 'Printer'}` : '🖨️ Attach Bluetooth Printer'}
+          </button>
           <button onClick={() => setShowOrdersPopup(true)} className="relative rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
             📋 Orders {myOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({myOrders.length})</span>}
           </button>
@@ -714,7 +885,14 @@ export function OrderTakerApp() {
                         {/* Actions */}
                         <div className="flex gap-1.5">
                           <button onClick={() => openEditOrder(order)} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">✏️ Edit Order</button>
-                          <button onClick={() => window.print()} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">🖨️ Print</button>
+                          <button onClick={() => {
+                            if (btConnected || btInfo || settings.btPrintEnabled) {
+                              printOrderBT({ ...order, date: order.createdAt || new Date().toISOString() })
+                                .catch((err) => setMessage(`Bluetooth print failed: ${err.message}`));
+                            } else {
+                              window.print();
+                            }
+                          }} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">🖨️ Print</button>
                         </div>
                       </div>
                     )}
