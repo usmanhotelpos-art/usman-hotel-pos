@@ -84,8 +84,6 @@ export function OrderTakerApp() {
 
   // Orders list UX
   const [expandedOrderId, setExpandedOrderId] = useState(null);
-  const [payOrderId, setPayOrderId] = useState(null);
-  const [payMethod, setPayMethod] = useState('Cash');
 
   const apiBase = API;
 
@@ -380,23 +378,23 @@ export function OrderTakerApp() {
     } catch (err) { setMessage(err.message); setRequestOrderId(null); } finally { setLoading(false); }
   }
 
-  async function processPayment() {
-    if (!payOrderId) return;
+  async function pushOwnerRequest(order) {
+    if (!order.paymentRequestImage) {
+      setMessage('Attach a payment photo first');
+      return;
+    }
     setLoading(true);
     try {
-      await fetchJson(`${apiBase}/pos/orders/${payOrderId}`, {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
         method: 'PUT',
         body: JSON.stringify({
-          paymentMethod: payMethod,
-          paymentStatus: 'Paid',
-          status: 'Payment Collected',
+          paymentRequestStatus: 'owner-request',
+          paymentRequestedAt: order.paymentRequestedAt || new Date().toISOString(),
           orderTaker: orderTaker?.name || orderTaker?.username || '',
         }),
         token
       });
-      setPayOrderId(null);
-      setPayMethod('Cash');
-      setMessage(`Payment collected (${payMethod})`);
+      setMessage(`Payment request pushed to Farhan Owner for #${order.orderNumber || order.id}`);
       await loadData();
     } catch (e) { setMessage(e.message); } finally { setLoading(false); }
   }
@@ -630,7 +628,7 @@ export function OrderTakerApp() {
                 const isExpanded = expandedOrderId === order.id;
                 const { subtotal, total } = orderTotals(order);
                 const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid' || (order.status || '').toLowerCase() === 'payment collected' || (order.status || '').toLowerCase() === 'completed';
-                const isPaymentFlow = payOrderId === order.id;
+                const requestSent = order.paymentRequestStatus === 'owner-request';
                 return (
                   <div key={order.id} className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
                     {/* Header - tap to expand */}
@@ -682,47 +680,34 @@ export function OrderTakerApp() {
                               <div className="flex items-center gap-2">
                                 <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-bold text-amber-400">📷 Payment Request Sent</p>
+                                  <p className="text-[10px] font-bold text-amber-400">📷 Payment Photo Attached</p>
                                   <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
+                                  {requestSent && <p className="text-[9px] font-bold text-violet-400 mt-0.5">✅ Request sent to Farhan Owner</p>}
                                 </div>
                                 <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
                               </div>
                             ) : (
                               <button onClick={() => openRequestCamera(order.id)} disabled={loading}
                                 className="w-full rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                                📷 Request Payment (Take Photo)
+                                📷 Attach Payment Photo
                               </button>
                             )}
                           </div>
                         )}
 
-                        {/* Payment process */}
+                        {/* Push to Farhan Owner request */}
                         {isPaid ? (
                           <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-center text-[11px] font-bold text-emerald-400">
                             ✅ Payment {order.paymentMethod ? `collected via ${order.paymentMethod}` : 'collected'}
                           </div>
-                        ) : isPaymentFlow ? (
-                          <div className="rounded-lg border border-slate-800 bg-slate-950 p-2.5 space-y-2">
-                            <p className="text-[10px] font-bold text-slate-300">💳 Collect Payment</p>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {['Cash', 'Online'].map(m => (
-                                <button key={m} onClick={() => setPayMethod(m)}
-                                  className={`rounded-lg py-2 text-[11px] font-bold transition ${payMethod === m ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
-                                  {m === 'Cash' ? '💵 Cash' : '📱 Online'}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="flex gap-1.5">
-                              <button onClick={() => { setPayOrderId(null); setPayMethod('Cash'); }} className="flex-1 rounded-lg bg-slate-800 py-2 text-[11px] font-semibold text-slate-300 hover:bg-slate-700">Cancel</button>
-                              <button onClick={processPayment} disabled={loading} className="flex-1 rounded-lg bg-emerald-600 py-2 text-[11px] font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
-                                {loading ? 'Processing...' : `Collect ${payMethod}`}
-                              </button>
-                            </div>
+                        ) : requestSent ? (
+                          <div className="rounded-lg bg-violet-500/10 border border-violet-500/30 px-3 py-2 text-center text-[11px] font-bold text-violet-400">
+                            👤 Request sent to Farhan Owner - awaiting approval
                           </div>
                         ) : (
-                          <button onClick={() => setPayOrderId(order.id)} disabled={loading}
-                            className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-emerald-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                            💳 Process Payment ({total} PKR)
+                          <button onClick={() => pushOwnerRequest(order)} disabled={loading || !order.paymentRequestImage}
+                            className="w-full rounded-lg bg-violet-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-violet-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                            👤 Push to Farhan Owner Request
                           </button>
                         )}
 

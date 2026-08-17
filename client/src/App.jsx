@@ -11003,8 +11003,9 @@ function App() {
                                 <div className="rounded-xl border border-amber-600/40 bg-amber-900/40 p-3 flex items-center gap-3">
                                   <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-14 w-14 rounded-lg object-cover cursor-pointer border border-amber-600/40" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-amber-400">📷 Payment Request</p>
+                                    <p className="text-xs font-bold text-amber-400">📷 Payment Request{tableOrder.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
                                     <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                    {tableOrder.waiter && <p className="text-[10px] font-bold text-violet-300">👤 Waiter: {tableOrder.waiter}</p>}
                                   </div>
                                   <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition">✓ OK - Mark Paid</button>
                                 </div>
@@ -11088,8 +11089,9 @@ function App() {
                                 <div className="rounded-xl border border-amber-600/40 bg-amber-900/40 p-3 flex items-center gap-3">
                                   <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-14 w-14 rounded-lg object-cover cursor-pointer border border-amber-600/40" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-amber-400">📷 Payment Request</p>
+                                    <p className="text-xs font-bold text-amber-400">📷 Payment Request{tableOrder.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
                                     <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                    {tableOrder.waiter && <p className="text-[10px] font-bold text-violet-300">👤 Waiter: {tableOrder.waiter}</p>}
                                   </div>
                                   <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition">✓ OK - Mark Paid</button>
                                 </div>
@@ -11274,7 +11276,8 @@ function App() {
                                 <div className="rounded-lg border border-amber-600/40 bg-amber-900/40 p-1.5 flex items-center gap-1.5">
                                   <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-8 w-8 rounded object-cover cursor-pointer border border-amber-600/40 shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request</p>
+                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request{tableOrder.paymentRequestStatus === 'owner-request' ? ' - 👤 Owner' : ''}</p>
+                                    {tableOrder.waiter && <p className="text-[8px] text-violet-300 font-semibold truncate">👤 {tableOrder.waiter}</p>}
                                   </div>
                                   <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-2 py-1 text-[9px] font-bold text-white">✓ OK</button>
                                 </div>
@@ -11364,7 +11367,8 @@ function App() {
                                 <div className="rounded-lg border border-amber-600/40 bg-amber-900/40 p-1.5 flex items-center gap-1.5">
                                   <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-8 w-8 rounded object-cover cursor-pointer border border-amber-600/40 shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request</p>
+                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request{tableOrder.paymentRequestStatus === 'owner-request' ? ' - 👤 Owner' : ''}</p>
+                                    {tableOrder.waiter && <p className="text-[8px] text-violet-300 font-semibold truncate">👤 {tableOrder.waiter}</p>}
                                   </div>
                                   <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-2 py-1 text-[9px] font-bold text-white">✓ OK</button>
                                 </div>
@@ -11456,8 +11460,9 @@ function App() {
                           <div className="mt-2 rounded-xl border border-amber-600/40 bg-amber-950/40 p-2 flex items-center gap-2">
                             <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-10 w-10 rounded-lg object-cover cursor-pointer border border-amber-600/40 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-[10px] font-bold text-amber-400">📷 Payment Request</p>
+                              <p className="text-[10px] font-bold text-amber-400">📷 Payment Request{order.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
                               <p className="text-[9px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                              {order.waiter && <p className="text-[9px] font-bold text-violet-300">👤 Waiter: {order.waiter}</p>}
                             </div>
                             {order.status !== 'Completed' && order.status !== 'Payment Collected' && (
                               <button onClick={() => confirmMarkPaid(order)} className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-500 active:scale-95 transition-all">✓ OK - Mark Paid</button>
@@ -12949,6 +12954,10 @@ function App() {
                     <div className="mt-2 text-lg font-semibold text-white">{markPaidOrder.orderNumber || markPaidOrder.id}</div>
                     <div className="text-sm text-slate-400">Table: {markPaidOrder.tableNumber || 'N/A'}</div>
                     <div className="text-sm text-slate-400">Customer: {markPaidOrder.customerName || 'TABLE'}</div>
+                    {markPaidOrder.waiter && <div className="mt-1 text-sm font-bold text-violet-400">👤 Waiter: {markPaidOrder.waiter}</div>}
+                    {markPaidOrder.paymentRequestStatus === 'owner-request' && (
+                      <div className="mt-1 text-sm font-bold text-violet-400">📨 Farhan Owner payment request received</div>
+                    )}
                   </div>
                   {markPaidOrder.paymentRequestImage && (
                     <div className="rounded-3xl border border-amber-600/40 bg-amber-950/40 p-4">
@@ -13025,7 +13034,8 @@ function App() {
                         {order.paymentRequestImage && (
                           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-6 w-6 rounded object-cover border border-amber-500 shrink-0" />
-                            <span className="text-[9px] font-bold text-amber-600">📷 Payment Request</span>
+                            <span className="text-[9px] font-bold text-amber-600">📷 Payment Request{order.paymentRequestStatus === 'owner-request' ? ' - 👤 Owner' : ''}</span>
+                            {order.waiter && <span className="text-[9px] font-semibold text-violet-600">👤 {order.waiter}</span>}
                             <button onClick={() => confirmMarkPaid(order)} className="ml-auto shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white">✓ OK - Paid</button>
                           </div>
                         )}

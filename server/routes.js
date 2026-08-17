@@ -1056,6 +1056,7 @@ router.put('/pos/orders/:id', (req, res) => {
     status = existingOrder.status,
     paymentRequestImage = existingOrder.paymentRequestImage,
     paymentRequestedAt = existingOrder.paymentRequestedAt,
+    paymentRequestStatus = existingOrder.paymentRequestStatus,
     orderTaker = existingOrder.orderTaker,
     waiter = existingOrder.waiter
   } = req.body;
@@ -1087,6 +1088,7 @@ router.put('/pos/orders/:id', (req, res) => {
     status: status || 'New',
     paymentRequestImage: paymentRequestImage || '',
     paymentRequestedAt: paymentRequestedAt || '',
+    paymentRequestStatus: paymentRequestStatus || '',
     subtotal: computedSubtotal,
     total: computedTotal,
     orderTaker,
