@@ -263,8 +263,32 @@ function loadDbFileIfExists() {
   }
 }
 
-async function ensurePostgresSchema() {
-  if (!pgClient) return;
+// SECURITY: convert any legacy plain-text `password` fields to bcrypt hashes.
+// Also strips plain-text password/rawPassword fields so no raw passwords persist.
+function migrateLegacyPasswords(data) {
+  let changed = false;
+  for (const collectionName of ['staff', 'riders', 'users']) {
+    const items = data[collectionName] || [];
+    for (const item of items) {
+      if (!item.passwordHash && typeof item.password === 'string' && item.password.length > 0) {
+        item.passwordHash = bcrypt.hashSync(item.password, 10);
+        console.warn(`[security] Hashed legacy plain-text password for ${collectionName}/${item.id}`);
+        changed = true;
+      }
+      if (item.passwordHash && typeof item.password === 'string') {
+        delete item.password;
+        changed = true;
+      }
+      if (typeof item.rawPassword === 'string') {
+        delete item.rawPassword;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
+async function ensurePostgresSchema() {  if (!pgClient) return;
   await pgClient.query(`
     CREATE TABLE IF NOT EXISTS pos_data (
       id TEXT PRIMARY KEY,
@@ -308,13 +332,12 @@ export async function initDatabase() {
         dbCache = mergeDefaultData(postgresData);
       } else {
         const localData = loadDbFileIfExists();
-        if (localData) {
-          dbCache = localData;
-          await saveDbToPostgres(dbCache);
-        } else {
-          dbCache = defaultData;
-          await saveDbToPostgres(dbCache);
-        }
+        dbCache = localData || defaultData;
+      }
+
+      const passwordsChanged = migrateLegacyPasswords(dbCache);
+      if (!postgresData || passwordsChanged) {
+        await saveDbToPostgres(dbCache);
       }
 
       console.log('Connected to Postgres. Data persistence is now using Postgres.');
@@ -327,6 +350,9 @@ export async function initDatabase() {
   }
 
   dbCache = loadDbFile();
+  if (migrateLegacyPasswords(dbCache)) {
+    writeDbFile(dbCache);
+  }
 }
 
 export function readDb() {

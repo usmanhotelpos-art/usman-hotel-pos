@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from './config.js';
 import {
   createRecord,
   findUserByEmail,
@@ -13,8 +14,41 @@ import {
 } from './db.js';
 import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup-restore.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'usman-hotel-secret';
 export const router = express.Router();
+
+// Simple in-memory login rate limiter (5 failed attempts per IP per 15 min)
+const loginAttempts = new Map();
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip) || { count: 0, windowStart: now, blockedUntil: 0 };
+  if (entry.blockedUntil > now) {
+    return { blocked: true, retryAfterMs: entry.blockedUntil - now };
+  }
+  if (entry.windowStart + LOGIN_WINDOW_MS < now) {
+    entry.count = 0;
+    entry.windowStart = now;
+  }
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.blockedUntil = now + LOGIN_WINDOW_MS;
+    entry.count = 0;
+    return { blocked: true, retryAfterMs: LOGIN_WINDOW_MS };
+  }
+  loginAttempts.set(ip, entry);
+  return { blocked: false, entry };
+}
+
+function recordLoginFailure(ip, entry) {
+  if (!entry) return;
+  entry.count += 1;
+  loginAttempts.set(ip, entry);
+}
+
+function clearLoginFailures(ip) {
+  loginAttempts.delete(ip);
+}
 
 // Basic API root for health check
 router.get('/', (req, res) => {
@@ -78,6 +112,12 @@ function authenticate(req, res, next) {
 }
 
 router.post('/auth/login', safe(async (req, res) => {
+  const clientIp = req.ip || req.socket?.remoteAddress || 'unknown';
+  const rate = checkLoginRateLimit(clientIp);
+  if (rate.blocked) {
+    return res.status(429).send({ error: 'Too many login attempts. Try again in 15 minutes.' });
+  }
+
   const { email, password } = req.body;
   const user = findUserByEmail(email || '');
   if (!user) {
@@ -92,17 +132,22 @@ router.post('/auth/login', safe(async (req, res) => {
       return username === loginValue || staffEmail === loginValue;
     });
 
-    if (!staff) return res.status(401).send({ error: 'Invalid credentials' });
-
-    // staff passwords are stored as plain `password` field in many setups
-    let validStaff = false;
-    if (typeof staff.password === 'string') {
-      validStaff = password === staff.password;
+    if (!staff) {
+      recordLoginFailure(clientIp, rate.entry);
+      return res.status(401).send({ error: 'Invalid credentials' });
     }
-    if (!validStaff && staff.passwordHash) {
+
+    // Staff passwords must be stored hashed (passwordHash). Plain-text
+    // `password` fields are migrated to hashes at startup by db.js.
+    let validStaff = false;
+    if (staff.passwordHash) {
       validStaff = await bcrypt.compare(password || '', staff.passwordHash);
     }
-    if (!validStaff) return res.status(401).send({ error: 'Invalid credentials' });
+    if (!validStaff) {
+      recordLoginFailure(clientIp, rate.entry);
+      return res.status(401).send({ error: 'Invalid credentials' });
+    }
+    clearLoginFailures(clientIp);
 
     const token = createToken({ id: staff.id, email: staff.username || staff.email, role: staff.role, name: staff.name });
     return res.send({ token, user: { id: staff.id, name: staff.name, email: staff.username || staff.email, role: staff.role } });
@@ -110,8 +155,10 @@ router.post('/auth/login', safe(async (req, res) => {
 
   const valid = await bcrypt.compare(password || '', user.passwordHash);
   if (!valid) {
+    recordLoginFailure(clientIp, rate.entry);
     return res.status(401).send({ error: 'Invalid credentials' });
   }
+  clearLoginFailures(clientIp);
 
   const token = createToken(user);
   res.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
@@ -138,6 +185,12 @@ router.get('/auth/me', authenticate, (req, res) => {
 
 // Rider Authentication Routes
 router.post('/auth/rider-login', safe(async (req, res) => {
+  const clientIp = req.ip || req.socket?.remoteAddress || 'unknown';
+  const rate = checkLoginRateLimit(clientIp);
+  if (rate.blocked) {
+    return res.status(429).send({ error: 'Too many login attempts. Try again in 15 minutes.' });
+  }
+
   const { email, password } = req.body;
   const loginValue = (email || '').toString().trim().toLowerCase();
   const riders = getCollection('riders');
@@ -166,7 +219,7 @@ router.post('/auth/rider-login', safe(async (req, res) => {
 
     if (!staff) return null;
 
-    if (typeof staff.password !== 'string' || password !== staff.password) {
+    if (!staff.passwordHash || !(await bcrypt.compare(password || '', staff.passwordHash))) {
       return null;
     }
 
@@ -183,7 +236,6 @@ router.post('/auth/rider-login', safe(async (req, res) => {
         email: staff.username,
         username: staff.username,
         passwordHash,
-        rawPassword: staff.password,
         role: staff.role,
         status: 'active'
       });
@@ -193,14 +245,8 @@ router.post('/auth/rider-login', safe(async (req, res) => {
     return targetRider;
   };
 
-  if (rider) {
-    if (rider.passwordHash) {
-      valid = await bcrypt.compare(password || '', rider.passwordHash);
-    } else if (typeof rider.password === 'string') {
-      valid = password === rider.password;
-    } else if (typeof rider.rawPassword === 'string') {
-      valid = password === rider.rawPassword;
-    }
+  if (rider?.passwordHash) {
+    valid = await bcrypt.compare(password || '', rider.passwordHash);
   }
 
   if (!valid) {
@@ -212,9 +258,11 @@ router.post('/auth/rider-login', safe(async (req, res) => {
   }
 
   if (!valid || !rider) {
+    recordLoginFailure(clientIp, rate.entry);
     console.warn(`Rider login failed for '${loginValue}' riderId=${rider?.id || 'none'}`);
     return res.status(401).send({ error: 'Invalid rider credentials' });
   }
+  clearLoginFailures(clientIp);
 
   const normalizedRole = (rider.role || '').toString().trim().toLowerCase();
   const isAdminRider = normalizedRole === 'admin' || normalizedRole === 'admin rider' || normalizedRole.includes('admin');

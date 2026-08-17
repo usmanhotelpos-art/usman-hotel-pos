@@ -9,6 +9,7 @@ server/node_modules/
 client/node_modules/
 server/data/*.bak
 server/data/*.bak.*
+server/data/*.json
 client/build.log
 client/vite.config.js.timestamp-*
 .vscode/
@@ -21,4 +22,24 @@ fe_err.txt
 fe_out.txt
 server_err.txt
 server_out.txt
+
+# ===== SECURITY: never commit these =====
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+server/.jwt-secret
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account.json
+client/vite_err.txt
+client/vite_out.txt
+server/data/.jwt-secret
+*.log
+logs/
 
