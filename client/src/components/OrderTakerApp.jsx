@@ -82,6 +82,11 @@ export function OrderTakerApp() {
   const [previewImage, setPreviewImage] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Orders list UX
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [payOrderId, setPayOrderId] = useState(null);
+  const [payMethod, setPayMethod] = useState('Cash');
+
   const apiBase = API;
 
   useEffect(() => {
@@ -348,6 +353,35 @@ export function OrderTakerApp() {
     } catch (err) { setMessage(err.message); setRequestOrderId(null); } finally { setLoading(false); }
   }
 
+  async function processPayment() {
+    if (!payOrderId) return;
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${payOrderId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          paymentMethod: payMethod,
+          paymentStatus: 'Paid',
+          status: 'Payment Collected',
+          orderTaker: orderTaker?.name || orderTaker?.username || '',
+        }),
+        token
+      });
+      setPayOrderId(null);
+      setPayMethod('Cash');
+      setMessage(`Payment collected (${payMethod})`);
+      await loadData();
+    } catch (e) { setMessage(e.message); } finally { setLoading(false); }
+  }
+
+  const orderTotals = (order) => {
+    const items = order.items || [];
+    const subtotal = Number(order.subtotal) ||
+      items.reduce((s, i) => s + (Number(i.total) || (Number(i.price) || 0) * (Number(i.quantity) || 1)), 0);
+    const total = Number(order.total) || Number(order.amount) || subtotal;
+    return { subtotal, total };
+  };
+
   if (!token || !orderTaker) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
@@ -565,56 +599,116 @@ export function OrderTakerApp() {
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {myOrders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No orders yet</p>}
-              {myOrders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => (
-                <div key={order.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-indigo-400">#{order.orderNumber || order.id}</span>
-                    <span className="text-[10px] text-slate-400">{new Date(order.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
-                    <span className={`font-semibold ${order.orderType === 'Dine-In' ? 'text-emerald-400' : 'text-amber-400'}`}>{order.orderType}</span>
-                    <span>•</span>
-                    <span>{order.customerName || order.tableNumber || '-'}</span>
-                    <span>•</span>
-                    <span className={`font-semibold ${order.status === 'Completed' || order.status === 'Payment Collected' ? 'text-emerald-400' : 'text-amber-400'}`}>{order.status}</span>
-                  </div>
-                  <div className="mt-1 space-y-1 border-t border-slate-800 pt-1.5">
-                    {(order.items || []).map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between gap-2 text-[11px]">
-                        <span className="text-slate-200 min-w-0"><span className="text-amber-400 font-bold">{item.quantity}x</span> <span className="truncate">{item.name}</span></span>
-                        <span className="text-slate-400 shrink-0">{Number(item.price) || 0} × {item.quantity} = <span className="text-emerald-400 font-bold">{Number(item.total) || ((Number(item.price) || 0) * item.quantity)}</span></span>
+              {[...myOrders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => {
+                const isExpanded = expandedOrderId === order.id;
+                const { subtotal, total } = orderTotals(order);
+                const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid' || (order.status || '').toLowerCase() === 'payment collected' || (order.status || '').toLowerCase() === 'completed';
+                const isPaymentFlow = payOrderId === order.id;
+                return (
+                  <div key={order.id} className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
+                    {/* Header - tap to expand */}
+                    <button onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="w-full p-3 text-left active:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-indigo-400">#{order.orderNumber || order.id}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400">{new Date(order.createdAt).toLocaleTimeString()}</span>
+                          <span className={`text-[10px] ${isExpanded ? 'rotate-180' : ''} transition-transform text-slate-500`}>▼</span>
+                        </span>
                       </div>
-                    ))}
-                    {order.subtotal ? <div className="flex items-center justify-between border-t border-slate-800 pt-1 text-[11px]"><span className="text-slate-400">Total</span><span className="font-bold text-emerald-400">{order.total || order.amount || 0} PKR</span></div> : null}
-                  </div>
-                  {order.orderType === 'Dine-In' && (
-                    <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950 p-2">
-                      {order.paymentRequestImage ? (
-                        <div className="flex items-center gap-2">
-                          <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[10px] font-bold text-amber-400">📷 Payment Request Sent</p>
-                            <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
+                        <span className={`font-semibold ${order.orderType === 'Dine-In' ? 'text-emerald-400' : 'text-amber-400'}`}>{order.orderType}</span>
+                        <span>•</span>
+                        <span>{order.customerName || order.tableNumber || '-'}</span>
+                        <span>•</span>
+                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-emerald-400">{total} PKR</span>
+                        <span className="text-[10px] text-slate-500">{isExpanded ? 'Hide details' : 'Tap for details'}</span>
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3 space-y-3">
+                        {/* Items + price details */}
+                        <div className="rounded-lg bg-slate-950 border border-slate-800 p-2.5 space-y-1.5">
+                          {(order.items || []).map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-slate-200 min-w-0"><span className="text-amber-400 font-bold">{item.quantity}x</span> <span className="truncate">{item.name}</span></span>
+                              <span className="text-slate-400 shrink-0">{Number(item.price) || 0} × {item.quantity} = <span className="text-emerald-400 font-bold">{Number(item.total) || ((Number(item.price) || 0) * item.quantity)}</span></span>
+                            </div>
+                          ))}
+                          <div className="border-t border-slate-800 pt-1.5 space-y-0.5 text-[11px]">
+                            <div className="flex justify-between text-slate-400"><span>Subtotal</span><span>{subtotal} PKR</span></div>
+                            {Number(order.discount) > 0 && <div className="flex justify-between text-slate-400"><span>Discount</span><span className="text-rose-400">-{Number(order.discount)} PKR</span></div>}
+                            {Number(order.taxPercent) > 0 && <div className="flex justify-between text-slate-400"><span>Tax ({order.taxPercent}%)</span><span>{Math.max(0, (subtotal - (Number(order.discount) || 0)) * (Number(order.taxPercent) || 0) / 100).toFixed(0)} PKR</span></div>}
+                            {Number(order.serviceCharge) > 0 && <div className="flex justify-between text-slate-400"><span>Service Charge</span><span>{Number(order.serviceCharge)} PKR</span></div>}
+                            {Number(order.deliveryFee) > 0 && <div className="flex justify-between text-slate-400"><span>Delivery Fee</span><span>{Number(order.deliveryFee)} PKR</span></div>}
+                            <div className="flex justify-between pt-1 text-xs font-bold"><span className="text-slate-300">Total</span><span className="text-emerald-400">{total} PKR</span></div>
                           </div>
-                          <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
                         </div>
-                      ) : (
-                        <button onClick={() => openRequestCamera(order.id)} disabled={loading}
-                          className="w-full rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                          📷 Request Payment (Take Photo)
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-emerald-400">{order.total || order.amount || 0} PKR</span>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => openEditOrder(order)} className="rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">✏️ Edit</button>
-                      <button onClick={() => window.print()} className="rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">🖨️ Print</button>
-                    </div>
+
+                        {/* Payment request photo (dine-in) */}
+                        {order.orderType === 'Dine-In' && !isPaid && (
+                          <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
+                            {order.paymentRequestImage ? (
+                              <div className="flex items-center gap-2">
+                                <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-bold text-amber-400">📷 Payment Request Sent</p>
+                                  <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
+                                </div>
+                                <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => openRequestCamera(order.id)} disabled={loading}
+                                className="w-full rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                                📷 Request Payment (Take Photo)
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Payment process */}
+                        {isPaid ? (
+                          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-center text-[11px] font-bold text-emerald-400">
+                            ✅ Payment {order.paymentMethod ? `collected via ${order.paymentMethod}` : 'collected'}
+                          </div>
+                        ) : isPaymentFlow ? (
+                          <div className="rounded-lg border border-slate-800 bg-slate-950 p-2.5 space-y-2">
+                            <p className="text-[10px] font-bold text-slate-300">💳 Collect Payment</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {['Cash', 'Online'].map(m => (
+                                <button key={m} onClick={() => setPayMethod(m)}
+                                  className={`rounded-lg py-2 text-[11px] font-bold transition ${payMethod === m ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                                  {m === 'Cash' ? '💵 Cash' : '📱 Online'}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button onClick={() => { setPayOrderId(null); setPayMethod('Cash'); }} className="flex-1 rounded-lg bg-slate-800 py-2 text-[11px] font-semibold text-slate-300 hover:bg-slate-700">Cancel</button>
+                              <button onClick={processPayment} disabled={loading} className="flex-1 rounded-lg bg-emerald-600 py-2 text-[11px] font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
+                                {loading ? 'Processing...' : `Collect ${payMethod}`}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setPayOrderId(order.id)} disabled={loading}
+                            className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-emerald-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                            💳 Process Payment ({total} PKR)
+                          </button>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-1.5">
+                          <button onClick={() => openEditOrder(order)} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">✏️ Edit Order</button>
+                          <button onClick={() => window.print()} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">🖨️ Print</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
