@@ -770,6 +770,7 @@ function App() {
   const [catalogueCart, setCatalogueCart] = useState([]);
   const [catalogueCustomer, setCatalogueCustomer] = useState({ name: '', phone: '', address: '' });
   const [catalogueOrderNote, setCatalogueOrderNote] = useState('');
+  const [cataloguePaymentMethod, setCataloguePaymentMethod] = useState('Online');
   const [catalogueMessage, setCatalogueMessage] = useState('');
   const [cataloguePage, setCataloguePage] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -7497,12 +7498,13 @@ try {
                 <button onClick={() => setShowMobileOrdersPopup(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">✕</button>
               </div>
 
-              {/* 3 Order type tabs */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              {/* 4 Order type tabs */}
+              <div className="grid grid-cols-4 gap-2 mb-4">
                 {[
                   { key: 'Takeaway', icon: '🛍️', label: 'Take Away', color: 'from-amber-500 to-orange-500', shadow: 'rgba(245,158,11,0.4)' },
                   { key: 'Dine-In', icon: '🍽️', label: 'Dine In', color: 'from-emerald-500 to-emerald-600', shadow: 'rgba(16,185,129,0.4)' },
                   { key: 'Delivery', icon: '🚚', label: 'Delivery', color: 'from-sky-500 to-blue-600', shadow: 'rgba(14,165,233,0.4)' },
+                  { key: 'Online', icon: '📱', label: 'Online Orders', color: 'from-violet-500 to-purple-600', shadow: 'rgba(168,85,247,0.4)' },
                 ].map(({ key, icon, label, color, shadow }) => {
                   const cutoff = new Date(Date.now() - (key === 'Delivery' ? 4 : 3) * 60 * 60 * 1000);
                   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
@@ -7549,9 +7551,9 @@ try {
                     return d && d >= todayStart && d >= cutoff;
                   })
                   .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-                const glowCss = type === 'Delivery' ? 'rgba(14,165,233,0.25)' : type === 'Takeaway' ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)';
-                const borderCls = type === 'Delivery' ? 'border-sky-700' : type === 'Takeaway' ? 'border-amber-700' : 'border-emerald-700';
-                const icon = type === 'Delivery' ? '🚚' : type === 'Takeaway' ? '🛍️' : '🍽️';
+                const glowCss = type === 'Delivery' ? 'rgba(14,165,233,0.25)' : type === 'Takeaway' ? 'rgba(245,158,11,0.25)' : type === 'Online' ? 'rgba(168,85,247,0.25)' : 'rgba(16,185,129,0.25)';
+                const borderCls = type === 'Delivery' ? 'border-sky-700' : type === 'Takeaway' ? 'border-amber-700' : type === 'Online' ? 'border-purple-700' : 'border-emerald-700';
+                const icon = type === 'Delivery' ? '🚚' : type === 'Takeaway' ? '🛍️' : type === 'Online' ? '📱' : '🍽️';
                 if (typeOrders.length === 0) return (
                   <div className="flex flex-col items-center justify-center py-8 text-slate-500">
                     <div className="text-4xl mb-2">{icon}</div>
@@ -7592,7 +7594,7 @@ try {
                               )}
                               {type !== 'Delivery' && (
                                 <div className="mt-0.5 text-xs font-bold text-emerald-300 truncate" style={{textShadow: '0 0 6px rgba(16,185,129,0.4)'}}>
-                                  {order.customerName || (type === 'Takeaway' ? 'PICK UP' : order.tableNumber || 'TABLE')}
+                                  {order.customerName || (type === 'Takeaway' ? 'PICK UP' : type === 'Online' ? '📱 ONLINE ORDER' : order.tableNumber || 'TABLE')}
                                 </div>
                               )}
                               <div className="mt-1 flex items-center justify-between">
@@ -9013,7 +9015,7 @@ try {
           item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { productId: product.id, name: product.name, price: Number(product.price) || 0, quantity: 1 }];
+      return [...prev, { productId: product.id, name: product.name, price: Number(product.price) || 0, quantity: 1, photo: product.photoUrl || product.photo || '' }];
     });
   }
 
@@ -9021,7 +9023,7 @@ try {
     setCatalogueCart((prev) =>
       prev
         .map((item) =>
-          item.productId === productId ? { ...item, quantity: Math.max(1, item.quantity + change) } : item
+          item.productId === productId ? { ...item, quantity: Math.max(0, item.quantity + change) } : item
         )
         .filter((item) => item.quantity > 0)
     );
@@ -9065,10 +9067,6 @@ try {
       setCatalogueMessage('Please add at least one item to cart.');
       return;
     }
-    if (!catalogueCustomer.name || !catalogueCustomer.phone) {
-      setCatalogueMessage('Customer name and phone are required to place an online order.');
-      return;
-    }
 
     const orderPayload = {
       items: catalogueCart,
@@ -9078,7 +9076,7 @@ try {
       address: catalogueCustomer.address,
       notes: catalogueOrderNote,
       status: 'Pending',
-      paymentMethod: 'Online'
+      paymentMethod: cataloguePaymentMethod
     };
 
     setLoading(true);
@@ -9110,6 +9108,7 @@ try {
     const accentStrong = `${accent}cc`;
     const showMenuCircle = catalogueLayout.showMenuButton !== false && (catalogueLayout.menuFront || settings.logo || settings.posHeaderPhoto || settings.riderAppLogo);
     const menuCircleSrc = catalogueLayout.menuFront || settings.logo || settings.posHeaderPhoto || settings.riderAppLogo;
+    const hotelLogo = settings.logo || settings.posHeaderPhoto || settings.riderAppLogo;
     const menuImageSrc = catalogueMenuSide === 'back' && catalogueLayout.menuBack ? catalogueLayout.menuBack : catalogueLayout.menuFront;
     const blockCategories = catalogueAssignedCategories.length
       ? catalogueAssignedCategories
@@ -9126,8 +9125,10 @@ try {
         <style>{`
           @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent-soft), 0 0 42px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 32px var(--accent-strong), 0 0 64px var(--accent-soft); transform: translateY(-3px); } }
           @keyframes catMenuRing { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 16px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 28px var(--accent-soft); } }
-          .cat-glow-block { position: relative; isolation: isolate; border-radius: 9999px; background: linear-gradient(135deg, #ffffff, #f7fdf9); border: 1px solid var(--accent-soft); animation: catGlow 2.2s ease-in-out infinite; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-          .cat-glow-block:hover { transform: translateY(-6px) scale(1.06); }
+          @keyframes catClickPop { 0% { transform: scale(1); } 40% { transform: scale(0.9); } 100% { transform: scale(1.06); } }
+          .cat-glow-block { position: relative; isolation: isolate; border-radius: 1.25rem; background: linear-gradient(135deg, #ffffff, #f7fdf9); border: 1px solid var(--accent-soft); animation: catGlow 2.2s ease-in-out infinite; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+          .cat-glow-block:hover { transform: translateY(-6px) scale(1.05); }
+          .cat-glow-block:active { animation: catClickPop 0.3s ease-out; }
           .cat-glow-block.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
           .cat-menu-circle { animation: catMenuRing 2.6s ease-in-out infinite; }
           .cat-flip-scene { perspective: 1200px; }
@@ -9179,17 +9180,19 @@ try {
                     <button
                       key={cat.name + idx}
                       onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); setCatalogueView('items'); }}
-                      className="cat-glow-block flex h-32 w-32 flex-col items-center justify-center gap-1.5 p-2 text-center"
+                      className="cat-glow-block flex min-w-[150px] flex-col items-center justify-center gap-2 px-5 py-4 text-center"
                       style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, animationDelay: `${idx * 0.15}s` }}
                     >
-                      {catPhoto ? (
-                        <span className="block h-16 w-16 overflow-hidden rounded-full border-4 border-white/80 shadow-lg">
+                      <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-white/80 bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg">
+                        {catPhoto ? (
                           <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
-                        </span>
-                      ) : (
-                        <span className="text-3xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
-                      )}
-                      <span className="block w-full max-w-[7.5rem] truncate text-[13px] font-black">{cat.name}</span>
+                        ) : cat.name !== 'All' && hotelLogo ? (
+                          <img src={hotelLogo} alt="Usman Hotel" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                        )}
+                      </span>
+                      <span className="block w-full max-w-[8.5rem] truncate text-[13px] font-black">{cat.name}</span>
                       <span className="block text-[10px] font-semibold opacity-70">{countFor(cat.name)} items</span>
                     </button>
                   );
@@ -9333,9 +9336,16 @@ try {
                     <div className="space-y-3">
                       {catalogueCart.map((item) => (
                         <div key={item.productId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-black text-slate-800 truncate">{item.name}</div>
-                            <div className="text-xs font-semibold text-slate-500">{item.price} PKR each</div>
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
+                            {item.photo ? (
+                              <img src={item.photo} alt={item.name} className="h-12 w-12 shrink-0 rounded-xl object-cover shadow" />
+                            ) : (
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-xl">🍽️</div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-black text-slate-800">{item.name}</div>
+                              <div className="text-xs font-semibold text-slate-500">{item.price} PKR each</div>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <button onClick={() => updateCatalogueCartItem(item.productId, -1)}
@@ -9385,14 +9395,14 @@ try {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Name *</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Name <span className="font-semibold text-slate-400">(optional)</span></label>
                     <input value={catalogueCustomer.name}
                       onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, name: e.target.value }))}
                       placeholder="Your name"
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Phone *</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Phone <span className="font-semibold text-slate-400">(optional)</span></label>
                     <input value={catalogueCustomer.phone}
                       onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, phone: e.target.value }))}
                       placeholder="Phone number"
@@ -9413,10 +9423,33 @@ try {
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Payment method</label>
-                    <select value="Online" className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none bg-white text-slate-700">
-                      <option value="Online">Online</option>
-                    </select>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">Payment method</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCataloguePaymentMethod('Online')}
+                        className={`rounded-2xl px-4 py-3 text-sm font-black transition-all active:scale-95 ${
+                          cataloguePaymentMethod === 'Online'
+                            ? 'text-white shadow-md'
+                            : 'bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-700'
+                        }`}
+                        style={cataloguePaymentMethod === 'Online' ? { background: `linear-gradient(135deg, ${accent}, #10b981)` } : undefined}
+                      >
+                        💳 Online
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCataloguePaymentMethod('Cash')}
+                        className={`rounded-2xl px-4 py-3 text-sm font-black transition-all active:scale-95 ${
+                          cataloguePaymentMethod === 'Cash'
+                            ? 'text-white shadow-md'
+                            : 'bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-700'
+                        }`}
+                        style={cataloguePaymentMethod === 'Cash' ? { background: `linear-gradient(135deg, #f59e0b, #f97316)` } : undefined}
+                      >
+                        💵 Cash on Delivery
+                      </button>
+                    </div>
                   </div>
                   <button onClick={saveOnlineCatalogueOrder}
                     disabled={loading}
@@ -9835,11 +9868,12 @@ try {
         {/* Mobile */}
         <div className="md:hidden space-y-3">
           {/* ── Order Type Icon Navigation with Badges ── */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
               { key: 'takeaway', icon: '🛍️', label: 'Take Away', color: 'from-amber-500 to-orange-500', shadow: 'rgba(245,158,11,0.4)' },
               { key: 'dinein', icon: '🍽️', label: 'Dine In', color: 'from-emerald-500 to-emerald-600', shadow: 'rgba(16,185,129,0.4)' },
               { key: 'delivery', icon: '🚚', label: 'Delivery', color: 'from-sky-500 to-blue-600', shadow: 'rgba(14,165,233,0.4)' },
+              { key: 'online', icon: '📱', label: 'Online Orders', color: 'from-violet-500 to-purple-600', shadow: 'rgba(168,85,247,0.4)' },
             ].map(({ key, icon, label, color, shadow }) => {
               const cutoff = new Date(Date.now() - (key === 'delivery' ? 4 : 3) * 60 * 60 * 1000);
               const todayStart = new Date(); todayStart.setHours(0,0,0,0);
@@ -9847,6 +9881,7 @@ try {
                 if (key === 'takeaway' && o.orderType !== 'Takeaway') return false;
                 if (key === 'dinein' && o.orderType !== 'Dine-In') return false;
                 if (key === 'delivery' && (o.orderType !== 'Delivery' || o.deliveryAgent)) return false;
+                if (key === 'online' && o.orderType !== 'Online') return false;
                 const d = o.createdAt ? new Date(o.createdAt) : null;
                 return d && d >= todayStart && d >= cutoff;
               });
