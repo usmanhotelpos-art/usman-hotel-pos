@@ -86,6 +86,10 @@ export function OrderTakerApp() {
 
   // Orders list UX
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [ordersTab, setOrdersTab] = useState('new');
+  const [now, setNow] = useState(() => Date.now());
+  const [paymentMethodOrder, setPaymentMethodOrder] = useState(null);
+  const [editAddSearch, setEditAddSearch] = useState('');
 
   // Bluetooth printer
   const [btDevice, setBtDevice] = useState(null);
@@ -110,6 +114,11 @@ export function OrderTakerApp() {
     const id = setInterval(() => loadData(true), 20000);
     return () => clearInterval(id);
   }, [token, orderTaker]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   async function loadData(silent = false) {
     try {
@@ -382,17 +391,42 @@ export function OrderTakerApp() {
     }));
   }, [tables, tablesList]);
 
-  // Only this order taker's NEW dine-in orders (completed/payment-collected hidden)
-  const myOrders = useMemo(() => {
+  // Only this order taker's dine-in orders split into New / Served / Cancelled tabs
+  const isMyOrder = (order) => {
     const name = orderTaker?.name || '';
     const username = orderTaker?.username || '';
-    const hiddenStatuses = ['completed', 'payment collected', 'paid'];
-    return (orders || []).filter(o =>
-      o.orderType === 'Dine-In' &&
-      (o.orderTaker === name || o.orderTaker === username || o.waiter === name || o.waiter === username) &&
-      !hiddenStatuses.includes((o.status || o.paymentStatus || '').toLowerCase())
-    );
-  }, [orders, orderTaker]);
+    return order.orderTaker === name || order.orderTaker === username || order.waiter === name || order.waiter === username;
+  };
+
+  const isServedOrder = (order) => {
+    const s = (order.status || '').toLowerCase();
+    return s === 'served' || Boolean(order.servedAt);
+  };
+
+  const isCancelledOrder = (order) => {
+    const s = (order.status || '').toLowerCase();
+    return s === 'cancelled' || Boolean(order.cancelledAt);
+  };
+
+  const isPaidOrDone = (order) => {
+    const s = (order.status || '').toLowerCase();
+    const p = (order.paymentStatus || '').toLowerCase();
+    return s === 'completed' || s === 'payment collected' || p === 'paid';
+  };
+
+  const myNewOrders = useMemo(() => (orders || []).filter(o =>
+    o.orderType === 'Dine-In' && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o)
+  ), [orders, orderTaker]);
+
+  const myServedOrders = useMemo(() => (orders || []).filter(o =>
+    o.orderType === 'Dine-In' && isMyOrder(o) && isServedOrder(o)
+  ), [orders, orderTaker]);
+
+  const myCancelledOrders = useMemo(() => (orders || []).filter(o =>
+    o.orderType === 'Dine-In' && isMyOrder(o) && isCancelledOrder(o)
+  ), [orders, orderTaker]);
+
+  const myActiveOrderCount = myNewOrders.length + myServedOrders.length;
 
   async function createOrder() {
     if (!cart.length) { setMessage('Cart is empty'); return; }
@@ -485,6 +519,7 @@ export function OrderTakerApp() {
 
   function openEditOrder(order) {
     setEditOrder(order);
+    setEditAddSearch('');
     setEditCart((order.items || []).map((item) => ({
       ...item,
       itemId: item.itemId || `${item.productId || item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -545,7 +580,7 @@ export function OrderTakerApp() {
     } catch (err) { setMessage(err.message); setRequestOrderId(null); } finally { setLoading(false); }
   }
 
-  async function pushOwnerRequest(order) {
+  async function pushOwnerRequest(order, paymentMethod = 'Cash') {
     if (!order.paymentRequestImage) {
       setMessage('Attach a payment photo first');
       return;
@@ -557,11 +592,50 @@ export function OrderTakerApp() {
         body: JSON.stringify({
           paymentRequestStatus: 'owner-request',
           paymentRequestedAt: order.paymentRequestedAt || new Date().toISOString(),
+          paymentMethod: paymentMethod || order.paymentMethod || 'Cash',
           orderTaker: orderTaker?.name || orderTaker?.username || '',
         }),
         token
       });
-      setMessage(`Payment request pushed to Farhan Owner for #${order.orderNumber || order.id}`);
+      setPaymentMethodOrder(null);
+      setMessage(`Payment request (${paymentMethod}) pushed to Farhan Owner for #${order.orderNumber || order.id}`);
+      await loadData();
+    } catch (e) { setMessage(e.message); } finally { setLoading(false); }
+  }
+
+  async function markServed(order) {
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          status: 'Served',
+          servedAt: new Date().toISOString(),
+          orderTaker: orderTaker?.name || orderTaker?.username || '',
+        }),
+        token
+      });
+      setExpandedOrderId(null);
+      setMessage(`Order #${order.orderNumber || order.id} marked served ✅`);
+      await loadData();
+    } catch (e) { setMessage(e.message); } finally { setLoading(false); }
+  }
+
+  async function cancelOrder(order) {
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          status: 'Cancelled',
+          cancelledAt: new Date().toISOString(),
+          paymentRequestStatus: '',
+          orderTaker: orderTaker?.name || orderTaker?.username || '',
+        }),
+        token
+      });
+      setExpandedOrderId(null);
+      setMessage(`Order #${order.orderNumber || order.id} cancelled ❌`);
       await loadData();
     } catch (e) { setMessage(e.message); } finally { setLoading(false); }
   }
@@ -573,6 +647,30 @@ export function OrderTakerApp() {
     const total = Number(order.total) || Number(order.amount) || subtotal;
     return { subtotal, total };
   };
+
+  const formatDuration = (ms) => {
+    if (!ms || ms < 0) ms = 0;
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  };
+
+  const printOrder = (order) => {
+    if (btConnected || btInfo || settings.btPrintEnabled) {
+      printOrderBT({ ...order, date: order.createdAt || new Date().toISOString() })
+        .catch((err) => setMessage(`Bluetooth print failed: ${err.message}`));
+    } else {
+      window.print();
+    }
+  };
+
+  const filteredEditAddProducts = useMemo(() => {
+    const term = editAddSearch.toLowerCase().trim();
+    return (products || []).filter(p => !term || (p.name || '').toLowerCase().includes(term)).slice(0, 50);
+  }, [products, editAddSearch]);
 
   if (!token || !orderTaker) {
     return (
@@ -613,7 +711,7 @@ export function OrderTakerApp() {
             {btConnecting ? 'Connecting...' : btConnected ? `🖨️ ${btInfo?.name || 'Printer'}` : '🖨️ Attach Bluetooth Printer'}
           </button>
           <button onClick={() => setShowOrdersPopup(true)} className="relative rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
-            📋 Orders {myOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({myOrders.length})</span>}
+            📋 Orders {myActiveOrderCount > 0 && <span className="ml-1 text-emerald-600 font-bold">({myActiveOrderCount})</span>}
           </button>
           <button onClick={handleLogout} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Logout</button>
         </div>
@@ -790,33 +888,62 @@ export function OrderTakerApp() {
         <div className="fixed inset-0 z-[60] bg-black/70 px-2 py-4 flex items-start justify-center pt-12" onClick={() => setShowOrdersPopup(false)}>
           <div className="relative w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white">📋 My Orders ({myOrders.length})</h3>
+              <h3 className="text-base font-bold text-white">📋 My Orders</h3>
               <button onClick={() => setShowOrdersPopup(false)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
             </div>
+
+            {/* Tabs: New | Served | Cancelled */}
+            <div className="flex gap-1.5 p-3 border-b border-slate-800">
+              <button onClick={() => setOrdersTab('new')} className={`flex-1 rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${ordersTab === 'new' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                🆕 New Orders {myNewOrders.length > 0 && <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{myNewOrders.length}</span>}
+              </button>
+              <button onClick={() => setOrdersTab('served')} className={`flex-1 rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${ordersTab === 'served' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                ✅ Served {myServedOrders.length > 0 && <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{myServedOrders.length}</span>}
+              </button>
+              <button onClick={() => setOrdersTab('cancelled')} className={`flex-1 rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${ordersTab === 'cancelled' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                ❌ Cancelled {myCancelledOrders.length > 0 && <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{myCancelledOrders.length}</span>}
+              </button>
+            </div>
+
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {myOrders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No new dine-in orders yet</p>}
-              {[...myOrders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(order => {
+              {(ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : myCancelledOrders).length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-8">
+                  {ordersTab === 'new' ? 'No new dine-in orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
+                </p>
+              )}
+              {(ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : myCancelledOrders)
+                .slice()
+                .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                .map(order => {
                 const isExpanded = expandedOrderId === order.id;
                 const { subtotal, total } = orderTotals(order);
                 const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid' || (order.status || '').toLowerCase() === 'payment collected' || (order.status || '').toLowerCase() === 'completed';
                 const requestSent = order.paymentRequestStatus === 'owner-request';
+                const servedAtMs = order.servedAt ? new Date(order.servedAt).getTime() : null;
+                const createdMs = order.createdAt ? new Date(order.createdAt).getTime() : null;
+                const cancelledMs = order.cancelledAt ? new Date(order.cancelledAt).getTime() : null;
                 return (
-                  <div key={order.id} className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
+                  <div key={order.id} className={`rounded-xl border overflow-hidden ${ordersTab === 'cancelled' ? 'border-rose-900/60 bg-rose-950/20' : 'border-slate-800 bg-slate-900'}`}>
                     {/* Header - tap to expand */}
                     <button onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="w-full p-3 text-left active:bg-slate-800/50 transition-colors">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-indigo-400">#{order.orderNumber || order.id}</span>
                         <span className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-slate-400">{new Date(order.createdAt).toLocaleTimeString()}</span>
+                          {createdMs && <span className="text-[10px] text-slate-400">{new Date(createdMs).toLocaleTimeString()}</span>}
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${ordersTab === 'new' ? 'bg-amber-500/15 text-amber-400' : ordersTab === 'served' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                            ⏱ {formatDuration(now - (ordersTab === 'new' ? createdMs : ordersTab === 'served' ? servedAtMs : cancelledMs) || now)}
+                          </span>
                           <span className={`text-[10px] ${isExpanded ? 'rotate-180' : ''} transition-transform text-slate-500`}>▼</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
-                        <span className={`font-semibold ${order.orderType === 'Dine-In' ? 'text-emerald-400' : 'text-amber-400'}`}>{order.orderType}</span>
+                        <span className={`font-semibold ${ordersTab === 'new' ? 'text-amber-400' : ordersTab === 'served' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {ordersTab === 'new' ? order.orderType : ordersTab === 'served' ? 'Served' : 'Cancelled'}
+                        </span>
                         <span>•</span>
                         <span>{order.customerName || order.tableNumber || '-'}</span>
                         <span>•</span>
-                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
+                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : ordersTab === 'cancelled' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-emerald-400">{total} PKR</span>
@@ -844,56 +971,67 @@ export function OrderTakerApp() {
                           </div>
                         </div>
 
-                        {/* Payment request photo (dine-in) */}
-                        {order.orderType === 'Dine-In' && !isPaid && (
-                          <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
-                            {order.paymentRequestImage ? (
-                              <div className="flex items-center gap-2">
-                                <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-bold text-amber-400">📷 Payment Photo Attached</p>
-                                  <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
-                                  {requestSent && <p className="text-[9px] font-bold text-violet-400 mt-0.5">✅ Request sent to Farhan Owner</p>}
-                                </div>
-                                <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
+                        {ordersTab === 'new' && (
+                          <div className="flex flex-wrap gap-1.5">
+                            <button onClick={() => printOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">🖨️ Print</button>
+                            <button onClick={() => openEditOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">✏️ Edit Order</button>
+                            <button onClick={() => markServed(order)} disabled={loading} className="flex-1 min-w-[45%] rounded-full bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-500 active:scale-[0.97] disabled:opacity-50">✅ Mark Served</button>
+                            <button onClick={() => cancelOrder(order)} disabled={loading} className="flex-1 min-w-[45%] rounded-full bg-rose-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-rose-500 active:scale-[0.97] disabled:opacity-50">❌ Cancel Order</button>
+                          </div>
+                        )}
+
+                        {ordersTab === 'served' && (
+                          <>
+                            {/* Payment request photo (dine-in) */}
+                            {!isPaid && (
+                              <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
+                                {order.paymentRequestImage ? (
+                                  <div className="flex items-center gap-2">
+                                    <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] font-bold text-amber-400">📷 Payment Photo Attached</p>
+                                      <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
+                                      {requestSent && <p className="text-[9px] font-bold text-violet-400 mt-0.5">✅ Request sent to Farhan Owner</p>}
+                                    </div>
+                                    <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => openRequestCamera(order.id)} disabled={loading}
+                                    className="w-full rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                                    📷 Attach Payment Photo
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Push to Farhan Owner request with payment method */}
+                            {isPaid ? (
+                              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-center text-[11px] font-bold text-emerald-400">
+                                ✅ Payment {order.paymentMethod ? `collected via ${order.paymentMethod}` : 'collected'}
+                              </div>
+                            ) : requestSent ? (
+                              <div className="rounded-lg bg-violet-500/10 border border-violet-500/30 px-3 py-2 text-center text-[11px] font-bold text-violet-400">
+                                👤 Request sent to Farhan Owner - awaiting approval
                               </div>
                             ) : (
-                              <button onClick={() => openRequestCamera(order.id)} disabled={loading}
-                                className="w-full rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                                📷 Attach Payment Photo
+                              <button onClick={() => setPaymentMethodOrder(order)} disabled={loading || !order.paymentRequestImage}
+                                className="w-full rounded-lg bg-violet-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-violet-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                                👤 Push to Farhan Owner Request
                               </button>
                             )}
-                          </div>
+
+                            <div className="flex gap-1.5">
+                              <button onClick={() => printOrder(order)} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">🖨️ Print</button>
+                              <button onClick={() => openEditOrder(order)} className="flex-1 rounded-full bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-500">➕ Add More Items</button>
+                            </div>
+                          </>
                         )}
 
-                        {/* Push to Farhan Owner request */}
-                        {isPaid ? (
-                          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-center text-[11px] font-bold text-emerald-400">
-                            ✅ Payment {order.paymentMethod ? `collected via ${order.paymentMethod}` : 'collected'}
+                        {ordersTab === 'cancelled' && (
+                          <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-center text-[11px] font-bold text-rose-400">
+                            ❌ Order cancelled{cancelledMs ? ` at ${new Date(cancelledMs).toLocaleTimeString()}` : ''}
                           </div>
-                        ) : requestSent ? (
-                          <div className="rounded-lg bg-violet-500/10 border border-violet-500/30 px-3 py-2 text-center text-[11px] font-bold text-violet-400">
-                            👤 Request sent to Farhan Owner - awaiting approval
-                          </div>
-                        ) : (
-                          <button onClick={() => pushOwnerRequest(order)} disabled={loading || !order.paymentRequestImage}
-                            className="w-full rounded-lg bg-violet-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-violet-500 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-                            👤 Push to Farhan Owner Request
-                          </button>
                         )}
-
-                        {/* Actions */}
-                        <div className="flex gap-1.5">
-                          <button onClick={() => openEditOrder(order)} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">✏️ Edit Order</button>
-                          <button onClick={() => {
-                            if (btConnected || btInfo || settings.btPrintEnabled) {
-                              printOrderBT({ ...order, date: order.createdAt || new Date().toISOString() })
-                                .catch((err) => setMessage(`Bluetooth print failed: ${err.message}`));
-                            } else {
-                              window.print();
-                            }
-                          }} className="flex-1 rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">🖨️ Print</button>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -931,6 +1069,31 @@ export function OrderTakerApp() {
                   </div>
                 </div>
               ))}
+
+              {/* Add more items */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900 p-2.5">
+                <p className="text-[11px] font-bold text-emerald-400 mb-1.5">➕ Add More Items</p>
+                <input type="text" value={editAddSearch} onChange={(e) => setEditAddSearch(e.target.value)} placeholder="Search items to add..." className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none placeholder-slate-500 mb-1.5" />
+                <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-800 divide-y divide-slate-800">
+                  {filteredEditAddProducts.map(product => (
+                    <button key={product.id} onClick={() => {
+                      const existingIdx = editCart.findIndex(i => (i.productId || i.id) === product.id);
+                      if (existingIdx >= 0) {
+                        const c = [...editCart];
+                        c[existingIdx].quantity += 1;
+                        setEditCart(c);
+                      } else {
+                        setEditCart([...editCart, { productId: product.id, id: product.id, name: product.name, price: Number(product.price) || 0, quantity: 1, itemId: `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }]);
+                      }
+                      setMessage(`${product.name} added`);
+                    }} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-800 active:bg-slate-800/70">
+                      <span className="text-xs text-slate-200 truncate flex-1">{product.name}</span>
+                      <span className="text-xs font-bold text-emerald-400 shrink-0 ml-2">{Number(product.price) || 0} PKR</span>
+                    </button>
+                  ))}
+                  {filteredEditAddProducts.length === 0 && <p className="px-3 py-3 text-[11px] text-slate-500 text-center">No items found</p>}
+                </div>
+              </div>
             </div>
             <div className="px-4 py-3 border-t border-slate-800">
               <div className="flex items-center justify-between mb-3">
@@ -954,6 +1117,35 @@ export function OrderTakerApp() {
       )}
 
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleRequestImage} />
+
+      {/* Payment method selection for Push to Farhan Owner request */}
+      {paymentMethodOrder && (
+        <div className="fixed inset-0 z-[75] bg-black/70 px-4 py-4 flex items-center justify-center" onClick={() => setPaymentMethodOrder(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-slate-950 border border-slate-800 p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-bold text-white">💳 Payment Method</h3>
+              <button onClick={() => setPaymentMethodOrder(null)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
+            </div>
+            <p className="text-xs text-slate-400 mb-1">
+              Push request for order <span className="font-bold text-indigo-400">#{paymentMethodOrder.orderNumber || paymentMethodOrder.id}</span> to Farhan Owner.
+            </p>
+            <p className="text-xs text-slate-500 mb-4">Select how the customer will pay:</p>
+            <div className="space-y-2">
+              <button onClick={() => pushOwnerRequest(paymentMethodOrder, 'Cash')} disabled={loading}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white hover:bg-emerald-500 active:scale-[0.98] transition-all disabled:opacity-50">
+                💵 Cash
+              </button>
+              <button onClick={() => pushOwnerRequest(paymentMethodOrder, 'Online')} disabled={loading}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-sky-600 py-3.5 text-sm font-bold text-white hover:bg-sky-500 active:scale-[0.98] transition-all disabled:opacity-50">
+                📱 Online
+              </button>
+            </div>
+            <button onClick={() => setPaymentMethodOrder(null)} className="mt-3 w-full rounded-xl border border-slate-700 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-900">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {previewImage && (
         <div className="fixed inset-0 z-[90] bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>

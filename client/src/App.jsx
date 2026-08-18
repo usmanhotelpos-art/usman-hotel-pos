@@ -370,7 +370,7 @@ function App() {
       const tableLabel = normalizeText(getTableLabel(table));
       return !dineinOrders.some((o) =>
         normalizeText(o.tableNumber) === tableLabel &&
-        !['completed', 'payment collected'].includes(normalizeText(o.status))
+        !['completed', 'payment collected', 'cancelled'].includes(normalizeText(o.status))
       );
     });
   }, [posTables, posOrders]);
@@ -10970,7 +10970,7 @@ function App() {
                   <div className="mt-4 grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {floorTables.map((table) => {
                       const tableLabel = getTableLabel(table);
-                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
+                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected', 'cancelled'].includes(normalizeText(o.status)));
                       const waiters = staff.filter((member) => member.role === 'Waiter' && member.loginEnabled);
                       return (
                         <div key={table.id} className={`rounded-3xl border p-6 ${tableOrder ? 'border-amber-600 bg-amber-950' : 'border-slate-700 bg-slate-950'} min-h-[200px]`}>
@@ -11056,7 +11056,7 @@ function App() {
                   <div className="mt-4 grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {outsideTables.map((table) => {
                       const tableLabel = getTableLabel(table);
-                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
+                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected', 'cancelled'].includes(normalizeText(o.status)));
                       const waiters = staff.filter((member) => member.role === 'Waiter' && member.loginEnabled);
                       return (
                         <div key={table.id} className={`rounded-3xl border p-6 ${tableOrder ? 'border-amber-600 bg-amber-950' : 'border-slate-700 bg-slate-950'} min-h-[200px]`}>
@@ -11250,7 +11250,7 @@ function App() {
                   <div className="grid grid-cols-2 gap-3">
                     {floorTables.map((table) => {
                       const tableLabel = getTableLabel(table);
-                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
+                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected', 'cancelled'].includes(normalizeText(o.status)));
                       return (
                         <div
                           key={table.id}
@@ -11341,7 +11341,7 @@ function App() {
                   <div className="grid grid-cols-2 gap-3">
                     {outsideTables.map((table) => {
                       const tableLabel = getTableLabel(table);
-                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected'].includes(normalizeText(o.status)));
+                      const tableOrder = dineinOrders.find((o) => normalizeText(o.tableNumber) === normalizeText(tableLabel) && !['completed', 'payment collected', 'cancelled'].includes(normalizeText(o.status)));
                       return (
                         <div
                           key={table.id}
