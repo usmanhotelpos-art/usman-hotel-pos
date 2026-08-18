@@ -697,22 +697,29 @@ function App() {
         if (storedVersion && storedVersion !== scripts && scripts) {
           // Build version changed - new deployment detected
           console.log('New app version detected');
-          
-          // Clear all POS app related data to force fresh load
-          const keysToKeep = ['riderToken', 'riderLoginToken', 'posToken'];
-          Object.keys(localStorage).forEach(key => {
-            if (!keysToKeep.includes(key)) {
-              localStorage.removeItem(key);
-            }
-          });
-          
-          // Update version and reload
+
+          // Remember the detected version so the check stabilizes
           localStorage.setItem(versionKey, scripts);
-          
-          // Auto-reload to get fresh version
-          setTimeout(() => {
-            window.location.reload();
-          }, 500);
+
+          // Reload at most once per tab session to avoid reload/login loops
+          // on mobile Chrome when cached HTML/bundle oscillates between old/new
+          const reloadKey = 'posAppBuildReloading';
+          if (!sessionStorage.getItem(reloadKey)) {
+            sessionStorage.setItem(reloadKey, '1');
+
+            // Clear stale app data but NEVER login tokens
+            const keysToKeep = ['riderToken', 'riderLoginToken', 'posToken', 'orderTakerToken', 'orderTakerUser'];
+            Object.keys(localStorage).forEach(key => {
+              if (!keysToKeep.includes(key)) {
+                localStorage.removeItem(key);
+              }
+            });
+
+            // Auto-reload to get fresh version
+            setTimeout(() => {
+              window.location.reload();
+            }, 500);
+          }
         } else if (!storedVersion && scripts) {
           // First load - store version
           localStorage.setItem(versionKey, scripts);
