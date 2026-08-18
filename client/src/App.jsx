@@ -18,14 +18,15 @@ function App() {
   const isOrderTakerRoute = initialPath.startsWith('/order-taker');
   const initialTabFromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
   const isHelperRoute = initialPath.startsWith('/helper');
-  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'order-taker-app', 'restore', 'settings'];
+  const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'order-taker-app', 'restore', 'qr-catalogue', 'settings'];
   const [tabs, setTabs] = useState(() => {
     if (typeof window === 'undefined') return defaultTabs;
     try {
       let saved = window.localStorage.getItem('posTabs');
       let base = saved ? JSON.parse(saved) : [...defaultTabs];
-      base = base.filter(t => t !== 'catalogue' && t !== 'qr-catalogue');
+      base = base.filter(t => t !== 'catalogue');
       if (!base.includes('restore')) base.push('restore');
+      if (!base.includes('qr-catalogue')) base.push('qr-catalogue');
       if (!base.includes('settings')) base.push('settings');
       if (!base.includes('order-taker-app')) base.push('order-taker-app');
       window.localStorage.setItem('posTabs', JSON.stringify(base));
@@ -766,6 +767,15 @@ function App() {
     const path = window.location.pathname.toLowerCase();
     return /\/?(menu|catalogue|qr)(\/|$|\?)/.test(path);
   });
+  const [qrCatalogueSubTab, setQrCatalogueSubTab] = useState('qr');
+  const [qrCatalogueRevealed, setQrCatalogueRevealed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('posQrCatalogueRevealed') === '1';
+  });
+  const [qrCatalogueItemSearch, setQrCatalogueItemSearch] = useState('');
+  const [qrCatalogueSaving, setQrCatalogueSaving] = useState(false);
+  const [qrCatalogueSavedAt, setQrCatalogueSavedAt] = useState('');
+  const [qrCatalogueMessage, setQrCatalogueMessage] = useState('');
 
   useEffect(() => {
     if (cataloguePage || !settings.cataloguePath) return;
@@ -814,6 +824,7 @@ function App() {
     'rider-book': 'Rider Book',
     'rider-order-requests': 'Rider Order Requests',
     'order-taker-app': 'Order Taker App',
+    'qr-catalogue': 'QR Catalogue',
     restore: 'Restore',
     settings: 'Settings'
   };
@@ -829,6 +840,7 @@ function App() {
     'rider-book': '🚴',
     'rider-order-requests': '📋',
     'order-taker-app': '📋',
+    'qr-catalogue': '📱',
     restore: '♻️',
     settings: '⚙️'
   };
@@ -839,6 +851,7 @@ function App() {
       const base = saved ? JSON.parse(saved) : defaultTabIcons;
       if (!base.restore) base.restore = '♻️';
       if (!base['order-taker-app']) base['order-taker-app'] = '📋';
+      if (!base['qr-catalogue']) base['qr-catalogue'] = '📱';
       return base;
     } catch {
       return defaultTabIcons;
@@ -851,6 +864,7 @@ function App() {
       const base = saved ? JSON.parse(saved) : defaultTabLabels;
       if (!base.restore) base.restore = 'Restore';
       if (!base['order-taker-app']) base['order-taker-app'] = 'Order Taker App';
+      if (!base['qr-catalogue']) base['qr-catalogue'] = 'QR Catalogue';
       return base;
     } catch {
       return defaultTabLabels;
@@ -1241,8 +1255,7 @@ function App() {
       window.localStorage.setItem('posRoles', JSON.stringify(roles));
       const cleanLabels = { ...tabLabels };
       delete cleanLabels.catalogue;
-      delete cleanLabels['qr-catalogue'];
-      window.localStorage.setItem('posTabs', JSON.stringify(tabs.filter(t => t !== 'catalogue' && t !== 'qr-catalogue')));
+      window.localStorage.setItem('posTabs', JSON.stringify(tabs.filter(t => t !== 'catalogue')));
       window.localStorage.setItem('posTabLabels', JSON.stringify(cleanLabels));
       window.localStorage.setItem('posTabIcons', JSON.stringify(tabIcons));
     } catch {
@@ -1514,11 +1527,11 @@ function App() {
       setToken(data.token);
       setUser(data.user);
       // reload persisted roles/tabs so permissions immediately apply
-      try {
+try {
         const savedRoles = window.localStorage.getItem('posRoles');
         if (savedRoles) setRoles(JSON.parse(savedRoles));
         const savedTabs = window.localStorage.getItem('posTabs');
-        if (savedTabs) setTabs(JSON.parse(savedTabs).filter(t => t !== 'catalogue' && t !== 'qr-catalogue'));
+        if (savedTabs) setTabs(JSON.parse(savedTabs).filter(t => t !== 'catalogue'));
         const savedTabLabels = window.localStorage.getItem('posTabLabels');
         if (savedTabLabels) setTabLabels(JSON.parse(savedTabLabels));
         const savedTabIcons = window.localStorage.getItem('posTabIcons');
@@ -11554,6 +11567,460 @@ function App() {
     );
   }
 
+  async function persistQrCatalogue() {
+    setQrCatalogueSaving(true);
+    setQrCatalogueMessage('');
+    try {
+      await fetchJson(`${apiBase}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          catalogueLayout,
+          catalogueHost,
+          cataloguePath,
+          catalogueAssignedCategories,
+          catalogueAssignedProducts
+        })
+      });
+      setQrCatalogueSavedAt(new Date().toLocaleTimeString());
+      setQrCatalogueMessage('Saved ✓');
+    } catch (error) {
+      setQrCatalogueMessage(`Save failed: ${error.message}`);
+    } finally {
+      setQrCatalogueSaving(false);
+    }
+  }
+
+  function renderQrCatalogue() {
+    const catalogueUrl = getCatalogueUrl();
+    const assignedIds = getAssignedCatalogueProductIds();
+    const hasAssignments = assignedIds.size > 0 || catalogueAssignedCategories.length > 0;
+    const itemSearch = qrCatalogueItemSearch.trim().toLowerCase();
+    const searchedProducts = posProducts.filter((p) =>
+      !itemSearch ||
+      (p.name || '').toLowerCase().includes(itemSearch) ||
+      (p.category || '').toLowerCase().includes(itemSearch)
+    );
+    const productsByCategory = posCategories
+      .map((cat) => ({
+        cat: cat.name,
+        products: searchedProducts.filter((p) => (p.category || 'All') === cat.name)
+      }))
+      .filter((g) => g.products.length > 0);
+    const uncategorized = searchedProducts.filter((p) => !posCategories.some((c) => c.name === (p.category || 'All')));
+    const previewTheme = catalogueLayout.theme === 'dark';
+    const previewProducts = posProducts.slice(0, 3);
+    const previewCategories = catalogueAssignedCategories.length ? catalogueAssignedCategories.slice(0, 4) : posCategories.slice(0, 4).map((c) => c.name);
+
+    const toggleQrReveal = () => {
+      setQrCatalogueRevealed((prev) => {
+        const next = !prev;
+        try {
+          window.localStorage.setItem('posQrCatalogueRevealed', next ? '1' : '0');
+        } catch {}
+        return next;
+      });
+    };
+    const copyCatalogueLink = async () => {
+      try {
+        await navigator.clipboard.writeText(catalogueUrl);
+        setQrCatalogueMessage('Link copied ✓');
+      } catch {
+        setQrCatalogueMessage('Copy failed');
+      }
+    };
+
+    const tabBtn = (key, icon, label, color) => (
+      <button
+        onClick={() => setQrCatalogueSubTab(key)}
+        className={`rounded-2xl px-3 py-2.5 text-center transition-all active:scale-95 ${
+          qrCatalogueSubTab === key
+            ? `bg-gradient-to-br ${color} text-white shadow-lg`
+            : 'border border-slate-700 bg-slate-900 text-slate-400'
+        }`}
+      >
+        <div className="text-lg">{icon}</div>
+        <div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide">{label}</div>
+      </button>
+    );
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-[24px] bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 p-4 text-white shadow-[0_10px_40px_rgba(217,70,239,0.35)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/70">Mobile Menu · Customer Facing</p>
+              <h2 className="mt-1 text-lg font-bold">📱 QR Catalogue</h2>
+            </div>
+            <div className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-bold backdrop-blur">
+              {qrCatalogueSubTab === 'qr' ? '🔗 QR' : qrCatalogueSubTab === 'items' ? '📦 Items' : '🎨 Layout'}
+            </div>
+          </div>
+          {qrCatalogueMessage && (
+            <div className="mt-2 rounded-xl bg-white/15 px-3 py-1.5 text-[11px] font-semibold backdrop-blur">{qrCatalogueMessage}</div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {tabBtn('qr', '🔗', 'QR', 'from-violet-600 to-fuchsia-600')}
+          {tabBtn('items', '📦', 'Items', 'from-emerald-500 to-teal-600')}
+          {tabBtn('layout', '🎨', 'Layout', 'from-sky-500 to-indigo-600')}
+        </div>
+
+        {/* ── Tab 1: QR ── */}
+        {qrCatalogueSubTab === 'qr' && (
+          <div className="rounded-3xl border border-slate-700 bg-slate-900 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-white">Customer Menu QR</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">Hidden by default — use 👁 to show</p>
+              </div>
+              <button
+                onClick={toggleQrReveal}
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[11px] font-bold transition-all active:scale-95 ${
+                  qrCatalogueRevealed
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_3px_15px_rgba(16,185,129,0.5)]'
+                    : 'bg-gradient-to-r from-slate-700 to-slate-800 text-slate-200'
+                }`}
+              >
+                {qrCatalogueRevealed ? <Eye size={13} /> : <EyeOff size={13} />}
+                {qrCatalogueRevealed ? 'QR Shown' : 'QR Hidden'}
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              {qrCatalogueRevealed ? (
+                <div className="relative rounded-3xl bg-white p-4 shadow-[0_10px_40px_rgba(0,0,0,0.4)]">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(catalogueUrl)}`}
+                    alt="QR Code"
+                    className="h-52 w-52 rounded-xl"
+                  />
+                  <div className="absolute inset-x-0 bottom-2 flex justify-center">
+                    <span className="rounded-full bg-slate-950/80 px-2.5 py-1 text-[9px] font-bold text-white">SCAN TO OPEN MENU</span>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={toggleQrReveal}
+                  className="flex h-52 w-52 flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-600 bg-slate-950/60 text-slate-500 transition hover:border-fuchsia-500 hover:text-fuchsia-400 active:scale-95"
+                >
+                  <EyeOff size={32} />
+                  <span className="mt-2 text-xs font-bold">QR is hidden</span>
+                  <span className="mt-0.5 text-[10px]">Tap 👁 above to reveal</span>
+                </button>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Menu Link</p>
+              <p className="mt-1 break-all text-xs font-semibold text-fuchsia-300">{catalogueUrl}</p>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={copyCatalogueLink}
+                className="rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2.5 text-xs font-bold text-white shadow-[0_4px_16px_rgba(168,85,247,0.4)] transition-all active:scale-95"
+              >
+                📋 Copy Link
+              </button>
+              <button
+                onClick={() => window.open(catalogueUrl, '_blank')}
+                className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-2.5 text-xs font-bold text-white shadow-[0_4px_16px_rgba(16,185,129,0.4)] transition-all active:scale-95"
+              >
+                🌐 Open Menu
+              </button>
+              <button
+                onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`🍽️ ${settings.hotelName || 'Our Menu'} — Scan to order online: ${catalogueUrl}`)}`, '_blank')}
+                className="col-span-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-3 py-2.5 text-xs font-bold text-white shadow-[0_4px_16px_rgba(16,185,129,0.4)] transition-all active:scale-95"
+              >
+                📲 Share on WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab 2: Items ── */}
+        {qrCatalogueSubTab === 'items' && (
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-[10px] font-semibold text-emerald-300">
+              🔄 Auto-synced with inventory — items added/removed here appear instantly on the customer menu.
+            </div>
+            <input
+              value={qrCatalogueItemSearch}
+              onChange={(e) => setQrCatalogueItemSearch(e.target.value)}
+              placeholder="🔍 Search items or category..."
+              className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500"
+            />
+
+            <div className="flex flex-wrap gap-1.5">
+              {posCategories.map((cat) => {
+                const on = catalogueAssignedCategories.includes(cat.name);
+                return (
+                  <button
+                    key={cat.name}
+                    onClick={() => { toggleAssignedCategory(cat.name); persistQrCatalogue(); }}
+                    className={`rounded-full px-2.5 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${on
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_2px_10px_rgba(16,185,129,0.5)]'
+                      : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {on ? '✓ ' : ''}{cat.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {productsByCategory.map((group) => (
+              <div key={group.cat} className="rounded-3xl border border-slate-700 bg-slate-900 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-bold text-white">🍽️ {group.cat}</span>
+                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-400">{group.products.length} items</span>
+                </div>
+                <div className="space-y-1.5">
+                  {group.products.map((product) => {
+                    const assigned = assignedIds.has(product.id);
+                    const stock = product.stock === '' || product.stock === null || product.stock === undefined ? null : Number(product.stock);
+                    const out = stock !== null && stock <= 0;
+                    return (
+                      <div key={product.id} className={`flex items-center gap-2.5 rounded-2xl border p-2 transition ${assigned ? 'border-emerald-700 bg-emerald-950/40' : 'border-slate-800 bg-slate-950/60'}`}>
+                        {product.photo ? (
+                          <img src={product.photo} alt={product.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-lg">🍲</div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-white">{product.name}</p>
+                          <p className="text-[10px] text-slate-400">{Number(product.price) || 0} PKR
+                            {out ? <span className="ml-1.5 rounded-full bg-rose-600/30 px-1.5 py-0.5 text-[9px] font-bold text-rose-300">OUT OF STOCK</span> : stock !== null && (
+                              <span className="ml-1.5 text-slate-500">· stock {stock}</span>
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { toggleAssignedProduct(group.cat, product.id); persistQrCatalogue(); }}
+                          className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all active:scale-90 ${assigned
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_2px_10px_rgba(16,185,129,0.4)]'
+                          }`}
+                        >
+                          {assigned ? '− Remove' : '+ Add'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {uncategorized.length > 0 && (
+              <div className="rounded-3xl border border-slate-700 bg-slate-900 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-bold text-white">🗂️ Uncategorized</span>
+                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-400">{uncategorized.length} items</span>
+                </div>
+                <div className="space-y-1.5">
+                  {uncategorized.map((product) => {
+                    const assigned = assignedIds.has(product.id);
+                    return (
+                      <div key={product.id} className={`flex items-center gap-2.5 rounded-2xl border p-2 ${assigned ? 'border-emerald-700 bg-emerald-950/40' : 'border-slate-800 bg-slate-950/60'}`}>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-lg">🍲</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-white">{product.name}</p>
+                          <p className="text-[10px] text-slate-400">{Number(product.price) || 0} PKR</p>
+                        </div>
+                        <button
+                          onClick={() => { toggleAssignedProduct('All', product.id); persistQrCatalogue(); }}
+                          className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all active:scale-90 ${assigned ? 'bg-rose-600 text-white' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'}`}
+                        >
+                          {assigned ? '− Remove' : '+ Add'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasAssignments ? (
+              <div className="rounded-2xl bg-emerald-950/40 px-3 py-2 text-center text-[10px] font-bold text-emerald-300">
+                {assignedIds.size} items selected for customer menu {qrCatalogueSavedAt ? `· last saved ${qrCatalogueSavedAt}` : ''}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-amber-950/30 px-3 py-2 text-center text-[10px] font-bold text-amber-300">
+                ⚠️ No items assigned yet — all inventory items are hidden from the customer menu until you add them.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab 3: Layout ── */}
+        {qrCatalogueSubTab === 'layout' && (
+          <div className="space-y-3">
+            {/* Phone preview */}
+            <div className="rounded-3xl border border-slate-700 bg-slate-950 p-3">
+              <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">Live Preview — exactly what customers see</p>
+              <div className={`mx-auto w-[240px] overflow-hidden rounded-[28px] border-4 ${previewTheme ? 'border-slate-800' : 'border-white'} shadow-2xl`}>
+                <div className={`h-2 bg-gradient-to-r ${catalogueLayout.accentColor ? '' : ''}`} style={{ background: catalogueLayout.accentColor || '#10b981' }} />
+                <div className={`${previewTheme ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'} p-3`}>
+                  <p className="text-center text-xs font-bold" style={{ color: previewTheme ? 'white' : 'black' }}>{catalogueLayout.pageTitle || 'Our Menu'}</p>
+                  <p className="mt-0.5 text-center text-[8px] leading-tight text-slate-500">{catalogueLayout.pageDescription || ''}</p>
+                  {catalogueLayout.showCategories && (
+                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                      {previewCategories.map((c) => (
+                        <span key={c} className="rounded-full px-2 py-0.5 text-[8px] font-bold text-white" style={{ background: catalogueLayout.accentColor || '#10b981' }}>{c}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div className={`mt-2 grid ${catalogueLayout.layoutStyle === 'list' || catalogueLayout.columns === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5`}>
+                    {previewProducts.map((p, i) => (
+                      <div key={i} className={`rounded-xl p-1.5 ${previewTheme ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                        <div className="flex h-10 items-center justify-center rounded-lg text-base" style={{ background: `${catalogueLayout.accentColor || '#10b981'}22` }}>🍲</div>
+                        <p className="mt-1 truncate text-[7px] font-bold">{p.name}</p>
+                        {catalogueLayout.showPrices && (
+                          <p className="text-[7px] font-black" style={{ color: catalogueLayout.accentColor || '#10b981' }}>{Number(p.price) || 0} Rs</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="rounded-3xl border border-slate-700 bg-slate-900 p-4">
+              <p className="text-xs font-bold text-white">🎨 Layout Settings</p>
+
+              <div className="mt-3">
+                <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Theme</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['light', '☀️ Light'], ['dark', '🌙 Dark']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setCatalogueLayout((prev) => ({ ...prev, theme: val }))}
+                      className={`rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueLayout.theme === val ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow' : 'bg-slate-800 text-slate-400'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Layout Style</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['grid', '▦ Grid'], ['list', '☰ List']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setCatalogueLayout((prev) => ({ ...prev, layoutStyle: val }))}
+                      className={`rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueLayout.layoutStyle === val ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow' : 'bg-slate-800 text-slate-400'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Columns</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[2, 3].map((cols) => (
+                    <button
+                      key={cols}
+                      onClick={() => setCatalogueLayout((prev) => ({ ...prev, columns: cols }))}
+                      className={`rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueLayout.columns === cols ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow' : 'bg-slate-800 text-slate-400'}`}
+                    >
+                      {cols} Columns
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setCatalogueLayout((prev) => ({ ...prev, showPrices: !prev.showPrices }))}
+                  className={`rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueLayout.showPrices ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                >
+                  💰 {catalogueLayout.showPrices ? 'Prices Shown' : 'Prices Hidden'}
+                </button>
+                <button
+                  onClick={() => setCatalogueLayout((prev) => ({ ...prev, showCategories: !prev.showCategories }))}
+                  className={`rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueLayout.showCategories ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                >
+                  🏷️ {catalogueLayout.showCategories ? 'Categories Shown' : 'Categories Hidden'}
+                </button>
+              </div>
+
+              <div className="mt-3">
+                <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Accent Color</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={catalogueLayout.accentColor || '#10b981'}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, accentColor: e.target.value }))}
+                    className="h-10 w-14 cursor-pointer rounded-xl border border-slate-700 bg-slate-800"
+                  />
+                  {['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'].map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setCatalogueLayout((prev) => ({ ...prev, accentColor: color }))}
+                      className="h-8 w-8 rounded-full border-2 transition-all active:scale-90"
+                      style={{ background: color, borderColor: catalogueLayout.accentColor === color ? 'white' : 'transparent' }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Page Title</p>
+                  <input
+                    value={catalogueLayout.pageTitle}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, pageTitle: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Page Description</p>
+                  <input
+                    value={catalogueLayout.pageDescription}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, pageDescription: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Custom Host <span className="normal-case text-slate-600">(optional)</span></p>
+                  <input
+                    value={catalogueHost}
+                    onChange={(e) => setCatalogueHost(e.target.value)}
+                    placeholder="e.g. menu.myhotel.com"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Menu Path</p>
+                  <input
+                    value={cataloguePath}
+                    onChange={(e) => setCataloguePath(e.target.value)}
+                    placeholder="menu"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={persistQrCatalogue}
+              disabled={qrCatalogueSaving}
+              className="w-full rounded-2xl bg-gradient-to-r from-sky-500 via-indigo-600 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-[0_6px_24px_rgba(99,102,241,0.5)] transition-all active:scale-95 disabled:opacity-50"
+            >
+              {qrCatalogueSaving ? '⏳ Saving...' : `💾 Save Layout ${qrCatalogueSavedAt ? `· saved ${qrCatalogueSavedAt}` : ''}`}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (cataloguePage) {
     return renderCustomerCataloguePage();
   }
@@ -12686,6 +13153,7 @@ function App() {
             {activeTab === 'order-taker-app' && <OrderTakerApp />}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'orders' && renderOrders()}
+            {activeTab === 'qr-catalogue' && renderQrCatalogue()}
             {activeTab === 'rider-book' && renderRiderBook()}
             {activeTab === 'rider-order-requests' && renderRiderOrderRequests()}
 
