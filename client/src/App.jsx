@@ -1163,6 +1163,11 @@ function App() {
   const [dineinOrderStatusFilter, setDineinOrderStatusFilter] = useState('all');
   const [dineinPageIndex, setDineinPageIndex] = useState(0);
   const [dineinPageSize, setDineinPageSize] = useState(8);
+  const [dineinMobileFiltersOpen, setDineinMobileFiltersOpen] = useState(false);
+  const [dineinMobileDateFrom, setDineinMobileDateFrom] = useState('');
+  const [dineinMobileDateTo, setDineinMobileDateTo] = useState('');
+  const [dineinMobileOrderTaker, setDineinMobileOrderTaker] = useState('');
+  const [dineinMobilePaymentMethod, setDineinMobilePaymentMethod] = useState('All');
   const [selectedDineinOrders, setSelectedDineinOrders] = useState([]);
   const [markPaidOrder, setMarkPaidOrder] = useState(null);
   const [markPaidAmount, setMarkPaidAmount] = useState('');
@@ -10929,12 +10934,35 @@ function App() {
       itemCount: statusFiltered.reduce((sum, order) => sum + (order.items?.reduce((count, item) => count + Number(item.quantity || 0), 0) || 0), 0)
     };
 
+    // Mobile floating filters: date range + order taker + payment method
+    const mobileFrom = dineinMobileDateFrom ? new Date(`${dineinMobileDateFrom}T00:00:00`) : null;
+    const mobileTo = dineinMobileDateTo ? new Date(`${dineinMobileDateTo}T23:59:59.999`) : null;
+    const mobileFilterMatches = (order) => {
+      const od = order.createdAt ? new Date(order.createdAt) : null;
+      if (mobileFrom && (!od || od < mobileFrom)) return false;
+      if (mobileTo && (!od || od > mobileTo)) return false;
+      if (dineinMobileOrderTaker && (order.orderTaker || order.waiter || '') !== dineinMobileOrderTaker) return false;
+      if (dineinMobilePaymentMethod !== 'All' && (order.paymentMethod || '') !== dineinMobilePaymentMethod) return false;
+      return true;
+    };
+    statusFiltered = statusFiltered.filter(mobileFilterMatches);
+    const orderTakerOptions = [...new Set(dineinOrders.map((o) => o.orderTaker || o.waiter || '').filter(Boolean))];
+    const mobileFilterCount = (dineinMobileDateFrom ? 1 : 0) + (dineinMobileDateTo ? 1 : 0) + (dineinMobileOrderTaker ? 1 : 0) + (dineinMobilePaymentMethod !== 'All' ? 1 : 0);
+    const clearMobileFilters = () => {
+      setDineinMobileDateFrom('');
+      setDineinMobileDateTo('');
+      setDineinMobileOrderTaker('');
+      setDineinMobilePaymentMethod('All');
+      setDineinPageIndex(0);
+    };
+
     const totalDineinPages = Math.max(1, Math.ceil(statusFiltered.length / dineinPageSize));
     const pagedDineinOrders = statusFiltered.slice(dineinPageIndex * dineinPageSize, (dineinPageIndex + 1) * dineinPageSize);
 
     const floorTables = posTables.filter((table) => (table.section || 'Floor') === 'Floor');
     const outsideTables = posTables.filter((table) => (table.section || 'Floor') === 'Outside');
     const activeDineinOrders = dineinOrders.filter((o) => !['Completed', 'Payment Collected', 'Cancelled'].includes(o.status || ''));
+    const activeDineinOrdersFiltered = activeDineinOrders.filter(mobileFilterMatches);
 
     return (
       <>
@@ -11240,12 +11268,12 @@ function App() {
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2.5">
                 <span className="text-xs font-bold text-white">🍽️ Active Dine-In Orders</span>
-                <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">{activeDineinOrders.length}</span>
+                <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">{activeDineinOrdersFiltered.length}</span>
               </div>
-              {activeDineinOrders.length === 0 ? (
+              {activeDineinOrdersFiltered.length === 0 ? (
                 <div className="text-center text-sm text-slate-500 py-8">No active dine-in orders</div>
               ) : (
-                activeDineinOrders.map((order) => {
+                activeDineinOrdersFiltered.map((order) => {
                   const isCompleted = ['Completed', 'Payment Collected'].includes(order.status);
                   return (
                     <div key={order.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200">
@@ -11450,6 +11478,68 @@ function App() {
               )}
             </>
           )}
+
+          {/* Floating filters - mobile Dine-In */}
+          <div className="fixed left-1/2 z-40 flex -translate-x-1/2 flex-col items-center gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+            <button
+              onClick={() => setDineinMobileFiltersOpen(!dineinMobileFiltersOpen)}
+              className="group relative flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 px-4 py-2 text-xs font-bold text-white shadow-[0_4px_20px_rgba(217,70,239,0.5)] transition-all hover:shadow-[0_4px_28px_rgba(217,70,239,0.8)] active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M3 5h18v3H3V5zm4 6h10v3H7v-3zm3 6h4v3h-4v-3z"/></svg>
+              {mobileFilterCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[9px] font-black text-slate-950 shadow-lg">{mobileFilterCount}</span>
+              )}
+            </button>
+
+            {dineinMobileFiltersOpen && (
+              <div className="w-[94vw] max-w-md rounded-2xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-white">🔍 Filters</span>
+                  <button onClick={clearMobileFilters} className="rounded-full bg-gradient-to-r from-rose-500 to-rose-600 px-2.5 py-1 text-[10px] font-bold text-white active:scale-95 transition-all">✕ Clear</button>
+                </div>
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">From</label>
+                    <input type="date" value={dineinMobileDateFrom} onChange={(e) => { setDineinMobileDateFrom(e.target.value); setDineinPageIndex(0); }} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-100 outline-none focus:border-fuchsia-500" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">To</label>
+                    <input type="date" value={dineinMobileDateTo} onChange={(e) => { setDineinMobileDateTo(e.target.value); setDineinPageIndex(0); }} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-100 outline-none focus:border-fuchsia-500" />
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <label className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">👤 Order Taker</label>
+                  <select value={dineinMobileOrderTaker} onChange={(e) => { setDineinMobileOrderTaker(e.target.value); setDineinPageIndex(0); }} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-100 outline-none focus:border-fuchsia-500">
+                    <option value="">All Order Takers</option>
+                    {orderTakerOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">💳 Payment Method</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {['All', 'Cash', 'Online'].map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => { setDineinMobilePaymentMethod(method); setDineinPageIndex(0); }}
+                        className={`rounded-full px-2 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
+                          dineinMobilePaymentMethod === method
+                            ? method === 'Cash'
+                              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-[0_2px_12px_rgba(16,185,129,0.6)]'
+                              : method === 'Online'
+                                ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-[0_2px_12px_rgba(56,189,248,0.6)]'
+                                : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-[0_2px_12px_rgba(168,85,247,0.6)]'
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        {method === 'Cash' ? '💵' : method === 'Online' ? '📱' : '🎯'} {method}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </>
     );
