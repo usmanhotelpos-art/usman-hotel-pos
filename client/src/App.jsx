@@ -752,10 +752,12 @@ function App() {
     showMenuButton: true,
     menuFront: '',
     menuBack: '',
-    categoryPhotos: {}
+    categoryPhotos: {},
+    recommendedIds: []
   });
   const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
   const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
+  const [catalogueActiveCategory, setCatalogueActiveCategory] = useState(null);
   const [catalogueHost, setCatalogueHost] = useState('');
   const [cataloguePath, setCataloguePath] = useState('menu');
   const [catalogueAssignedCategories, setCatalogueAssignedCategories] = useState([]);
@@ -8978,6 +8980,16 @@ try {
     });
   }
 
+  function toggleRecommendedProduct(productId) {
+    setCatalogueLayout((prev) => {
+      const list = Array.isArray(prev.recommendedIds) ? prev.recommendedIds : [];
+      const next = list.includes(productId)
+        ? list.filter((id) => id !== productId)
+        : [...list, productId];
+      return { ...prev, recommendedIds: next };
+    });
+  }
+
   function openAssignCategory(categoryName) {
     setCatalogueAssignCategory(categoryName);
     setCatalogueAssignSearch('');
@@ -9093,6 +9105,9 @@ try {
     const countFor = (catName) => catName === 'All'
       ? posProducts.filter((p) => !blockCategories.length || blockCategories.includes(p.category)).length
       : posProducts.filter((p) => (p.category || '') === catName).length;
+    const categoryProducts = catalogueActiveCategory
+      ? filteredProducts.filter((p) => catalogueActiveCategory === 'All' || (p.category || '') === catalogueActiveCategory)
+      : [];
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/40 text-slate-900">
@@ -9108,6 +9123,12 @@ try {
           .cat-flip-inner.flipped { transform: rotateY(180deg); }
           .cat-flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
           .cat-flip-back { transform: rotateY(180deg); }
+          @keyframes catItemGlow { 0%,100% { box-shadow: 0 0 10px var(--accent-soft), 0 0 0 2px var(--accent-soft); } 50% { box-shadow: 0 0 26px var(--accent-strong), 0 0 0 3px var(--accent-strong); } }
+          @keyframes catRecText { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+          @keyframes catScreenIn { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: translateY(0); } }
+          .cat-item-recommended { animation: catItemGlow 1.8s ease-in-out infinite; }
+          .cat-rec-badge { animation: catRecText 1.2s ease-in-out infinite; }
+          .cat-screen-in { animation: catScreenIn 0.35s ease-out; }
         `}</style>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="space-y-6">
@@ -9133,16 +9154,15 @@ try {
               </div>
             </div>
 
-            {catalogueLayout.showCategories !== false && (
+            {catalogueLayout.showCategories !== false && !catalogueActiveCategory && (
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
-                  const isActive = catalogueCategory === cat.name;
                   const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
                   return (
                     <button
                       key={cat.name + idx}
-                      onClick={() => setCatalogueCategory(cat.name)}
-                      className={`cat-glow-block flex items-center gap-3 px-4 py-3 text-sm font-bold ${isActive ? 'active' : ''}`}
+                      onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); }}
+                      className={`cat-glow-block flex items-center gap-3 px-4 py-3 text-sm font-bold`}
                       style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, animationDelay: `${idx * 0.15}s` }}
                     >
                       {catPhoto ? (
@@ -9162,17 +9182,28 @@ try {
               </div>
             )}
 
-            <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
+            {catalogueActiveCategory && (
+            <div className="cat-screen-in grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
               <div className="space-y-6">
                 <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                    <div className="text-sm font-semibold text-slate-700">
-                      {catalogueCategory === 'All' ? 'All Items' : `${catalogueCategory} · ${countFor(catalogueCategory)} items`}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => { setCatalogueActiveCategory(null); setCatalogueSearch(''); }}
+                        className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold transition-all active:scale-95 text-white shadow-md"
+                        style={{ background: accent }}
+                      >
+                        ⬅ Back to Menu
+                      </button>
+                      <div className="text-lg font-bold text-slate-800">
+                        {catalogueActiveCategory === 'All' ? '🎯 All Items' : `${getCategoryIcon(catalogueActiveCategory)} ${catalogueActiveCategory}`}
+                        <span className="ml-2 text-xs font-semibold text-slate-400">{categoryProducts.length} items</span>
+                      </div>
                     </div>
                     <div className="relative">
                       <input value={catalogueSearch}
                         onChange={(e) => setCatalogueSearch(e.target.value)}
-                        placeholder="Search menu..."
+                        placeholder="Search items..."
                         className="rounded-3xl border border-slate-300 px-4 py-3 pr-10 text-sm outline-none bg-white text-slate-700 w-48" />
                       <svg className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -9181,7 +9212,7 @@ try {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {catalogueLoading && !filteredProducts.length && Array.from({ length: 8 }).map((_, idx) => (
+                    {catalogueLoading && !categoryProducts.length && Array.from({ length: 8 }).map((_, idx) => (
                       <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse">
                         <div className="w-full h-32 rounded-xl bg-slate-200 mb-3"></div>
                         <div className="h-3 w-16 rounded bg-slate-200 mb-2"></div>
@@ -9189,15 +9220,24 @@ try {
                         <div className="h-3 w-14 rounded bg-slate-200"></div>
                       </div>
                     ))}
-                    {filteredProducts.map((product) => (
+                    {categoryProducts.map((product) => {
+                      const recommended = (catalogueLayout.recommendedIds || []).includes(product.id);
+                      return (
                       <div key={product.id}
-                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97]">
+                        className={`rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] ${recommended ? 'cat-item-recommended' : 'border-slate-200'}`}
+                        style={recommended ? { '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong } : undefined}>
                         {product.photoUrl || product.photo ? (
                           <img src={product.photoUrl || product.photo} alt={product.name} loading="lazy"
                             className="w-full h-32 rounded-xl object-cover mb-3" />
                         ) : (
                           <div className="w-full h-32 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-3 text-slate-400 text-3xl">
                             🍽️
+                          </div>
+                        )}
+                        {recommended && (
+                          <div className="cat-rec-badge mb-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md"
+                            style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)` }}>
+                            ⭐ Highly Recommended
                           </div>
                         )}
                         {catalogueLayout.showCategories && product.category && (
@@ -9212,8 +9252,9 @@ try {
                           Add to cart
                         </button>
                       </div>
-                    ))}
-                    {!filteredProducts.length && (
+                      );
+                    })}
+                    {!categoryProducts.length && !catalogueLoading && (
                       <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-400">
                         No items found.
                       </div>
@@ -9300,6 +9341,7 @@ try {
                 </div>
               </aside>
             </div>
+            )}
           </div>
         </div>
 
@@ -11941,6 +11983,17 @@ try {
                           </p>
                         </div>
                         <button
+                          onClick={() => { toggleRecommendedProduct(product.id); persistQrCatalogue(); }}
+                          title="Mark as highly recommended"
+                          className={`shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-90 ${
+                            (catalogueLayout.recommendedIds || []).includes(product.id)
+                              ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-[0_2px_10px_rgba(245,158,11,0.5)]'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {(catalogueLayout.recommendedIds || []).includes(product.id) ? '★ Recommended' : '☆ Recommend'}
+                        </button>
+                        <button
                           onClick={() => { toggleAssignedProduct(group.cat, product.id); persistQrCatalogue(); }}
                           className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all active:scale-90 ${assigned
                             ? 'bg-rose-600 text-white'
@@ -11972,6 +12025,17 @@ try {
                           <p className="truncate text-xs font-bold text-white">{product.name}</p>
                           <p className="text-[10px] text-slate-400">{Number(product.price) || 0} PKR</p>
                         </div>
+                        <button
+                          onClick={() => { toggleRecommendedProduct(product.id); persistQrCatalogue(); }}
+                          title="Mark as highly recommended"
+                          className={`shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-90 ${
+                            (catalogueLayout.recommendedIds || []).includes(product.id)
+                              ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-[0_2px_10px_rgba(245,158,11,0.5)]'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {(catalogueLayout.recommendedIds || []).includes(product.id) ? '★ Recommended' : '☆ Recommend'}
+                        </button>
                         <button
                           onClick={() => { toggleAssignedProduct('All', product.id); persistQrCatalogue(); }}
                           className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all active:scale-90 ${assigned ? 'bg-rose-600 text-white' : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'}`}
