@@ -142,6 +142,11 @@ router.post('/auth/login', safe(async (req, res) => {
     let validStaff = false;
     if (staff.passwordHash) {
       validStaff = await bcrypt.compare(password || '', staff.passwordHash);
+    } else if (typeof staff.password === 'string' && staff.password.length > 0) {
+      validStaff = await bcrypt.compare(password || '', staff.password);
+      if (validStaff) {
+        updateRecord('staff', staff.id, { passwordHash: await bcrypt.hash(staff.password, 10) });
+      }
     }
     if (!validStaff) {
       recordLoginFailure(clientIp, rate.entry);
@@ -516,19 +521,30 @@ collections.forEach((collection) => {
     res.send(getCollection(collection));
   });
 
-  router.post(`/${collection}`, (req, res) => {
+  router.post(`/${collection}`, safe(async (req, res) => {
     const record = req.body;
+    if (collection === 'staff' && typeof record.password === 'string' && record.password.length > 0) {
+      record.passwordHash = await bcrypt.hash(record.password, 10);
+      delete record.password;
+    }
     const created = createRecord(collection, record);
     res.status(201).send(created);
-  });
+  }));
 
-  router.put(`/${collection}/:id`, (req, res) => {
-    const updated = updateRecord(collection, req.params.id, req.body);
+  router.put(`/${collection}/:id`, safe(async (req, res) => {
+    const changes = req.body;
+    if (collection === 'staff') {
+      if (typeof changes.password === 'string' && changes.password.length > 0) {
+        changes.passwordHash = await bcrypt.hash(changes.password, 10);
+      }
+      delete changes.password;
+    }
+    const updated = updateRecord(collection, req.params.id, changes);
     if (!updated) {
       return res.status(404).send({ error: 'Record not found' });
     }
     res.send(updated);
-  });
+  }));
 
   router.delete(`/${collection}/:id`, (req, res) => {
     // Admin-only delete for pos_orders
