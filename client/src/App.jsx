@@ -767,6 +767,7 @@ function App() {
     const path = window.location.pathname.toLowerCase();
     return /\/?(menu|catalogue|qr)(\/|$|\?)/.test(path);
   });
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
   const [qrCatalogueSubTab, setQrCatalogueSubTab] = useState('qr');
   const [qrCatalogueRevealed, setQrCatalogueRevealed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -788,9 +789,34 @@ function App() {
 
   useEffect(() => {
     if (!cataloguePage) return;
-    loadSettings();
-    loadPosData();
+    loadCatalogueData();
   }, [cataloguePage]);
+
+  // Fast loader for the public QR catalogue page: only settings + categories + lightweight products
+  async function loadCatalogueData() {
+    setCatalogueLoading(true);
+    try {
+      const [settingsData, categories, products] = await Promise.all([
+        fetchJson(`${apiBase}/settings`),
+        fetchJson(`${apiBase}/pos/categories`),
+        fetchJson(`${apiBase}/pos/products?light=1`)
+      ]);
+      setSettings((prev) => ({
+        ...prev,
+        ...(settingsData || {}),
+        receiptFontSizes: {
+          ...prev.receiptFontSizes,
+          ...((settingsData && settingsData.receiptFontSizes) || {})
+        }
+      }));
+      setPosCategories(categories || []);
+      setPosProducts(products || []);
+    } catch (error) {
+      setCatalogueMessage(error.message);
+    } finally {
+      setCatalogueLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (activeTab === 'rider-root-settings') {
@@ -1606,6 +1632,8 @@ try {
         // Order Taker App is a self-contained component and does not need generic tab data loading.
       } else if (tab === 'pos') {
         await loadPosData();
+      } else if (tab === 'qr-catalogue') {
+        await loadInventoryData();
       } else if (tab === 'customers') {
         await loadCustomers();
         await loadOrdersData();
@@ -9035,7 +9063,7 @@ try {
       setCatalogueCart([]);
       setCatalogueCustomer({ name: '', phone: '', address: '' });
       setCatalogueOrderNote('');
-      await loadPosData();
+      await loadCatalogueData();
     } catch (error) {
       setCatalogueMessage(error.message);
     } finally {
@@ -9087,11 +9115,19 @@ try {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {catalogueLoading && !filteredProducts.length && Array.from({ length: 8 }).map((_, idx) => (
+                      <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse">
+                        <div className="w-full h-32 rounded-xl bg-slate-200 mb-3"></div>
+                        <div className="h-3 w-16 rounded bg-slate-200 mb-2"></div>
+                        <div className="h-3 w-24 rounded bg-slate-200 mb-2"></div>
+                        <div className="h-3 w-14 rounded bg-slate-200"></div>
+                      </div>
+                    ))}
                     {filteredProducts.map((product) => (
                       <div key={product.id}
                         className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97]">
-                        {product.photo ? (
-                          <img src={product.photo} alt={product.name}
+                        {product.photoUrl || product.photo ? (
+                          <img src={product.photoUrl || product.photo} alt={product.name} loading="lazy"
                             className="w-full h-32 rounded-xl object-cover mb-3" />
                         ) : (
                           <div className="w-full h-32 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-3 text-slate-400 text-3xl">

@@ -331,7 +331,29 @@ router.get('/pos/categories', (req, res) => {
 });
 
 router.get('/pos/products', (req, res) => {
-  res.send(getCollection('pos_products'));
+  const products = getCollection('pos_products');
+  if (req.query.light === '1') {
+    const origin = `${req.protocol}://${req.get('host')}`;
+    res.send(products.map((p) => {
+      const { photo, ...rest } = p;
+      return { ...rest, photoUrl: photo ? `${origin}/api/pos/products/${p.id}/photo` : '' };
+    }));
+    return;
+  }
+  res.send(products);
+});
+
+// Public: serve a single product photo by id (used by light catalogue payloads)
+router.get('/pos/products/:id/photo', (req, res) => {
+  const products = getCollection('pos_products');
+  const product = products.find((p) => p.id === req.params.id);
+  const match = product && product.photo ? /^data:([^;]+);base64,(.+)$/.exec(product.photo) : null;
+  if (!match) {
+    return res.status(404).send({ error: 'Photo not found' });
+  }
+  res.set('Content-Type', match[1]);
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(match[2], 'base64'));
 });
 
 // Public: return basic rider/hotel settings without requiring auth
