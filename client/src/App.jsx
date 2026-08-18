@@ -751,7 +751,8 @@ function App() {
     layoutStyle: 'grid',
     showMenuButton: true,
     menuFront: '',
-    menuBack: ''
+    menuBack: '',
+    categoryPhotos: {}
   });
   const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
   const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
@@ -9136,14 +9137,21 @@ try {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
                   const isActive = catalogueCategory === cat.name;
+                  const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
                   return (
                     <button
                       key={cat.name + idx}
                       onClick={() => setCatalogueCategory(cat.name)}
-                      className={`cat-glow-block flex min-w-[96px] items-center gap-2 px-4 py-3 text-sm font-bold ${isActive ? 'active' : ''}`}
+                      className={`cat-glow-block flex items-center gap-3 px-4 py-3 text-sm font-bold ${isActive ? 'active' : ''}`}
                       style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, animationDelay: `${idx * 0.15}s` }}
                     >
-                      <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                      {catPhoto ? (
+                        <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-2xl border-2 border-white/70 shadow-md">
+                          <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
+                        </span>
+                      ) : (
+                        <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                      )}
                       <span className="text-left leading-tight">
                         <span className="block">{cat.name}</span>
                         <span className="block text-[10px] font-semibold opacity-70">{countFor(cat.name)} items</span>
@@ -12189,6 +12197,60 @@ try {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-slate-700 bg-slate-950 p-3">
+                <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">🖼️ Category Photos (PNG) — shown on menu blocks</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {posCategories.map((cat) => {
+                    const catName = cat.name || '';
+                    const hasPhoto = Boolean(catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[catName]);
+                    return (
+                      <div key={cat.id || catName} className="rounded-xl border border-slate-700 bg-slate-900 p-2">
+                        <p className="mb-1.5 truncate text-center text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                          {getCategoryIcon(catName)} {catName || 'Unnamed'}
+                        </p>
+                        <div className="mx-auto flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-800">
+                          {hasPhoto ? (
+                            <img src={catalogueLayout.categoryPhotos[catName]} alt={catName} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-[10px] text-slate-500">No photo</span>
+                          )}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-1.5">
+                          <label className="cursor-pointer rounded-lg bg-sky-600 px-2 py-1.5 text-center text-[9px] font-bold text-white transition hover:bg-sky-500">
+                            Upload
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files && e.target.files[0];
+                                e.target.value = '';
+                                if (!file || !catName) return;
+                                const dataUrl = await resizeImageFile(file, 600, 0.85);
+                                setCatalogueLayout((prev) => ({
+                                  ...prev,
+                                  categoryPhotos: { ...(prev.categoryPhotos || {}), [catName]: dataUrl }
+                                }));
+                              }}
+                            />
+                          </label>
+                          <button
+                            onClick={() => setCatalogueLayout((prev) => {
+                              const next = { ...(prev.categoryPhotos || {}) };
+                              delete next[catName];
+                              return { ...prev, categoryPhotos: next };
+                            })}
+                            className="rounded-lg bg-rose-600 px-2 py-1.5 text-[9px] font-bold text-white transition hover:bg-rose-500"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
