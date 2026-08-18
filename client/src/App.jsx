@@ -748,8 +748,13 @@ function App() {
     accentColor: '#10b981',
     pageTitle: 'Our Menu',
     pageDescription: 'Scan to browse our full menu and order online',
-    layoutStyle: 'grid'
+    layoutStyle: 'grid',
+    showMenuButton: true,
+    menuFront: '',
+    menuBack: ''
   });
+  const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
+  const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
   const [catalogueHost, setCatalogueHost] = useState('');
   const [cataloguePath, setCataloguePath] = useState('menu');
   const [catalogueAssignedCategories, setCatalogueAssignedCategories] = useState([]);
@@ -9075,9 +9080,34 @@ try {
     const filteredProducts = getCatalogueFilteredProducts();
     const summary = getCatalogueCartSummary();
     const catalogueUrl = getCatalogueUrl();
+    const accent = catalogueLayout.accentColor || '#10b981';
+    const accentSoft = `${accent}44`;
+    const accentStrong = `${accent}cc`;
+    const showMenuCircle = catalogueLayout.showMenuButton !== false && (catalogueLayout.menuFront || settings.logo || settings.posHeaderPhoto || settings.riderAppLogo);
+    const menuCircleSrc = catalogueLayout.menuFront || settings.logo || settings.posHeaderPhoto || settings.riderAppLogo;
+    const menuImageSrc = catalogueMenuSide === 'back' && catalogueLayout.menuBack ? catalogueLayout.menuBack : catalogueLayout.menuFront;
+    const blockCategories = catalogueAssignedCategories.length
+      ? catalogueAssignedCategories
+      : posCategories.map((c) => c.name);
+    const countFor = (catName) => catName === 'All'
+      ? posProducts.filter((p) => !blockCategories.length || blockCategories.includes(p.category)).length
+      : posProducts.filter((p) => (p.category || '') === catName).length;
 
     return (
-      <div className="min-h-screen bg-white text-slate-900">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/40 text-slate-900">
+        <style>{`
+          @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 2px var(--accent), 0 0 14px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 3px var(--accent), 0 0 26px var(--accent-soft); transform: translateY(-2px); } }
+          @keyframes catMenuRing { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 16px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 28px var(--accent-soft); } }
+          .cat-glow-block { position: relative; isolation: isolate; border-radius: 1.25rem; background: linear-gradient(135deg, #ffffff, #f7fdf9); border: 1px solid var(--accent-soft); animation: catGlow 2.4s ease-in-out infinite; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+          .cat-glow-block:hover { transform: translateY(-4px) scale(1.05); }
+          .cat-glow-block.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
+          .cat-menu-circle { animation: catMenuRing 2.6s ease-in-out infinite; }
+          .cat-flip-scene { perspective: 1200px; }
+          .cat-flip-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
+          .cat-flip-inner.flipped { transform: rotateY(180deg); }
+          .cat-flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+          .cat-flip-back { transform: rotateY(180deg); }
+        `}</style>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="space-y-6">
             <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
@@ -9087,21 +9117,49 @@ try {
                   <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
                 </div>
+                {showMenuCircle && (
+                  <button
+                    onClick={() => { setCatalogueMenuOpen(true); setCatalogueMenuSide('front'); }}
+                    title="View attached menu"
+                    className="cat-menu-circle relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white"
+                    style={{ '--accent': accent, '--accent-soft': accentSoft }}
+                  >
+                    <img src={menuCircleSrc} alt="Menu" className="h-full w-full object-cover" />
+                    <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] shadow"
+                      style={{ background: accent, color: '#fff' }}>📖</span>
+                  </button>
+                )}
               </div>
             </div>
+
+            {catalogueLayout.showCategories !== false && (
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
+                  const isActive = catalogueCategory === cat.name;
+                  return (
+                    <button
+                      key={cat.name + idx}
+                      onClick={() => setCatalogueCategory(cat.name)}
+                      className={`cat-glow-block flex min-w-[96px] items-center gap-2 px-4 py-3 text-sm font-bold ${isActive ? 'active' : ''}`}
+                      style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, animationDelay: `${idx * 0.15}s` }}
+                    >
+                      <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                      <span className="text-left leading-tight">
+                        <span className="block">{cat.name}</span>
+                        <span className="block text-[10px] font-semibold opacity-70">{countFor(cat.name)} items</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
               <div className="space-y-6">
                 <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                    <div className="flex items-center gap-3">
-                      <select value={catalogueCategory}
-                        onChange={(e) => setCatalogueCategory(e.target.value)}
-                        className="rounded-3xl border border-slate-300 px-4 py-3 text-sm outline-none bg-white text-slate-700">
-                        {getAssignedCategoriesForDropdown().map((category) => (
-                          <option key={category.id || category.name} value={category.name}>{category.name}</option>
-                        ))}
-                      </select>
+                    <div className="text-sm font-semibold text-slate-700">
+                      {catalogueCategory === 'All' ? 'All Items' : `${catalogueCategory} · ${countFor(catalogueCategory)} items`}
                     </div>
                     <div className="relative">
                       <input value={catalogueSearch}
@@ -9236,6 +9294,48 @@ try {
             </div>
           </div>
         </div>
+
+        {catalogueMenuOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setCatalogueMenuOpen(false)} />
+            <div className="relative w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-bold text-slate-800">📖 Attached Menu</p>
+                <button onClick={() => setCatalogueMenuOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">✕</button>
+              </div>
+              <div className="cat-flip-scene mx-auto h-[420px] w-full max-w-[300px]">
+                <div className={`cat-flip-inner ${catalogueMenuSide === 'back' ? 'flipped' : ''}`}>
+                  <div className="cat-flip-face overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                    {menuImageSrc ? (
+                      <img src={menuImageSrc} alt="Menu front" className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">No front image</div>
+                    )}
+                  </div>
+                  <div className="cat-flip-face cat-flip-back overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                    {catalogueLayout.menuBack ? (
+                      <img src={catalogueLayout.menuBack} alt="Menu back" className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">No back image</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setCatalogueMenuSide('front')}
+                  className={`rounded-full px-5 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueMenuSide === 'front' ? 'text-white shadow' : 'bg-slate-100 text-slate-600'}`}
+                  style={catalogueMenuSide === 'front' ? { background: accent } : undefined}
+                >Front</button>
+                <button
+                  onClick={() => setCatalogueMenuSide('back')}
+                  className={`rounded-full px-5 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueMenuSide === 'back' ? 'text-white shadow' : 'bg-slate-100 text-slate-600'}`}
+                  style={catalogueMenuSide === 'back' ? { background: accent } : undefined}
+                >Back</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -12040,6 +12140,55 @@ try {
                     placeholder="menu"
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500"
                   />
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-slate-700 bg-slate-950 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">🖼️ Attached Menu (PNG) — Front & Back</p>
+                  <button
+                    onClick={() => setCatalogueLayout((prev) => ({ ...prev, showMenuButton: !prev.showMenuButton }))}
+                    className={`rounded-xl px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.showMenuButton !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                  >
+                    {catalogueLayout.showMenuButton !== false ? 'Circle Button Shown' : 'Circle Button Hidden'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['menuFront', '📄 Front', 'Front image'], ['menuBack', '📄 Back', 'Back image']].map(([key, label, emptyText]) => (
+                    <div key={key} className="rounded-xl border border-slate-700 bg-slate-900 p-2">
+                      <p className="mb-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+                      <div className="mx-auto flex h-28 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-800">
+                        {catalogueLayout[key] ? (
+                          <img src={catalogueLayout[key]} alt={label} className="h-full w-full object-contain" />
+                        ) : (
+                          <span className="text-[10px] text-slate-500">{emptyText}</span>
+                        )}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-1.5">
+                        <label className="cursor-pointer rounded-lg bg-sky-600 px-2 py-1.5 text-center text-[9px] font-bold text-white transition hover:bg-sky-500">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files && e.target.files[0];
+                              e.target.value = '';
+                              if (!file) return;
+                              const dataUrl = await resizeImageFile(file, 1200, 0.85);
+                              setCatalogueLayout((prev) => ({ ...prev, [key]: dataUrl }));
+                            }}
+                          />
+                        </label>
+                        <button
+                          onClick={() => setCatalogueLayout((prev) => ({ ...prev, [key]: '' }))}
+                          className="rounded-lg bg-rose-600 px-2 py-1.5 text-[9px] font-bold text-white transition hover:bg-rose-500"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
