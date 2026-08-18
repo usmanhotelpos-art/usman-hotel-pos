@@ -1500,7 +1500,7 @@ function App() {
         const savedRoles = window.localStorage.getItem('posRoles');
         if (savedRoles) setRoles(JSON.parse(savedRoles));
         const savedTabs = window.localStorage.getItem('posTabs');
-        if (savedTabs) setTabs(JSON.parse(savedTabs).filter(t => t !== 'catalogue' && t !== 'qr-catalogue'));
+        if (savedTabs) setTabs(JSON.parse(savedTabs).filter(t => t !== 'catalogue'));
         const savedTabLabels = window.localStorage.getItem('posTabLabels');
         if (savedTabLabels) setTabLabels(JSON.parse(savedTabLabels));
         const savedTabIcons = window.localStorage.getItem('posTabIcons');
