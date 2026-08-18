@@ -11481,7 +11481,7 @@ function App() {
 
           {/* Floating filters - mobile Dine-In */}
           {!isAnyPopupOpen && (
-          <div className="fixed left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2" style={{ bottom: isMobile ? mobileFloatBottomUp : 16 }}>
+          <div className="fixed left-4 z-[60] flex flex-col items-start gap-2" style={{ bottom: isMobile ? mobileFloatBottomUp + 60 : 16 }}>
             <button
               onClick={() => setDineinMobileFiltersOpen(!dineinMobileFiltersOpen)}
               className="group relative flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 px-4 py-2 text-xs font-bold text-white shadow-[0_4px_20px_rgba(217,70,239,0.5)] transition-all hover:shadow-[0_4px_28px_rgba(217,70,239,0.8)] active:scale-95"
@@ -11494,7 +11494,7 @@ function App() {
             </button>
 
             {dineinMobileFiltersOpen && (
-              <div className="w-[94vw] max-w-md rounded-2xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+              <div className="w-[calc(100vw-2rem)] max-w-md rounded-2xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-white">🔍 Filters</span>
                   <button onClick={clearMobileFilters} className="rounded-full bg-gradient-to-r from-rose-500 to-rose-600 px-2.5 py-1 text-[10px] font-bold text-white active:scale-95 transition-all">✕ Clear</button>
