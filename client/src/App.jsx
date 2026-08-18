@@ -11480,7 +11480,8 @@ function App() {
           )}
 
           {/* Floating filters - mobile Dine-In */}
-          <div className="fixed left-1/2 z-40 flex -translate-x-1/2 flex-col items-center gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+          {!isAnyPopupOpen && (
+          <div className="fixed left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2" style={{ bottom: isMobile ? mobileFloatBottomUp : 16 }}>
             <button
               onClick={() => setDineinMobileFiltersOpen(!dineinMobileFiltersOpen)}
               className="group relative flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 px-4 py-2 text-xs font-bold text-white shadow-[0_4px_20px_rgba(217,70,239,0.5)] transition-all hover:shadow-[0_4px_28px_rgba(217,70,239,0.8)] active:scale-95"
@@ -11540,6 +11541,7 @@ function App() {
               </div>
             )}
           </div>
+          )}
         </div>
       </>
     );
