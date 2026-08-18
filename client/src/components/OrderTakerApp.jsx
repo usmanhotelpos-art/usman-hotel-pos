@@ -1011,7 +1011,7 @@ export function OrderTakerApp() {
                               </div>
                             ) : requestSent ? (
                               <div className="rounded-lg bg-violet-500/10 border border-violet-500/30 px-3 py-2 text-center text-[11px] font-bold text-violet-400">
-                                👤 Request sent to Farhan Owner - awaiting approval
+                                👤 Request sent to Farhan Owner{order.paymentMethod ? ` (${order.paymentMethod === 'Online' ? '📱' : '💵'} ${order.paymentMethod})` : ''} - awaiting approval
                               </div>
                             ) : (
                               <button onClick={() => setPaymentMethodOrder(order)} disabled={loading || !order.paymentRequestImage}
