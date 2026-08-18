@@ -758,6 +758,7 @@ function App() {
   const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
   const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
   const [catalogueActiveCategory, setCatalogueActiveCategory] = useState(null);
+  const [catalogueView, setCatalogueView] = useState('categories');
   const [catalogueHost, setCatalogueHost] = useState('');
   const [cataloguePath, setCataloguePath] = useState('menu');
   const [catalogueAssignedCategories, setCatalogueAssignedCategories] = useState([]);
@@ -978,6 +979,10 @@ function App() {
       if (lower.includes(key.toLowerCase())) return icon;
     }
     return '📁';
+  }
+  function isChefSpecialName(name) {
+    const n = (name || '').toString().toLowerCase();
+    return n.includes('seekh kabab') || n.includes('seekh tikka') || n.includes('pizza');
   }
 
   const [editingRoleTabs, setEditingRoleTabs] = useState(null);
@@ -9034,7 +9039,13 @@ try {
       await fetchJson(`${apiBase}/settings`, {
         method: 'PUT',
         body: JSON.stringify({
-          catalogueLayout,
+          catalogueLayout: {
+            ...catalogueLayout,
+            recommendedIds: [...new Set([
+              ...(Array.isArray(catalogueLayout.recommendedIds) ? catalogueLayout.recommendedIds : []),
+              ...posProducts.filter((p) => isChefSpecialName(p.name)).map((p) => p.id)
+            ])]
+          },
           catalogueHost,
           cataloguePath,
           catalogueAssignedCategories,
@@ -9092,6 +9103,7 @@ try {
   function renderCustomerCataloguePage() {
     const filteredProducts = getCatalogueFilteredProducts();
     const summary = getCatalogueCartSummary();
+    const cartCount = catalogueCart.reduce((s, i) => s + i.quantity, 0);
     const catalogueUrl = getCatalogueUrl();
     const accent = catalogueLayout.accentColor || '#10b981';
     const accentSoft = `${accent}44`;
@@ -9112,10 +9124,10 @@ try {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/40 text-slate-900">
         <style>{`
-          @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 2px var(--accent), 0 0 14px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 3px var(--accent), 0 0 26px var(--accent-soft); transform: translateY(-2px); } }
+          @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent-soft), 0 0 42px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 32px var(--accent-strong), 0 0 64px var(--accent-soft); transform: translateY(-3px); } }
           @keyframes catMenuRing { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 16px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 28px var(--accent-soft); } }
-          .cat-glow-block { position: relative; isolation: isolate; border-radius: 1.25rem; background: linear-gradient(135deg, #ffffff, #f7fdf9); border: 1px solid var(--accent-soft); animation: catGlow 2.4s ease-in-out infinite; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-          .cat-glow-block:hover { transform: translateY(-4px) scale(1.05); }
+          .cat-glow-block { position: relative; isolation: isolate; border-radius: 9999px; background: linear-gradient(135deg, #ffffff, #f7fdf9); border: 1px solid var(--accent-soft); animation: catGlow 2.2s ease-in-out infinite; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+          .cat-glow-block:hover { transform: translateY(-6px) scale(1.06); }
           .cat-glow-block.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
           .cat-menu-circle { animation: catMenuRing 2.6s ease-in-out infinite; }
           .cat-flip-scene { perspective: 1200px; }
@@ -9125,225 +9137,322 @@ try {
           .cat-flip-back { transform: rotateY(180deg); }
           @keyframes catItemGlow { 0%,100% { box-shadow: 0 0 10px var(--accent-soft), 0 0 0 2px var(--accent-soft); } 50% { box-shadow: 0 0 26px var(--accent-strong), 0 0 0 3px var(--accent-strong); } }
           @keyframes catRecText { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
-          @keyframes catScreenIn { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: translateY(0); } }
+          @keyframes catScreenIn { 0% { opacity: 0; transform: translateY(18px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+          @keyframes catTitleGlow { 0%,100% { text-shadow: 0 0 8px var(--accent-soft); } 50% { text-shadow: 0 0 18px var(--accent-strong), 0 0 30px var(--accent-soft); } }
           .cat-item-recommended { animation: catItemGlow 1.8s ease-in-out infinite; }
           .cat-rec-badge { animation: catRecText 1.2s ease-in-out infinite; }
-          .cat-screen-in { animation: catScreenIn 0.35s ease-out; }
+          .cat-screen-in { animation: catScreenIn 0.4s ease-out; }
+          .cat-glow-title { animation: catTitleGlow 2s ease-in-out infinite; color: var(--accent); }
+          .cat-float-cart { animation: catMenuRing 2s ease-in-out infinite; }
         `}</style>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="space-y-6">
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Online Menu</p>
-                  <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
+            {catalogueView === 'categories' && (
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Online Menu</p>
+                    <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
+                  </div>
+                  {showMenuCircle && (
+                    <button
+                      onClick={() => { setCatalogueMenuOpen(true); setCatalogueMenuSide('front'); }}
+                      title="View attached menu"
+                      className="cat-menu-circle relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white"
+                      style={{ '--accent': accent, '--accent-soft': accentSoft }}
+                    >
+                      <img src={menuCircleSrc} alt="Menu" className="h-full w-full object-cover" />
+                      <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] shadow"
+                        style={{ background: accent, color: '#fff' }}>📖</span>
+                    </button>
+                  )}
                 </div>
-                {showMenuCircle && (
-                  <button
-                    onClick={() => { setCatalogueMenuOpen(true); setCatalogueMenuSide('front'); }}
-                    title="View attached menu"
-                    className="cat-menu-circle relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white"
-                    style={{ '--accent': accent, '--accent-soft': accentSoft }}
-                  >
-                    <img src={menuCircleSrc} alt="Menu" className="h-full w-full object-cover" />
-                    <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] shadow"
-                      style={{ background: accent, color: '#fff' }}>📖</span>
-                  </button>
-                )}
               </div>
-            </div>
+            )}
 
-            {catalogueLayout.showCategories !== false && !catalogueActiveCategory && (
-              <div className="flex flex-wrap items-center justify-center gap-3">
+            {catalogueView === 'categories' && catalogueLayout.showCategories !== false && (
+              <div className="flex flex-wrap items-center justify-center gap-5">
                 {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
                   const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
                   return (
                     <button
                       key={cat.name + idx}
-                      onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); }}
-                      className={`cat-glow-block flex items-center gap-3 px-4 py-3 text-sm font-bold`}
+                      onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); setCatalogueView('items'); }}
+                      className="cat-glow-block flex h-32 w-32 flex-col items-center justify-center gap-1.5 p-2 text-center"
                       style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, animationDelay: `${idx * 0.15}s` }}
                     >
                       {catPhoto ? (
-                        <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-2xl border-2 border-white/70 shadow-md">
+                        <span className="block h-16 w-16 overflow-hidden rounded-full border-4 border-white/80 shadow-lg">
                           <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
                         </span>
                       ) : (
-                        <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                        <span className="text-3xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
                       )}
-                      <span className="text-left leading-tight">
-                        <span className="block">{cat.name}</span>
-                        <span className="block text-[10px] font-semibold opacity-70">{countFor(cat.name)} items</span>
-                      </span>
+                      <span className="block w-full max-w-[7.5rem] truncate text-[13px] font-black">{cat.name}</span>
+                      <span className="block text-[10px] font-semibold opacity-70">{countFor(cat.name)} items</span>
                     </button>
                   );
                 })}
               </div>
             )}
 
-            {catalogueActiveCategory && (
-            <div className="cat-screen-in grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
-              <div className="space-y-6">
-                <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        onClick={() => { setCatalogueActiveCategory(null); setCatalogueSearch(''); }}
-                        className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold transition-all active:scale-95 text-white shadow-md"
-                        style={{ background: accent }}
-                      >
-                        ⬅ Back to Menu
-                      </button>
-                      <div className="text-lg font-bold text-slate-800">
-                        {catalogueActiveCategory === 'All' ? '🎯 All Items' : `${getCategoryIcon(catalogueActiveCategory)} ${catalogueActiveCategory}`}
-                        <span className="ml-2 text-xs font-semibold text-slate-400">{categoryProducts.length} items</span>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <input value={catalogueSearch}
-                        onChange={(e) => setCatalogueSearch(e.target.value)}
-                        placeholder="Search items..."
-                        className="rounded-3xl border border-slate-300 px-4 py-3 pr-10 text-sm outline-none bg-white text-slate-700 w-48" />
-                      <svg className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
+            {catalogueView === 'items' && catalogueActiveCategory && (
+              <div className="cat-screen-in rounded-[32px] border border-slate-200 bg-white p-5 shadow-soft">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => { setCatalogueActiveCategory(null); setCatalogueSearch(''); setCatalogueView('categories'); }}
+                      className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold transition-all active:scale-95 text-white shadow-md"
+                      style={{ background: accent }}
+                    >
+                      ⬅ Back to Menu
+                    </button>
+                    <div className="text-lg font-bold text-slate-800">
+                      {catalogueActiveCategory === 'All' ? '🎯 All Items' : `${getCategoryIcon(catalogueActiveCategory)} ${catalogueActiveCategory}`}
+                      <span className="ml-2 text-xs font-semibold text-slate-400">{categoryProducts.length} items</span>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {catalogueLoading && !categoryProducts.length && Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse">
-                        <div className="w-full h-32 rounded-xl bg-slate-200 mb-3"></div>
-                        <div className="h-3 w-16 rounded bg-slate-200 mb-2"></div>
-                        <div className="h-3 w-24 rounded bg-slate-200 mb-2"></div>
-                        <div className="h-3 w-14 rounded bg-slate-200"></div>
-                      </div>
-                    ))}
-                    {categoryProducts.map((product) => {
-                      const recommended = (catalogueLayout.recommendedIds || []).includes(product.id);
-                      return (
-                      <div key={product.id}
-                        className={`rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] ${recommended ? 'cat-item-recommended' : 'border-slate-200'}`}
-                        style={recommended ? { '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong } : undefined}>
-                        {product.photoUrl || product.photo ? (
-                          <img src={product.photoUrl || product.photo} alt={product.name} loading="lazy"
-                            className="w-full h-32 rounded-xl object-cover mb-3" />
-                        ) : (
-                          <div className="w-full h-32 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-3 text-slate-400 text-3xl">
-                            🍽️
-                          </div>
-                        )}
-                        {recommended && (
-                          <div className="cat-rec-badge mb-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md"
-                            style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)` }}>
-                            ⭐ Highly Recommended
-                          </div>
-                        )}
-                        {catalogueLayout.showCategories && product.category && (
-                          <div className="text-[10px] uppercase tracking-[0.15em] text-slate-400 mb-1">{product.category}</div>
-                        )}
-                        <div className="text-sm font-semibold text-slate-800 line-clamp-2 mb-1">{product.name}</div>
-                        {catalogueLayout.showPrices && (
-                          <div className="text-sm font-bold text-emerald-600">{Number(product.price) || 0} PKR</div>
-                        )}
-                        <button onClick={() => addToCatalogueCart(product)}
-                          className="mt-3 w-full rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition">
-                          Add to cart
-                        </button>
-                      </div>
-                      );
-                    })}
-                    {!categoryProducts.length && !catalogueLoading && (
-                      <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-400">
-                        No items found.
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCatalogueView('cart')}
+                      className="cat-float-cart relative flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-black text-white shadow-md transition-all active:scale-95"
+                      style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, '--accent': accent, '--accent-soft': accentSoft }}
+                    >
+                      🛒 Cart
+                      <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-xs font-black"
+                        style={{ color: accent }}>{cartCount}</span>
+                    </button>
+                    {showMenuCircle && (
+                      <button
+                        onClick={() => { setCatalogueMenuOpen(true); setCatalogueMenuSide('front'); }}
+                        title="View attached menu"
+                        className="cat-menu-circle relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-md"
+                        style={{ '--accent': accent, '--accent-soft': accentSoft }}
+                      >
+                        <img src={menuCircleSrc} alt="Menu" className="h-full w-full object-cover" />
+                      </button>
                     )}
                   </div>
                 </div>
-              </div>
 
-              <aside className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft h-fit sticky top-6">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Your cart</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-slate-900">{catalogueCart.length} item{catalogueCart.length !== 1 ? 's' : ''}</h2>
+                <div className="relative mt-4">
+                  <input value={catalogueSearch}
+                    onChange={(e) => setCatalogueSearch(e.target.value)}
+                    placeholder="🔍 Search items..."
+                    className="w-full rounded-3xl border border-slate-300 px-5 py-3.5 pr-11 text-sm outline-none bg-slate-50 text-slate-700 focus:border-emerald-400 focus:bg-white"
+                    style={{ boxShadow: `0 0 0 2px ${accentSoft}22` }}
+                  />
+                  <svg className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-                {catalogueCart.length > 0 && (
+
+                <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {catalogueLoading && !categoryProducts.length && Array.from({ length: 6 }).map((_, idx) => (
+                    <div key={idx} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse">
+                      <div className="w-full h-40 rounded-2xl bg-slate-200 mb-3"></div>
+                      <div className="h-3 w-16 rounded bg-slate-200 mb-2"></div>
+                      <div className="h-3 w-24 rounded bg-slate-200 mb-2"></div>
+                      <div className="h-3 w-14 rounded bg-slate-200"></div>
+                    </div>
+                  ))}
+                  {categoryProducts.map((product) => {
+                    const chefSpecial = isChefSpecialName(product.name);
+                    const recommended = (catalogueLayout.recommendedIds || []).includes(product.id);
+                    const glow = chefSpecial || recommended;
+                    return (
+                    <div key={product.id}
+                      className={`rounded-3xl border-2 bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.14)] active:scale-[0.97] ${glow ? 'cat-item-recommended border-transparent' : 'border-slate-200'}`}
+                      style={glow ? { '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong } : undefined}>
+                      {product.photoUrl || product.photo ? (
+                        <img src={product.photoUrl || product.photo} alt={product.name} loading="lazy"
+                          className="w-full h-40 rounded-2xl object-cover mb-3" />
+                      ) : (
+                        <div className="w-full h-40 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-3 text-slate-400 text-4xl">
+                          🍽️
+                        </div>
+                      )}
+                      {chefSpecial ? (
+                        <div className="cat-rec-badge mb-1.5 inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md"
+                          style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}>
+                          🔥 Chef's Special
+                        </div>
+                      ) : recommended ? (
+                        <div className="cat-rec-badge mb-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md"
+                          style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)` }}>
+                          ⭐ Highly Recommended
+                        </div>
+                      ) : null}
+                      <div className="text-base font-black text-slate-800 line-clamp-2 mb-1">{product.name}</div>
+                      {catalogueLayout.showPrices && (
+                        <div className="text-base font-black text-emerald-600">{Number(product.price) || 0} PKR</div>
+                      )}
+                      <button onClick={() => addToCatalogueCart(product)}
+                        className="mt-3 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-sm font-black text-white hover:bg-emerald-500 transition shadow-[0_4px_14px_rgba(16,185,129,0.35)]">
+                        🛒 Add to cart
+                      </button>
+                    </div>
+                    );
+                  })}
+                  {!categoryProducts.length && !catalogueLoading && (
+                    <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-400">
+                      No items found.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {catalogueView === 'cart' && (
+              <div className="cat-screen-in mx-auto max-w-2xl rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="cat-glow-title text-2xl font-black"
+                    style={{ '--accent': accent, '--accent-strong': accentStrong, '--accent-soft': accentSoft }}>🛒 Your Cart</h2>
+                  <button
+                    onClick={() => setCatalogueView(catalogueActiveCategory ? 'items' : 'categories')}
+                    className="flex items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                  >
+                    ⬅ Back
+                  </button>
+                </div>
+                {catalogueCart.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                    <div className="text-5xl">🛒</div>
+                    <p className="mt-3 text-sm font-bold text-slate-500">Your cart is empty</p>
+                    <button
+                      onClick={() => setCatalogueView(catalogueActiveCategory ? 'items' : 'categories')}
+                      className="mt-4 rounded-full px-6 py-2.5 text-sm font-bold text-white transition-all active:scale-95"
+                      style={{ background: accent }}
+                    >
+                      Browse Menu
+                    </button>
+                  </div>
+                ) : (
                   <>
-                    <div className="mt-4 space-y-3">
+                    <div className="space-y-3">
                       {catalogueCart.map((item) => (
-                        <div key={item.productId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div key={item.productId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-slate-800 truncate">{item.name}</div>
-                            <div className="text-xs text-slate-500">{item.price} PKR</div>
+                            <div className="text-sm font-black text-slate-800 truncate">{item.name}</div>
+                            <div className="text-xs font-semibold text-slate-500">{item.price} PKR each</div>
                           </div>
                           <div className="flex items-center gap-2">
                             <button onClick={() => updateCatalogueCartItem(item.productId, -1)}
-                              className="rounded-full bg-slate-200 w-7 h-7 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-300">-</button>
-                            <span className="text-sm font-semibold w-6 text-center">{item.quantity}</span>
+                              className="rounded-full bg-white w-8 h-8 flex items-center justify-center text-sm font-black text-slate-600 shadow hover:bg-slate-200">-</button>
+                            <span className="text-base font-black w-7 text-center text-slate-800">{item.quantity}</span>
                             <button onClick={() => updateCatalogueCartItem(item.productId, 1)}
-                              className="rounded-full bg-slate-200 w-7 h-7 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-300">+</button>
+                              className="rounded-full w-8 h-8 flex items-center justify-center text-sm font-black text-white shadow hover:opacity-90"
+                              style={{ background: accent }}>+</button>
+                            <button onClick={() => updateCatalogueCartItem(item.productId, -item.quantity)}
+                              className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-500 hover:bg-rose-200">✕</button>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 flex justify-between text-sm font-semibold text-slate-800">
+                    <div className="mt-5 flex items-center justify-between rounded-2xl p-4 text-lg font-black text-white"
+                      style={{ background: `linear-gradient(135deg, ${accent}, #10b981)`, boxShadow: `0 8px 24px ${accentSoft}` }}>
                       <span>Total</span>
-                      <span>{summary.total} PKR</span>
+                      <span className="cat-rec-badge">{summary.total} PKR</span>
                     </div>
+                    <button
+                      onClick={() => setCatalogueView('checkout')}
+                      disabled={!catalogueCart.length}
+                      className="mt-4 w-full rounded-2xl px-4 py-3.5 text-sm font-black text-white transition-all active:scale-95 disabled:opacity-50"
+                      style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, boxShadow: `0 8px 24px ${accentSoft}` }}
+                    >
+                      Continue to Details →
+                    </button>
                   </>
                 )}
-                <div className="mt-4 space-y-3">
+              </div>
+            )}
+
+            {catalogueView === 'checkout' && (
+              <div className="cat-screen-in mx-auto max-w-2xl rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="cat-glow-title text-2xl font-black"
+                    style={{ '--accent': accent, '--accent-strong': accentStrong, '--accent-soft': accentSoft }}>👤 Your Details</h2>
+                  <button
+                    onClick={() => setCatalogueView('cart')}
+                    className="flex items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                  >
+                    ⬅ Cart
+                  </button>
+                </div>
+                <div className="mb-4 rounded-2xl bg-slate-50 p-3 text-sm font-bold text-slate-600">
+                  {cartCount} item{cartCount !== 1 ? 's' : ''} · <span className="text-emerald-600">{summary.total} PKR</span>
+                </div>
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Name *</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Name *</label>
                     <input value={catalogueCustomer.name}
                       onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, name: e.target.value }))}
                       placeholder="Your name"
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Phone *</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Phone *</label>
                     <input value={catalogueCustomer.phone}
                       onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, phone: e.target.value }))}
                       placeholder="Phone number"
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Address</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Address</label>
                     <textarea value={catalogueCustomer.address}
                       onChange={(e) => setCatalogueCustomer((prev) => ({ ...prev, address: e.target.value }))}
                       rows={2} placeholder="Delivery address"
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Order note</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Order note</label>
                     <textarea value={catalogueOrderNote}
                       onChange={(e) => setCatalogueOrderNote(e.target.value)}
                       rows={2} placeholder="Special instructions"
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Payment method</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Payment method</label>
                     <select value="Online" className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none bg-white text-slate-700">
                       <option value="Online">Online</option>
                     </select>
                   </div>
                   <button onClick={saveOnlineCatalogueOrder}
                     disabled={loading}
-                    className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition disabled:opacity-50">
-                    {loading ? 'Placing order...' : 'Place order'}
+                    className="w-full rounded-2xl px-4 py-3.5 text-sm font-black text-white transition-all active:scale-95 disabled:opacity-50"
+                    style={{ background: `linear-gradient(135deg, ${accent}, #10b981)`, boxShadow: `0 8px 24px ${accentSoft}` }}>
+                    {loading ? '⏳ Placing order...' : `✅ Place Order · ${summary.total} PKR`}
                   </button>
                   {catalogueMessage && (
                     <div className={`rounded-2xl p-3 text-sm ${catalogueMessage.includes('success') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
-                      {catalogueMessage}
+                      <p className="font-bold">{catalogueMessage}</p>
+                      {catalogueMessage.includes('success') && (
+                        <button
+                          onClick={() => { setCatalogueMessage(''); setCatalogueView('categories'); setCatalogueActiveCategory(null); }}
+                          className="mt-2 w-full rounded-2xl px-4 py-2.5 text-sm font-black text-white transition-all active:scale-95"
+                          style={{ background: accent }}
+                        >
+                          🍽️ Continue Browsing →
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
-              </aside>
-            </div>
+              </div>
             )}
           </div>
         </div>
+
+        {cartCount > 0 && catalogueView !== 'cart' && catalogueView !== 'checkout' && (
+          <button
+            onClick={() => setCatalogueView('cart')}
+            className="cat-float-cart fixed bottom-5 right-5 z-[60] flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-black text-white shadow-2xl transition-all active:scale-95"
+            style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, '--accent': accent, '--accent-soft': accentSoft }}
+          >
+            🛒 <span>{cartCount}</span> · {summary.total} PKR
+          </button>
+        )}
 
         {catalogueMenuOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -11757,10 +11866,16 @@ try {
     setQrCatalogueSaving(true);
     setQrCatalogueMessage('');
     try {
+      const chefIds = posProducts.filter((p) => isChefSpecialName(p.name)).map((p) => p.id);
+      const mergedLayout = {
+        ...catalogueLayout,
+        recommendedIds: [...new Set([...(Array.isArray(catalogueLayout.recommendedIds) ? catalogueLayout.recommendedIds : []), ...chefIds])]
+      };
+      setCatalogueLayout(mergedLayout);
       await fetchJson(`${apiBase}/settings`, {
         method: 'PUT',
         body: JSON.stringify({
-          catalogueLayout,
+          catalogueLayout: mergedLayout,
           catalogueHost,
           cataloguePath,
           catalogueAssignedCategories,
