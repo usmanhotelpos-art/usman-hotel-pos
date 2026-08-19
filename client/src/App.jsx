@@ -9142,11 +9142,11 @@ try {
           @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent-soft), 0 0 42px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 32px var(--accent-strong), 0 0 64px var(--accent-soft); transform: translateY(-3px); } }
           @keyframes catMenuRing { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 16px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 28px var(--accent-soft); } }
           @keyframes catClickPop { 0% { transform: scale(1); } 40% { transform: scale(0.9); } 100% { transform: scale(1.06); } }
-          .cat-glow-block { position: relative; isolation: isolate; border-radius: 9999px; background: var(--block-bg, #ffffff); border: 1px solid var(--accent-soft); box-shadow: 0 6px 18px rgba(0,0,0,0.07); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
-          .cat-glow-block.hl { animation: catGlow 2.2s ease-in-out infinite; }
-          .cat-glow-block:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 26px var(--accent-soft); border-color: var(--accent); }
-          .cat-glow-block:active { animation: catClickPop 0.3s ease-out; }
-          .cat-glow-block.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
+          .cat-block-card { position: relative; isolation: isolate; border-radius: 20px; background: var(--block-bg, #ffffff); border: 1px solid var(--accent-soft); box-shadow: 0 8px 20px rgba(16,185,129,0.10), 0 2px 8px rgba(0,0,0,0.05); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+          .cat-block-card.hl { animation: catGlow 2.4s ease-in-out infinite; }
+          .cat-block-card:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 14px 30px var(--accent-soft), 0 4px 12px rgba(0,0,0,0.06); border-color: var(--accent); }
+          .cat-block-card:active { animation: catClickPop 0.3s ease-out; }
+          .cat-block-card.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
           .cat-menu-circle { animation: catMenuRing 2.6s ease-in-out infinite; }
           .cat-flip-scene { perspective: 1200px; }
           .cat-flip-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
@@ -9190,7 +9190,7 @@ try {
             )}
 
             {catalogueView === 'categories' && catalogueLayout.showCategories !== false && (
-              <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-5">
+              <div className="flex flex-wrap justify-center gap-3">
                 {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
                   const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
                   const blockBg = catalogueLayout.categoryBlockColor || '#ffffff';
@@ -9201,22 +9201,23 @@ try {
                     <button
                       key={cat.name + idx}
                       onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); setCatalogueView('items'); }}
-                      className="flex flex-col items-center gap-1.5 text-center"
-                      style={{ animationDelay: `${idx * 0.15}s` }}
+                      className={`cat-block-card flex w-[calc(50%-0.5rem)] max-w-[340px] items-center gap-3 px-4 py-3.5 text-left ${highlightCat ? 'hl' : ''}`}
+                      style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, '--block-bg': blockBg, animationDelay: `${idx * 0.12}s` }}
                     >
-                      <span className={`cat-glow-block flex h-20 w-20 items-center justify-center overflow-hidden ${highlightCat ? 'hl' : ''}`}
-                        style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, '--block-bg': blockBg }}
-                      >
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm"
+                        style={{ borderColor: `${blockText}55`, background: `${blockText}22` }}>
                         {catPhoto ? (
                           <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
                         ) : cat.name !== 'All' && hotelLogo ? (
                           <img src={hotelLogo} alt="Usman Hotel" className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-2xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                          <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
                         )}
                       </span>
-                      <span className="max-w-[5.5rem] truncate text-[11px] font-black" style={{ color: blockText }}>{cat.name}</span>
-                      <span className="-mt-1 text-[9px] font-bold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[13px] font-bold leading-tight" style={{ color: blockText }}>{cat.name}</span>
+                        <span className="text-[10px] font-semibold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
+                      </span>
                     </button>
                   );
                 })}
