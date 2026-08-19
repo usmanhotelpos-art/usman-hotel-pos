@@ -790,6 +790,9 @@ function App() {
   });
   const [catalogueLoading, setCatalogueLoading] = useState(false);
   const [catalogueOrderPlacing, setCatalogueOrderPlacing] = useState(false);
+  const [catalogueVariantProduct, setCatalogueVariantProduct] = useState(null);
+  const [catalogueVariantFlavor, setCatalogueVariantFlavor] = useState(null);
+  const [catalogueVariantStep, setCatalogueVariantStep] = useState('flavors');
   const [qrCatalogueSubTab, setQrCatalogueSubTab] = useState('qr');
   const [qrCatalogueRevealed, setQrCatalogueRevealed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -9036,22 +9039,58 @@ try {
   }
 
   function addToCatalogueCart(product) {
+    if (product.flavors && product.flavors.length > 0) {
+      setCatalogueVariantProduct(product);
+      setCatalogueVariantFlavor(null);
+      setCatalogueVariantStep('flavors');
+      return;
+    }
     setCatalogueCart((prev) => {
-      const existing = prev.find((item) => item.productId === product.id);
+      const existing = prev.find((item) => item.productId === product.id && !item.flavor && !item.weight);
       if (existing) {
         return prev.map((item) =>
-          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.productId === product.id && !item.flavor && !item.weight ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { productId: product.id, name: product.name, price: Number(product.price) || 0, quantity: 1, photo: product.photoUrl || product.photo || '' }];
+      return [...prev, { itemId: `${product.id}-base-${Date.now()}`, productId: product.id, name: product.name, price: Number(product.price) || 0, quantity: 1, photo: product.photoUrl || product.photo || '', weight: '', flavor: '' }];
     });
   }
 
-  function updateCatalogueCartItem(productId, change) {
+  function selectCatalogueFlavor(flavor) {
+    if (flavor.variants && flavor.variants.length > 0) {
+      setCatalogueVariantFlavor(flavor);
+      setCatalogueVariantStep('variants');
+      return;
+    }
+    addCatalogueVariantToCart(catalogueVariantProduct, flavor, null);
+  }
+
+  function addCatalogueVariantToCart(product, flavor, variant) {
+    if (!product) return;
+    const price = Number(variant?.price ?? product.price) || 0;
+    const flavorLabel = flavor?.label || '';
+    const weightLabel = variant?.label || '';
+    setCatalogueCart((prev) => {
+      const existing = prev.find((item) => item.productId === product.id && (item.flavor || '') === flavorLabel && (item.weight || '') === weightLabel);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id && (item.flavor || '') === flavorLabel && (item.weight || '') === weightLabel
+            ? { ...item, quantity: item.quantity + 1, price: item.price || price }
+            : item
+        );
+      }
+      return [...prev, { itemId: `${product.id}-${variant?.label || 'base'}-${flavor?.label || 'noflavor'}-${Date.now()}`, productId: product.id, name: product.name, price, quantity: 1, photo: product.photoUrl || product.photo || '', weight: weightLabel, flavor: flavorLabel }];
+    });
+    setCatalogueVariantProduct(null);
+    setCatalogueVariantFlavor(null);
+    setCatalogueVariantStep('flavors');
+  }
+
+  function updateCatalogueCartItem(itemId, change) {
     setCatalogueCart((prev) =>
       prev
         .map((item) =>
-          item.productId === productId ? { ...item, quantity: Math.max(0, item.quantity + change) } : item
+          item.itemId === itemId ? { ...item, quantity: Math.max(0, item.quantity + change) } : item
         )
         .filter((item) => item.quantity > 0)
     );
@@ -9376,7 +9415,7 @@ try {
                   <>
                     <div className="space-y-3">
                       {catalogueCart.map((item) => (
-                        <div key={item.productId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div key={item.itemId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex min-w-0 flex-1 items-center gap-3">
                             {item.photo ? (
                               <img src={item.photo} alt={item.name} className="h-12 w-12 shrink-0 rounded-xl object-cover shadow" />
@@ -9385,17 +9424,20 @@ try {
                             )}
                             <div className="min-w-0">
                               <div className="truncate text-sm font-black text-slate-800">{item.name}</div>
+                              {(item.flavor || item.weight) && (
+                                <div className="truncate text-[10px] font-semibold text-slate-500">{item.flavor}{item.flavor && item.weight ? ' • ' : ''}{item.weight}</div>
+                              )}
                               <div className="text-xs font-semibold text-slate-500">{item.price} PKR each</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button onClick={() => updateCatalogueCartItem(item.productId, -1)}
+                            <button onClick={() => updateCatalogueCartItem(item.itemId, -1)}
                               className="rounded-full bg-white w-8 h-8 flex items-center justify-center text-sm font-black text-slate-600 shadow hover:bg-slate-200">-</button>
                             <span className="text-base font-black w-7 text-center text-slate-800">{item.quantity}</span>
-                            <button onClick={() => updateCatalogueCartItem(item.productId, 1)}
+                            <button onClick={() => updateCatalogueCartItem(item.itemId, 1)}
                               className="rounded-full w-8 h-8 flex items-center justify-center text-sm font-black text-white shadow hover:opacity-90"
                               style={{ background: accent }}>+</button>
-                            <button onClick={() => updateCatalogueCartItem(item.productId, -item.quantity)}
+                            <button onClick={() => updateCatalogueCartItem(item.itemId, -item.quantity)}
                               className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-500 hover:bg-rose-200">✕</button>
                           </div>
                         </div>
@@ -9565,6 +9607,37 @@ try {
                   className={`rounded-full px-5 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueMenuSide === 'back' ? 'text-white shadow' : 'bg-slate-100 text-slate-600'}`}
                   style={catalogueMenuSide === 'back' ? { background: accent } : undefined}
                 >Back</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {catalogueVariantProduct && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => { setCatalogueVariantProduct(null); setCatalogueVariantFlavor(null); setCatalogueVariantStep('flavors'); }} />
+            <div className="relative w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{catalogueVariantStep === 'flavors' ? 'Choose flavor' : 'Select size / weight'}</p>
+                  <h3 className="mt-1 text-lg font-black text-slate-800">{catalogueVariantProduct.name}</h3>
+                  {catalogueVariantFlavor && <p className="text-xs font-semibold text-slate-500">Flavor: {catalogueVariantFlavor.label}</p>}
+                </div>
+                <button onClick={() => { setCatalogueVariantProduct(null); setCatalogueVariantFlavor(null); setCatalogueVariantStep('flavors'); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">✕</button>
+              </div>
+              <div className="space-y-2.5">
+                {catalogueVariantStep === 'flavors'
+                  ? (catalogueVariantProduct.flavors || []).map((flavor, index) => (
+                      <button key={index} type="button" onClick={() => selectCatalogueFlavor(flavor)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50 active:scale-[0.98]">
+                        <span>{flavor.label}</span>
+                        {flavor.variants?.length > 0 && <span className="text-[10px] font-semibold text-slate-400">{flavor.variants.length} options</span>}
+                      </button>
+                    ))
+                  : (catalogueVariantFlavor?.variants || []).map((variant, index) => (
+                      <button key={index} type="button" onClick={() => addCatalogueVariantToCart(catalogueVariantProduct, catalogueVariantFlavor, variant)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50 active:scale-[0.98]">
+                        <span>{variant.label}</span>
+                        <span className="font-black text-emerald-600">{variant.price} PKR</span>
+                      </button>
+                    ))}
               </div>
             </div>
           </div>

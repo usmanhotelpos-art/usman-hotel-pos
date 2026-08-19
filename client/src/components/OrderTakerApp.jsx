@@ -69,6 +69,11 @@ export function OrderTakerApp() {
   const [orderedItems, setOrderedItems] = useState({});
   const [showOrdersPopup, setShowOrdersPopup] = useState(false);
 
+  // Variant / flavor selection popup
+  const [variantProduct, setVariantProduct] = useState(null);
+  const [variantFlavor, setVariantFlavor] = useState(null);
+  const [variantStep, setVariantStep] = useState('flavors');
+
   // Order creation
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -331,13 +336,60 @@ export function OrderTakerApp() {
   }
 
   function addToCart(product) {
+    // Show flavor/variant popup if product has variants
+    if (product.flavors && product.flavors.length > 0) {
+      setVariantProduct(product);
+      setVariantFlavor(null);
+      setVariantStep('flavors');
+      return;
+    }
+    addPlainToCart(product);
+  }
+
+  function addPlainToCart(product) {
     setCart(prev => {
-      const existing = prev.find(i => i.id === product.id);
-      if (existing) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { ...product, quantity: 1, itemId: `${product.id}-${Date.now()}` }];
+      const existing = prev.find(i => i.id === product.id && !i.flavor && !i.weight);
+      if (existing) return prev.map(i => i.id === product.id && !i.flavor && !i.weight ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { ...product, quantity: 1, price: Number(product.price) || 0, weight: '', flavor: '', itemId: `${product.id}-base-${Date.now()}` }];
     });
     setOrderedItems(prev => ({ ...prev, [product.id]: true }));
     setTimeout(() => setOrderedItems(prev => ({ ...prev, [product.id]: false })), 600);
+  }
+
+  function selectVariantFlavor(flavor) {
+    if (flavor.variants && flavor.variants.length > 0) {
+      setVariantFlavor(flavor);
+      setVariantStep('variants');
+      return;
+    }
+    // No variants - add with flavor only
+    addVariantToCart(variantProduct, flavor, null);
+  }
+
+  function selectVariantSize(variant) {
+    addVariantToCart(variantProduct, variantFlavor, variant);
+  }
+
+  function addVariantToCart(product, flavor, variant) {
+    if (!product) return;
+    const price = Number(variant?.price ?? product.price) || 0;
+    setCart(prev => {
+      const existing = prev.find(i => i.id === product.id && (i.flavor || '') === (flavor?.label || '') && (i.weight || '') === (variant?.label || ''));
+      if (existing) return prev.map(i => i.id === product.id && (i.flavor || '') === (flavor?.label || '') && (i.weight || '') === (variant?.label || '') ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, {
+        ...product,
+        quantity: 1,
+        price,
+        weight: variant?.label || '',
+        flavor: flavor?.label || '',
+        itemId: `${product.id}-${variant?.label || 'base'}-${flavor?.label || 'noflavor'}-${Date.now()}`
+      }];
+    });
+    setOrderedItems(prev => ({ ...prev, [product.id]: true }));
+    setTimeout(() => setOrderedItems(prev => ({ ...prev, [product.id]: false })), 600);
+    setVariantProduct(null);
+    setVariantFlavor(null);
+    setVariantStep('flavors');
   }
 
   function updateCartQty(itemId, delta) {
@@ -440,7 +492,7 @@ export function OrderTakerApp() {
     setLoading(true);
     try {
       const payload = {
-        items: cart.map(i => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity, code: i.code || '' })),
+        items: cart.map(i => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity, code: i.code || '', weight: i.weight || '', flavor: i.flavor || '' })),
         orderType: 'Dine-In',
         customerName: customerName || '',
         phone,
@@ -846,6 +898,39 @@ export function OrderTakerApp() {
         </div>
       )}
 
+      {/* Variant / flavor selection popup */}
+      {variantProduct && (
+        <div className="fixed inset-0 z-[75] flex items-end sm:items-center justify-center bg-black/70" onClick={() => { setVariantProduct(null); setVariantFlavor(null); setVariantStep('flavors'); }}>
+          <div className="w-full sm:max-w-md max-h-[85vh] rounded-t-3xl sm:rounded-3xl border border-slate-700 bg-slate-950 p-5 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{variantStep === 'flavors' ? 'Choose flavor' : 'Select size / weight'}</p>
+                <h3 className="mt-2 text-xl font-semibold text-white">{variantProduct.name}</h3>
+                {variantFlavor && <p className="text-sm text-slate-400">Flavor: {variantFlavor.label}</p>}
+              </div>
+              <button onClick={() => { setVariantProduct(null); setVariantFlavor(null); setVariantStep('flavors'); }} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">✕</button>
+            </div>
+            <div className="space-y-3">
+              {variantStep === 'flavors'
+                ? (variantProduct.flavors || []).map((flavor, index) => (
+                    <button key={index} type="button" onClick={() => selectVariantFlavor(flavor)} className="w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-left text-sm text-slate-100 transition hover:border-emerald-500 hover:bg-slate-800">
+                      <span>{flavor.label}</span>
+                      {flavor.variants?.length > 0 && <span className="float-right text-xs text-slate-500">{flavor.variants.length} options</span>}
+                    </button>
+                  ))
+                : (variantFlavor?.variants || []).map((variant, index) => (
+                    <button key={index} type="button" onClick={() => selectVariantSize(variant)} className="w-full rounded-3xl border border-slate-700 bg-slate-900 px-4 py-3 text-left text-sm text-slate-100 transition hover:border-emerald-500 hover:bg-slate-800">
+                      <div className="flex items-center justify-between">
+                        <span>{variant.label}</span>
+                        <span className="font-semibold">{variant.price} PKR</span>
+                      </div>
+                    </button>
+                  ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cart screen */}
       {showCart && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
@@ -866,6 +951,9 @@ export function OrderTakerApp() {
               <div key={item.itemId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">{item.name}</p>
+                  {(item.flavor || item.weight) && (
+                    <p className="text-[10px] text-slate-500 truncate">{item.flavor}{item.flavor && item.weight ? ' • ' : ''}{item.weight}</p>
+                  )}
                   <p className="text-xs text-slate-400">{item.price} PKR each</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
