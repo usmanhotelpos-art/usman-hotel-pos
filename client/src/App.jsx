@@ -9425,7 +9425,7 @@ try {
                   </svg>
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-3">
+                <div className="mt-5 grid grid-cols-2 gap-3">
                   {catalogueLoading && !categoryProducts.length && Array.from({ length: 6 }).map((_, idx) => (
                     <div key={idx} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse">
                       <div className="w-full h-40 rounded-2xl bg-slate-200 mb-3"></div>
@@ -9478,13 +9478,13 @@ try {
                         <div className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600" style={{ textShadow: '0 0 10px rgba(245,158,11,0.4)' }}>{Number(product.price) || 0} PKR</div>
                       )}
                       <div className="mt-1.5 grid grid-cols-2 gap-2">
-                        <button onClick={(e) => { e.stopPropagation(); addToCatalogueCart(product); }}
-                          className="rounded-xl bg-emerald-600 px-2 py-1.5 text-xs font-black text-white hover:bg-emerald-500 transition shadow-[0_4px_14px_rgba(16,185,129,0.35)] active:scale-95">
-                          🛒 Add
+                        <button onClick={(e) => { e.stopPropagation(); addToCatalogueCart(product); }} title="Add to cart"
+                          className="flex items-center justify-center rounded-xl bg-emerald-600 px-2 py-1.5 text-base font-black text-white hover:bg-emerald-500 transition shadow-[0_4px_14px_rgba(16,185,129,0.35)] active:scale-95">
+                          🛒
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); removeProductFromCatalogueCart(product); }} disabled={cartQty === 0}
-                          className="rounded-xl bg-rose-600 px-2 py-1.5 text-xs font-black text-white hover:bg-rose-500 transition shadow-[0_4px_14px_rgba(244,63,94,0.35)] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
-                          🗑 Remove
+                        <button onClick={(e) => { e.stopPropagation(); removeProductFromCatalogueCart(product); }} disabled={cartQty === 0} title="Remove from cart"
+                          className="flex items-center justify-center rounded-xl bg-rose-600 px-2 py-1.5 text-base font-black text-white hover:bg-rose-500 transition shadow-[0_4px_14px_rgba(244,63,94,0.35)] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
+                          🗑
                         </button>
                       </div>
                     </div>
@@ -13522,7 +13522,7 @@ try {
                           dashboard?.salesSeries?.Dine || []
                         ]} />
                       </div>
-<div className="mt-5 grid grid-cols-2 gap-3">
+<div className="mt-5 grid grid-cols-3 gap-3">
                         {['Delivery', 'Takeaway', 'Dine'].map((type, index) => (
                           <div key={type} className="rounded-3xl bg-slate-950 p-3">
                             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{type}</p>
