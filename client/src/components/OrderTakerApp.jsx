@@ -400,6 +400,38 @@ export function OrderTakerApp() {
     setCart(prev => prev.filter(i => i.itemId !== itemId));
   }
 
+  const pressTimerRef = useRef(null);
+  const pressFiredRef = useRef(false);
+
+  function removeProductFromCart(product) {
+    const line = cart.find(i => i.id === product.id);
+    if (line) removeFromCart(line.itemId);
+  }
+
+  function handleProductPressStart(product) {
+    pressFiredRef.current = false;
+    pressTimerRef.current = setTimeout(() => {
+      pressFiredRef.current = true;
+      pressTimerRef.current = null;
+      removeProductFromCart(product);
+    }, 2000);
+  }
+
+  function handleProductPressEnd() {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  }
+
+  function handleProductClick(product) {
+    if (pressFiredRef.current) {
+      pressFiredRef.current = false;
+      return;
+    }
+    addToCart(product);
+  }
+
   const cartTotal = cart.reduce((s, i) => s + (Number(i.price) || 0) * i.quantity, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
@@ -816,7 +848,14 @@ export function OrderTakerApp() {
               {filteredProducts.map(product => {
                 const cartQty = cart.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
                 return (
-                <button key={product.id} type="button" onClick={() => addToCart(product)}
+                <button key={product.id} type="button"
+                  onTouchStart={() => handleProductPressStart(product)}
+                  onTouchEnd={handleProductPressEnd}
+                  onTouchCancel={handleProductPressEnd}
+                  onMouseDown={() => handleProductPressStart(product)}
+                  onMouseUp={handleProductPressEnd}
+                  onMouseLeave={handleProductPressEnd}
+                  onClick={() => handleProductClick(product)}
                   className={`relative rounded-xl border p-1.5 shadow-soft transition active:scale-[0.97] ${
                     orderedItems[product.id]
                       ? 'border-emerald-500 bg-emerald-50 scale-105'
@@ -895,37 +934,6 @@ export function OrderTakerApp() {
             <button onClick={() => setShowCart(false)} className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100">✕</button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {/* Order details */}
-            <div className="px-4 py-3 space-y-2.5 bg-slate-50 border-b border-slate-200">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Order Details</p>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">Table / Room <span className="text-rose-500">*</span></label>
-                <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500">
-                  <option value="">Select table or room</option>
-                  {availableDineInTables.length ? availableDineInTables.map((table) => (
-                    <option key={table.id} value={getTableLabel(table)}>
-                      {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
-                    </option>
-                  )) : <option value="" disabled>No tables found</option>}
-                </select>
-                {!tableNumber && <p className="text-xs text-amber-600">Please select a table to place the order</p>}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="grid gap-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Customer Name</label>
-                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
-                </div>
-                <div className="grid gap-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Phone <span className="text-slate-400">(optional)</span></label>
-                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
-                </div>
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">Notes <span className="text-slate-400">(optional)</span></label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Order notes" rows={2} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
-              </div>
-            </div>
-
             {/* Cart items */}
             <div className="px-4 py-3 space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Items</p>
@@ -953,6 +961,31 @@ export function OrderTakerApp() {
                   <button onClick={() => setShowCart(false)} className="mt-3 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white">Back to Menu</button>
                 </div>
               )}
+            </div>
+
+            {/* Order details */}
+            <div className="px-4 py-3 space-y-2.5 bg-slate-50 border-t border-slate-200">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Order Details</p>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-slate-600">Table / Room <span className="text-rose-500">*</span></label>
+                <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500">
+                  <option value="">Select table or room</option>
+                  {availableDineInTables.length ? availableDineInTables.map((table) => (
+                    <option key={table.id} value={getTableLabel(table)}>
+                      {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
+                    </option>
+                  )) : <option value="" disabled>No tables found</option>}
+                </select>
+                {!tableNumber && <p className="text-xs text-amber-600">Please select a table to place the order</p>}
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-slate-600">Customer Name</label>
+                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-slate-600">Notes <span className="text-slate-400">(optional)</span></label>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Order notes" rows={2} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
+              </div>
             </div>
           </div>
           <div className="px-4 py-3 border-t border-slate-200 space-y-2">

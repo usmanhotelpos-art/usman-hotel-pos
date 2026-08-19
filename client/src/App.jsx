@@ -2783,6 +2783,38 @@ try {
     setCart((prev) => prev.filter((item) => item.itemId !== itemId));
   }
 
+  const posPressTimerRef = useRef(null);
+  const posPressFiredRef = useRef(false);
+
+  function removeProductFromPosCart(product) {
+    const line = cart.find((i) => i.productId === product.id);
+    if (line) removeCartItem(line.itemId);
+  }
+
+  function handlePosPressStart(product) {
+    posPressFiredRef.current = false;
+    posPressTimerRef.current = setTimeout(() => {
+      posPressFiredRef.current = true;
+      posPressTimerRef.current = null;
+      removeProductFromPosCart(product);
+    }, 2000);
+  }
+
+  function handlePosPressEnd() {
+    if (posPressTimerRef.current) {
+      clearTimeout(posPressTimerRef.current);
+      posPressTimerRef.current = null;
+    }
+  }
+
+  function handlePosTileClick(product) {
+    if (posPressFiredRef.current) {
+      posPressFiredRef.current = false;
+      return;
+    }
+    addToCart(product);
+  }
+
   function updateCartNotes(itemId, notes) {
     setCart((prev) => prev.map((item) => (item.itemId === itemId ? { ...item, notes } : item)));
   }
@@ -6912,7 +6944,15 @@ try {
                     {filteredProducts.map((product) => {
                       const cartQty = cart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
                       return (
-                      <button key={product.id} type="button" className={`relative rounded-xl border p-1.5 shadow-soft transition active:scale-[0.97] ${cartQty > 0 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/60' : 'border-slate-200 bg-white'}`} onClick={() => addToCart(product)}>
+                      <button key={product.id} type="button"
+                        onTouchStart={() => handlePosPressStart(product)}
+                        onTouchEnd={handlePosPressEnd}
+                        onTouchCancel={handlePosPressEnd}
+                        onMouseDown={() => handlePosPressStart(product)}
+                        onMouseUp={handlePosPressEnd}
+                        onMouseLeave={handlePosPressEnd}
+                        onClick={() => handlePosTileClick(product)}
+                        className={`relative rounded-xl border p-1.5 shadow-soft transition active:scale-[0.97] ${cartQty > 0 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/60' : 'border-slate-200 bg-white'}`}>
                         {cartQty > 0 && (
                           <span className="absolute -left-1.5 -top-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-black text-white shadow-md">{cartQty}</span>
                         )}
@@ -6986,8 +7026,14 @@ try {
                     <button
                       key={product.id}
                       type="button"
+                      onTouchStart={() => handlePosPressStart(product)}
+                      onTouchEnd={handlePosPressEnd}
+                      onTouchCancel={handlePosPressEnd}
+                      onMouseDown={() => handlePosPressStart(product)}
+                      onMouseUp={handlePosPressEnd}
+                      onMouseLeave={handlePosPressEnd}
+                      onClick={() => handlePosTileClick(product)}
                       className={`relative rounded-2xl border p-3 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] ${cartQty > 0 ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400/60' : 'border-slate-200 bg-white hover:border-sky-300'}`}
-                      onClick={() => addToCart(product)}
                     >
                       {cartQty > 0 && (
                         <span className="absolute -left-2 -top-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-xs font-black text-white shadow-lg">{cartQty}</span>
