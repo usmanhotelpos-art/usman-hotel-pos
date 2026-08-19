@@ -134,7 +134,13 @@ export function OrderTakerApp() {
       if (Array.isArray(prods)) setProducts(prods);
       if (Array.isArray(tbls)) setTables(tbls);
       if (Array.isArray(ords)) setOrders(ords);
-      if (sets) setSettings(sets);
+      if (sets) {
+        const recFmt = sets.receiptDateTimeFormat || 'DD/MM/YYYY hh:mm A';
+        setSettings({
+          ...sets,
+          receiptDateTimeFormat: recFmt.includes('HH') ? `${recFmt.replace('HH', 'hh')} A` : (recFmt.includes('hh') && !recFmt.includes('A') ? `${recFmt} A` : recFmt)
+        });
+      }
       if (Array.isArray(slots)) setMashallahSlots(slots);
       if (!silent && tbls === null) setMessage('Could not load tables from server - check connection or re-login');
     } catch (e) { if (!silent) setMessage(e.message); }
@@ -929,7 +935,7 @@ export function OrderTakerApp() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-indigo-400">#{order.orderNumber || order.id}</span>
                         <span className="flex items-center gap-1.5">
-                          {createdMs && <span className="text-[10px] text-slate-400">{new Date(createdMs).toLocaleTimeString()}</span>}
+                          {createdMs && <span className="text-[10px] text-slate-400">{new Date(createdMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>}
                           <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${ordersTab === 'new' ? 'bg-amber-500/15 text-amber-400' : ordersTab === 'served' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
                             ⏱ {formatDuration(now - (ordersTab === 'new' ? createdMs : ordersTab === 'served' ? servedAtMs : cancelledMs) || now)}
                           </span>
@@ -990,7 +996,7 @@ export function OrderTakerApp() {
                                     <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPreviewImage(order.paymentRequestImage)} className="h-12 w-12 rounded-lg object-cover cursor-pointer border border-amber-600/50" />
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[10px] font-bold text-amber-400">📷 Payment Photo Attached</p>
-                                      <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : ''}</p>
+                                      <p className="text-[9px] text-slate-500 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : ''}</p>
                                       {requestSent && <p className="text-[9px] font-bold text-violet-400 mt-0.5">✅ Request sent to Farhan Owner</p>}
                                     </div>
                                     <button onClick={() => openRequestCamera(order.id)} className="shrink-0 rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-700">Retake</button>
@@ -1029,7 +1035,7 @@ export function OrderTakerApp() {
 
                         {ordersTab === 'cancelled' && (
                           <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-center text-[11px] font-bold text-rose-400">
-                            ❌ Order cancelled{cancelledMs ? ` at ${new Date(cancelledMs).toLocaleTimeString()}` : ''}
+                            ❌ Order cancelled{cancelledMs ? ` at ${new Date(cancelledMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}
                           </div>
                         )}
                       </div>

@@ -339,7 +339,7 @@ export function RidersApp() {
       if (shiftAssignedRiderName && inputLoginLower && !canAttemptLogin) {
         return `Shift active for ${shiftAssignedRiderName}. Please login with the assigned rider username.`;
       }
-      return `Shift active for ${shiftAssignedRiderName}. Started at ${shiftStartedAt ? shiftStartedAt.toLocaleTimeString() : 'N/A'}`;
+      return `Shift active for ${shiftAssignedRiderName}. Started at ${shiftStartedAt ? shiftStartedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'}`;
     }
     return 'Shift not started. Please ask Owner Farhan to start your shift.';
   };
@@ -1030,7 +1030,7 @@ export function RidersApp() {
               <p className="font-semibold">{shiftLoginHint()}</p>
               {selectedRoleTab === 'biker' && shiftActive && shiftStartedAt ? (
                 <div className="mt-3 space-y-1 text-xs text-orange-300">
-                  <p>Started at {shiftStartedAt.toLocaleTimeString()}</p>
+                  <p>Started at {shiftStartedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
                   <p>Elapsed: {formatShiftElapsed(primaryShift?.startedAt)}</p>
                 </div>
               ) : null}

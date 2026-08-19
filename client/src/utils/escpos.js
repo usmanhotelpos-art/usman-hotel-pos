@@ -1174,6 +1174,8 @@ function formatDate(dateString, format) {
     .replace('MM', zero(date.getMonth() + 1))
     .replace('YYYY', String(date.getFullYear()))
     .replace('HH', zero(date.getHours()))
+    .replace('hh', zero(date.getHours() % 12 || 12))
     .replace('mm', zero(date.getMinutes()))
-    .replace('ss', zero(date.getSeconds()));
+    .replace('ss', zero(date.getSeconds()))
+    .replace('A', date.getHours() < 12 ? 'AM' : 'PM');
 }

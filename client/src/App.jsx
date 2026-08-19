@@ -11,6 +11,14 @@ const apiBase = envApiBase
   ? envApiBase.replace(/\/$/, '')
   : '/api';
 
+function normalizeReceiptDateFormat(fmt) {
+  if (!fmt) return 'DD/MM/YYYY hh:mm A';
+  let next = fmt;
+  if (next.includes('HH')) next = next.replace('HH', 'hh');
+  if (next.includes('hh') && !next.includes('A')) next = `${next} A`;
+  return next;
+}
+
 
 function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
@@ -77,7 +85,7 @@ function App() {
     receiptFontSize: '12',
     receiptFontStyle: 'Arial',
     receiptLineStyle: 'dashed',
-    receiptDateTimeFormat: 'DD/MM/YYYY HH:mm',
+    receiptDateTimeFormat: 'DD/MM/YYYY hh:mm A',
     slipPrefix: 'usmanhotel',
     receiptTemplate: 'classic',
     receiptLanguage: 'English',
@@ -818,6 +826,7 @@ function App() {
       setSettings((prev) => ({
         ...prev,
         ...(settingsData || {}),
+        receiptDateTimeFormat: normalizeReceiptDateFormat(settingsData && settingsData.receiptDateTimeFormat),
         receiptFontSizes: {
           ...prev.receiptFontSizes,
           ...((settingsData && settingsData.receiptFontSizes) || {})
@@ -1604,6 +1613,7 @@ try {
       setSettings((prev) => ({
         ...prev,
         ...data,
+        receiptDateTimeFormat: normalizeReceiptDateFormat(data.receiptDateTimeFormat),
         receiptFontSizes: {
           ...prev.receiptFontSizes,
           ...(data.receiptFontSizes || {})
@@ -2430,8 +2440,10 @@ try {
       'MM': zero(date.getMonth() + 1),
       'YYYY': date.getFullYear(),
       'HH': zero(date.getHours()),
+      'hh': zero(date.getHours() % 12 || 12),
       'mm': zero(date.getMinutes()),
-      'ss': zero(date.getSeconds())
+      'ss': zero(date.getSeconds()),
+      'A': date.getHours() < 12 ? 'AM' : 'PM'
     };
     return Object.entries(replacements).reduce((str, [key, value]) => str.replaceAll(key, value), format);
   }
@@ -3517,7 +3529,7 @@ try {
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-semibold truncate ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{b.name}</p>
                   <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {new Date(b.createdAt).toLocaleString()} &middot; {(b.data?.pos_orders?.length || 0)} orders
+                    {new Date(b.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true })} &middot; {(b.data?.pos_orders?.length || 0)} orders
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0 ml-4">
@@ -3990,7 +4002,7 @@ try {
     const tokenNumber = Number(settings.tokenSlipNextNumber || 1);
     const prefix = settings.tokenSlipPrefix || settings.slipPrefix || 'TS';
     const tokenText = `${prefix}-${tokenNumber}`;
-    const dateText = formatReceiptDate(order.date || new Date().toISOString(), settings.receiptDateTimeFormat || 'DD/MM/YYYY HH:mm');
+    const dateText = formatReceiptDate(order.date || new Date().toISOString(), settings.receiptDateTimeFormat || 'DD/MM/YYYY hh:mm A');
     const fontFamily = settings.receiptFontFamily || settings.receiptFontStyle || 'Arial';
     const showLogo = settings.btTokenSlipLogoEnabled !== false;
     const logoHtml = settings.logo && showLogo ? `<div class="logo"><img src="${settings.logo}" alt="Logo" style="max-width: 90px; width: auto; height: auto; display: block; margin: 0 auto 4px;" /></div>` : '';
@@ -4046,7 +4058,7 @@ try {
     const header = settings.receiptHeader || 'Usman Hotel';
     const footer = settings.receiptFooter || 'Thank you for your business';
     const slipNumber = settings.receiptShowReceiptNumber ? `${settings.slipPrefix || 'UH'}-${order.orderNumber || order.id || Date.now()}` : '';
-    const dateText = settings.receiptShowDateTime ? formatReceiptDate(order.date || new Date().toISOString(), settings.receiptDateTimeFormat || 'DD/MM/YYYY HH:mm') : '';
+    const dateText = settings.receiptShowDateTime ? formatReceiptDate(order.date || new Date().toISOString(), settings.receiptDateTimeFormat || 'DD/MM/YYYY hh:mm A') : '';
     const fontFamily = settings.receiptFontFamily || settings.receiptFontStyle || 'Arial';
     const titleSize = `${settings.receiptFontSizes?.title || 18}px`;
     const sectionSize = `${settings.receiptFontSizes?.section || 14}px`;
@@ -6848,7 +6860,7 @@ try {
                 darkMode
                   ? 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800 text-slate-200'
                   : 'bg-gradient-to-br from-slate-200 via-slate-100 to-white text-slate-600'
-              }`} title={syncState.syncing ? 'Syncing...' : `Sync (${new Date(syncState.lastSync).toLocaleTimeString()})`}>
+              }`} title={syncState.syncing ? 'Syncing...' : `Sync (${new Date(syncState.lastSync).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })})`}>
                 <RefreshCw size={12} className={syncState.syncing ? 'animate-spin' : ''} />
               </button>
               <button onClick={() => setDarkMode((prev) => !prev)} className={`header-btn-3d rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.15)] transition-all duration-200 ${
@@ -8713,7 +8725,7 @@ try {
   const formatShiftStartedAt = (startedAt) => {
     if (!startedAt) return 'Not started';
     try {
-      return new Date(startedAt).toLocaleString();
+      return new Date(startedAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
     } catch {
       return 'Not started';
     }
@@ -9130,7 +9142,7 @@ try {
           @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent-soft), 0 0 42px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 32px var(--accent-strong), 0 0 64px var(--accent-soft); transform: translateY(-3px); } }
           @keyframes catMenuRing { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 16px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 28px var(--accent-soft); } }
           @keyframes catClickPop { 0% { transform: scale(1); } 40% { transform: scale(0.9); } 100% { transform: scale(1.06); } }
-          .cat-glow-block { position: relative; isolation: isolate; border-radius: 1.75rem; background: var(--block-bg, #ffffff); border: 1px solid var(--accent-soft); box-shadow: 0 6px 18px rgba(0,0,0,0.07); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+          .cat-glow-block { position: relative; isolation: isolate; border-radius: 9999px; background: var(--block-bg, #ffffff); border: 1px solid var(--accent-soft); box-shadow: 0 6px 18px rgba(0,0,0,0.07); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
           .cat-glow-block.hl { animation: catGlow 2.2s ease-in-out infinite; }
           .cat-glow-block:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 26px var(--accent-soft); border-color: var(--accent); }
           .cat-glow-block:active { animation: catClickPop 0.3s ease-out; }
@@ -9178,7 +9190,7 @@ try {
             )}
 
             {catalogueView === 'categories' && catalogueLayout.showCategories !== false && (
-              <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-5">
                 {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
                   const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
                   const blockBg = catalogueLayout.categoryBlockColor || '#ffffff';
@@ -9189,22 +9201,22 @@ try {
                     <button
                       key={cat.name + idx}
                       onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); setCatalogueView('items'); }}
-                      className={`cat-glow-block flex h-16 w-full flex-row items-center gap-3 px-4 text-left ${highlightCat ? 'hl' : ''}`}
-                      style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, '--block-bg': blockBg, animationDelay: `${idx * 0.15}s` }}
+                      className="flex flex-col items-center gap-1.5 text-center"
+                      style={{ animationDelay: `${idx * 0.15}s` }}
                     >
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-gradient-to-br from-slate-100 to-slate-200 shadow-md">
+                      <span className={`cat-glow-block flex h-20 w-20 items-center justify-center overflow-hidden ${highlightCat ? 'hl' : ''}`}
+                        style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, '--block-bg': blockBg }}
+                      >
                         {catPhoto ? (
                           <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
                         ) : cat.name !== 'All' && hotelLogo ? (
                           <img src={hotelLogo} alt="Usman Hotel" className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                          <span className="text-2xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
                         )}
                       </span>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[13px] font-black" style={{ color: blockText }}>{cat.name}</span>
-                        <span className="text-[10px] font-bold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
-                      </span>
+                      <span className="max-w-[5.5rem] truncate text-[11px] font-black" style={{ color: blockText }}>{cat.name}</span>
+                      <span className="-mt-1 text-[9px] font-bold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
                     </button>
                   );
                 })}
@@ -10753,7 +10765,7 @@ try {
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
-                        <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</span>
+                        <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : '-'}</span>
                       </div>
                       <div className="relative">
                         <button
@@ -11003,7 +11015,7 @@ try {
                         </td>
                         <td className="px-4 py-4 font-semibold text-white">{order.total || order.amount || 0} Rs</td>
                         <td className="px-4 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
-                        <td className="px-4 py-4 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>
+                        <td className="px-4 py-4 text-slate-400">{order.createdAt ? new Date(order.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : '-'}</td>
                         <td className="px-4 py-4">
                           <div className="flex flex-wrap gap-2">
                             {order.status === 'Pay Later' && (
@@ -11190,7 +11202,7 @@ try {
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
-                        <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</span>
+                        <span className="text-[10px] text-slate-500">{order.createdAt ? new Date(order.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : '-'}</span>
                       </div>
                       <div className="relative">
                         <button
@@ -11393,7 +11405,7 @@ try {
                                   <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-14 w-14 rounded-lg object-cover cursor-pointer border border-amber-600/40" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-amber-400">📷 Payment Request{tableOrder.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
-                                    <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                    <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'With photo attached'}</p>
                                     {tableOrder.waiter && <p className="text-[10px] font-bold text-violet-300">👤 Waiter: {tableOrder.waiter}</p>}
                                   </div>
                                   <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition">✓ OK - Mark Paid</button>
@@ -11479,7 +11491,7 @@ try {
                                   <img src={tableOrder.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(tableOrder.paymentRequestImage)} className="h-14 w-14 rounded-lg object-cover cursor-pointer border border-amber-600/40" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-amber-400">📷 Payment Request{tableOrder.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
-                                    <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                    <p className="text-[10px] text-slate-300 truncate">{tableOrder.paymentRequestedAt ? new Date(tableOrder.paymentRequestedAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'With photo attached'}</p>
                                     {tableOrder.waiter && <p className="text-[10px] font-bold text-violet-300">👤 Waiter: {tableOrder.waiter}</p>}
                                   </div>
                                   <button onClick={() => confirmMarkPaid(tableOrder)} className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition">✓ OK - Mark Paid</button>
@@ -11572,7 +11584,7 @@ try {
                           <td className="px-4 py-3">{order.total || order.amount || 0} PKR</td>
                           <td className="px-4 py-3">{order.paymentMethod || order.paymentStatus || '-'}</td>
                           <td className="px-4 py-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span></td>
-                          <td className="px-4 py-3">{order.orderDate ? order.orderDate.toLocaleString() : order.createdAt || order.date || 'N/A'}</td>
+                          <td className="px-4 py-3">{order.orderDate ? order.orderDate.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : order.createdAt || order.date || 'N/A'}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <button onClick={() => openOrderForEditInPos(order)} className="rounded px-2 py-1 bg-violet-500 text-white text-xs">Edit</button>
@@ -11660,7 +11672,7 @@ try {
                               <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-10 w-10 rounded-lg object-cover cursor-pointer border border-amber-600/40 shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-[10px] font-bold text-amber-400">📷 Payment Request{order.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}{order.paymentMethod ? ` - ${order.paymentMethod === 'Online' ? '📱' : '💵'} ${order.paymentMethod}` : ''}</p>
-                                <p className="text-[9px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                                <p className="text-[9px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'With photo attached'}</p>
                               </div>
                               {!isCompleted && (
                                 <button onClick={() => confirmMarkPaid(order)} className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-500 active:scale-95 transition-all">✓ OK - Mark Paid</button>
@@ -11763,7 +11775,7 @@ try {
                             <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-10 w-10 rounded-lg object-cover cursor-pointer border border-amber-600/40 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-[10px] font-bold text-amber-400">📷 Payment Request{order.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}{order.paymentMethod ? ` - ${order.paymentMethod === 'Online' ? '📱' : '💵'} ${order.paymentMethod}` : ''}</p>
-                              <p className="text-[9px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString() : 'With photo attached'}</p>
+                              <p className="text-[9px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'With photo attached'}</p>
                               {order.waiter && <p className="text-[9px] font-bold text-violet-300">👤 Waiter: {order.waiter}</p>}
                             </div>
                             {order.status !== 'Completed' && order.status !== 'Payment Collected' && (
@@ -11928,7 +11940,7 @@ try {
           catalogueAssignedProducts
         })
       });
-      setQrCatalogueSavedAt(new Date().toLocaleTimeString());
+      setQrCatalogueSavedAt(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
       setQrCatalogueMessage('Saved ✓');
     } catch (error) {
       setQrCatalogueMessage(`Save failed: ${error.message}`);
