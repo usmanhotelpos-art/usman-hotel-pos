@@ -764,10 +764,17 @@ function App() {
     recommendedIds: [],
     categoryBlockColor: '#ffffff',
     categoryTextColor: '#10b981',
-    highlightCategories: true
+    highlightCategories: true,
+    showLogo: true,
+    bannerEnabled: false,
+    bannerText: '',
+    bannerDays: 7,
+    bannerStart: 0,
+    bannerPhotos: []
   });
   const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
   const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
+  const [catalogueBannerPhoto, setCatalogueBannerPhoto] = useState(null);
   const [catalogueActiveCategory, setCatalogueActiveCategory] = useState(null);
   const [catalogueView, setCatalogueView] = useState('categories');
   const [catalogueHost, setCatalogueHost] = useState('');
@@ -6176,10 +6183,20 @@ try {
                 <div className="mt-6 flex justify-end gap-3">
                   <button onClick={() => setMarkDueOrder(null)} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Cancel</button>
                   <button onClick={handleMarkDue} className="rounded-3xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500">Confirm Due</button>
-                </div>
-              </div>
+</div>
             </div>
-          )}
+          </div>
+        )}
+
+        {catalogueBannerPhoto && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" onClick={() => setCatalogueBannerPhoto(null)}>
+            <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" />
+            <div className="relative">
+              <img src={catalogueBannerPhoto} alt="Banner photo" className="max-h-[85vh] max-w-full rounded-3xl object-contain shadow-2xl" />
+              <button onClick={() => setCatalogueBannerPhoto(null)} className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800 shadow-xl">✕</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -9318,10 +9335,16 @@ try {
             {catalogueView === 'categories' && (
               <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Online Menu</p>
-                    <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
+                  <div className="flex items-center gap-4">
+                    {catalogueLayout.showLogo !== false && hotelLogo && (
+                      <img src={hotelLogo} alt="Logo" className="h-20 w-20 shrink-0 rounded-full border-2 object-cover shadow-lg"
+                        style={{ borderColor: accent, boxShadow: `0 0 0 4px ${accentSoft}, 0 8px 24px ${accentSoft}` }} />
+                    )}
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Online Menu</p>
+                      <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
+                    </div>
                   </div>
                   {showMenuCircle && (
                     <button
@@ -9336,6 +9359,38 @@ try {
                     </button>
                   )}
                 </div>
+
+                {(() => {
+                  const bannerDays = Math.max(1, Number(catalogueLayout.bannerDays) || 7);
+                  const bannerStarted = Number(catalogueLayout.bannerStart) || 0;
+                  const bannerExpired = bannerStarted > 0 && Date.now() - bannerStarted > bannerDays * 86400000;
+                  const bannerPhotos = Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : [];
+                  const showBanner = catalogueLayout.bannerEnabled === true && (catalogueLayout.bannerText || bannerPhotos.length > 0) && !bannerExpired;
+                  if (!showBanner) return null;
+                  return (
+                    <div className="cat-banner mt-5 flex flex-wrap items-center justify-between gap-4 rounded-3xl border p-4"
+                      style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, borderColor: accentStrong, boxShadow: `0 10px 28px ${accentSoft}` }}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/80">📢 Announcement</p>
+                        {catalogueLayout.bannerText ? (
+                          <p className="mt-1 text-lg font-black leading-snug text-white" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.25)' }}>{catalogueLayout.bannerText}</p>
+                        ) : null}
+                      </div>
+                      {bannerPhotos.length > 0 && (
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5">
+                          {bannerPhotos.map((photo, i) => (
+                            <button key={i} type="button" title="View photo"
+                              onClick={() => setCatalogueBannerPhoto(photo)}
+                              className="h-14 w-14 overflow-hidden bg-white shadow-lg transition active:scale-90"
+                              style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}>
+                              <img src={photo} alt={`Banner ${i + 1}`} className="h-full w-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -12551,6 +12606,16 @@ try {
                 </button>
               </div>
 
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2">
+                <p className="text-[10px] font-bold text-slate-300">🖼️ Show Logo (instead of text) on customer menu</p>
+                <button
+                  onClick={() => setCatalogueLayout((prev) => ({ ...prev, showLogo: !prev.showLogo }))}
+                  className={`rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.showLogo !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                >
+                  {catalogueLayout.showLogo !== false ? 'ON' : 'OFF'}
+                </button>
+              </div>
+
               <div className="mt-3">
                 <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Accent Color</p>
                 <div className="flex items-center gap-2">
@@ -12709,6 +12774,74 @@ try {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-slate-700 bg-slate-950 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">📢 Announcement Banner — top of customer menu</p>
+                  <button
+                    onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerEnabled: !prev.bannerEnabled, bannerStart: !prev.bannerEnabled ? Date.now() : prev.bannerStart }))}
+                    className={`rounded-xl px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.bannerEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                  >
+                    {catalogueLayout.bannerEnabled ? 'Banner ON' : 'Banner OFF'}
+                  </button>
+                </div>
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Banner Text</p>
+                  <input
+                    value={catalogueLayout.bannerText}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, bannerText: e.target.value }))}
+                    placeholder="e.g. 🎉 New items added — try our new BBQ platter!"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Show for how many days</p>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={catalogueLayout.bannerDays ?? 7}
+                    onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, bannerDays: Math.max(1, Number(e.target.value) || 7) }))}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — small star shapes, tap to view large <span className="normal-case text-slate-600">(min 2, max 5)</span></p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : []).map((photo, i) => (
+                      <div key={i} className="rounded-xl border border-slate-700 bg-slate-900 p-1.5">
+                        <div className="flex h-16 w-full items-center justify-center overflow-hidden bg-slate-800" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}>
+                          <img src={photo} alt={`Banner ${i + 1}`} className="h-full w-full object-cover" />
+                        </div>
+                        <button
+                          onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerPhotos: (prev.bannerPhotos || []).filter((_, idx) => idx !== i) }))}
+                          className="mt-1.5 w-full rounded-lg bg-rose-600 px-2 py-1 text-[9px] font-bold text-white transition hover:bg-rose-500"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    {(Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : []).length < 5 && (
+                      <label className="flex h-full min-h-[96px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-600 bg-slate-900 text-center transition hover:border-sky-500">
+                        <span className="text-lg">📷</span>
+                        <span className="text-[9px] font-bold text-slate-400">Add Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0];
+                            e.target.value = '';
+                            if (!file) return;
+                            const dataUrl = await resizeImageFile(file, 400, 0.8);
+                            setCatalogueLayout((prev) => ({ ...prev, bannerPhotos: [...(prev.bannerPhotos || []), dataUrl] }));
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -12915,7 +13048,7 @@ try {
                   🍽️
                 </div>
               )}
-              <span className="text-lg font-bold text-slate-900">{settings.hotelName || 'Usman Hotel'}</span>
+              {!loginLogo && <span className="text-lg font-bold text-slate-900">{settings.hotelName || 'Usman Hotel'}</span>}
             </div>
 
             {/* Greeting */}
