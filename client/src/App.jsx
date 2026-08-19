@@ -7674,6 +7674,27 @@ try {
                                   {order.customerName || (type === 'Takeaway' ? 'PICK UP' : type === 'Online' ? '📱 ONLINE ORDER' : order.tableNumber || 'TABLE')}
                                 </div>
                               )}
+                              <div className="mt-1 flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-violet-300">👤 {order.waiter || order.orderTaker || '-'}</span>
+                                <span className="text-slate-600">|</span>
+                                <span className="text-[10px] text-slate-400">#{(order.orderNumber || order.id)}</span>
+                              </div>
+                              {(type === 'Dine-In' || type === 'Takeaway') && (order.items || []).length > 0 && (
+                                <div className="mt-1 text-[10px] text-slate-400 leading-tight line-clamp-2">
+                                  {(order.items || []).map((item, idx) => (
+                                    <span key={idx}>{item.quantity}x {item.name}{idx < (order.items || []).length - 1 ? ', ' : ''}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {order.paymentRequestImage && (
+                                <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-amber-600/40 bg-amber-950/40 p-1.5">
+                                  <img src={order.paymentRequestImage} alt="Payment request" onClick={(e) => { e.stopPropagation(); setPaymentRequestPreview(order.paymentRequestImage); }} className="h-9 w-9 rounded-lg object-cover cursor-pointer border border-amber-600/40 shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[9px] font-bold text-amber-400">📷 Payment Request{order.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
+                                    <p className="text-[8px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'With photo attached'}</p>
+                                  </div>
+                                </div>
+                              )}
                               <div className="mt-1 flex items-center justify-between">
                                 <div className="flex flex-wrap gap-1">
                                   <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
@@ -11332,10 +11353,26 @@ try {
                     </div>
                     <div className="mt-1 text-[10px] text-slate-500 truncate">{order.orderNumber || order.id}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold text-violet-300">👤 {order.waiter || order.orderTaker || '-'}</span>
+                      <span className="text-slate-600">|</span>
                       <span className="text-[11px] text-slate-400">{order.phone || '-'}</span>
                       <span className="text-slate-600">|</span>
                       <span className="text-[11px] text-slate-400">{(order.items || []).length} item{(order.items || []).length === 1 ? '' : 's'}</span>
                     </div>
+                    <div className="mt-1 text-[10px] text-slate-400 leading-tight line-clamp-2">
+                      {(order.items || []).map((item, idx) => (
+                        <span key={idx}>{item.quantity}x {item.name}{idx < (order.items || []).length - 1 ? ', ' : ''}</span>
+                      ))}
+                    </div>
+                    {order.paymentRequestImage && (
+                      <div className="mt-1.5 rounded-xl border border-amber-600/40 bg-amber-950/40 p-2 flex items-center gap-2">
+                        <img src={order.paymentRequestImage} alt="Payment request" onClick={() => setPaymentRequestPreview(order.paymentRequestImage)} className="h-9 w-9 rounded-lg object-cover cursor-pointer border border-amber-600/40 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[9px] font-bold text-amber-400">📷 Payment Request{order.paymentRequestStatus === 'owner-request' ? ' - 👤 Farhan Owner' : ''}</p>
+                          <p className="text-[8px] text-slate-400 truncate">{order.paymentRequestedAt ? new Date(order.paymentRequestedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'With photo attached'}</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Pending'}</span>
@@ -11472,7 +11509,9 @@ try {
     const floorTables = posTables.filter((table) => (table.section || 'Floor') === 'Floor');
     const outsideTables = posTables.filter((table) => (table.section || 'Floor') === 'Outside');
     const activeDineinOrders = dineinOrders.filter((o) => !['Completed', 'Payment Collected', 'Cancelled'].includes(o.status || ''));
-    const activeDineinOrdersFiltered = activeDineinOrders.filter(mobileFilterMatches);
+    const activeDineinOrdersFiltered = activeDineinOrders
+      .filter(mobileFilterMatches)
+      .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
 
     return (
       <>
