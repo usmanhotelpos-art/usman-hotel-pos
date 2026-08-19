@@ -9163,6 +9163,38 @@ try {
     );
   }
 
+  const cataloguePressTimerRef = useRef(null);
+  const cataloguePressFiredRef = useRef(false);
+
+  function removeProductFromCatalogueCart(product) {
+    const line = catalogueCart.find((i) => i.productId === product.id);
+    if (line) updateCatalogueCartItem(line.itemId, -line.quantity);
+  }
+
+  function handleCataloguePressStart(product) {
+    cataloguePressFiredRef.current = false;
+    cataloguePressTimerRef.current = setTimeout(() => {
+      cataloguePressFiredRef.current = true;
+      cataloguePressTimerRef.current = null;
+      removeProductFromCatalogueCart(product);
+    }, 2000);
+  }
+
+  function handleCataloguePressEnd() {
+    if (cataloguePressTimerRef.current) {
+      clearTimeout(cataloguePressTimerRef.current);
+      cataloguePressTimerRef.current = null;
+    }
+  }
+
+  function handleCatalogueTileClick(product) {
+    if (cataloguePressFiredRef.current) {
+      cataloguePressFiredRef.current = false;
+      return;
+    }
+    addToCatalogueCart(product);
+  }
+
   function getCatalogueCartSummary() {
     const subtotal = catalogueCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     return { subtotal, total: subtotal };
@@ -9393,7 +9425,7 @@ try {
                   </svg>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="mt-5 grid grid-cols-3 gap-3">
                   {catalogueLoading && !categoryProducts.length && Array.from({ length: 6 }).map((_, idx) => (
                     <div key={idx} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse">
                       <div className="w-full h-40 rounded-2xl bg-slate-200 mb-3"></div>
@@ -9409,7 +9441,14 @@ try {
                     const cartQty = catalogueCart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
                     return (
                     <div key={product.id}
-                      className={`relative rounded-3xl border-2 bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.14)] active:scale-[0.97] ${glow ? 'cat-item-recommended border-transparent' : cartQty > 0 ? 'border-emerald-500 ring-2 ring-emerald-400/50' : 'border-slate-200'}`}
+                      onTouchStart={() => handleCataloguePressStart(product)}
+                      onTouchEnd={handleCataloguePressEnd}
+                      onTouchCancel={handleCataloguePressEnd}
+                      onMouseDown={() => handleCataloguePressStart(product)}
+                      onMouseUp={handleCataloguePressEnd}
+                      onMouseLeave={handleCataloguePressEnd}
+                      onClick={() => handleCatalogueTileClick(product)}
+                      className={`relative cursor-pointer rounded-3xl border-2 bg-white p-3 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.14)] active:scale-[0.97] ${glow ? 'cat-item-recommended border-transparent' : cartQty > 0 ? 'border-emerald-500 ring-2 ring-emerald-400/50' : 'border-slate-200'}`}
                       style={glow ? { '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong } : undefined}>
                       {cartQty > 0 && (
                         <span className="absolute -left-2 -top-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-xs font-black text-white shadow-lg"
@@ -9417,9 +9456,9 @@ try {
                       )}
                       {product.photoUrl || product.photo ? (
                         <img src={product.photoUrl || product.photo} alt={product.name} loading="lazy"
-                          className="w-full h-40 rounded-2xl object-cover mb-3" />
+                          className="w-full h-44 rounded-2xl object-cover mb-2 shadow-md" />
                       ) : (
-                        <div className="w-full h-40 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-3 text-slate-400 text-4xl">
+                        <div className="w-full h-44 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mb-2 text-slate-400 text-4xl shadow-md">
                           🍽️
                         </div>
                       )}
@@ -9434,14 +9473,20 @@ try {
                           ⭐ Highly Recommended
                         </div>
                       ) : null}
-                      <div className="text-base font-black text-slate-800 line-clamp-2 mb-1">{product.name}</div>
+                      <div className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 leading-tight line-clamp-2 mb-0.5" style={{ textShadow: '0 0 12px rgba(168,85,247,0.35), 0 0 24px rgba(236,72,153,0.2)' }}>{product.name}</div>
                       {catalogueLayout.showPrices && (
-                        <div className="text-base font-black text-emerald-600">{Number(product.price) || 0} PKR</div>
+                        <div className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600" style={{ textShadow: '0 0 10px rgba(245,158,11,0.4)' }}>{Number(product.price) || 0} PKR</div>
                       )}
-                      <button onClick={() => addToCatalogueCart(product)}
-                        className="mt-3 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-sm font-black text-white hover:bg-emerald-500 transition shadow-[0_4px_14px_rgba(16,185,129,0.35)]">
-                        🛒 Add to cart
-                      </button>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); addToCatalogueCart(product); }}
+                          className="rounded-xl bg-emerald-600 px-2 py-2 text-xs font-black text-white hover:bg-emerald-500 transition shadow-[0_4px_14px_rgba(16,185,129,0.35)] active:scale-95">
+                          🛒 Add
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); removeProductFromCatalogueCart(product); }} disabled={cartQty === 0}
+                          className="rounded-xl bg-rose-600 px-2 py-2 text-xs font-black text-white hover:bg-rose-500 transition shadow-[0_4px_14px_rgba(244,63,94,0.35)] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
+                          🗑 Remove
+                        </button>
+                      </div>
                     </div>
                     );
                   })}
