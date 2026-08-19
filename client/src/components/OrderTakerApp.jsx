@@ -79,6 +79,8 @@ export function OrderTakerApp() {
   const [phone, setPhone] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   // Edit
   const [editOrder, setEditOrder] = useState(null);
@@ -505,43 +507,57 @@ export function OrderTakerApp() {
   };
 
   const myNewOrders = useMemo(() => (orders || []).filter(o =>
-    o.orderType === 'Dine-In' && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o)
+    (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o)
   ), [orders, orderTaker]);
 
   const myServedOrders = useMemo(() => (orders || []).filter(o =>
-    o.orderType === 'Dine-In' && isMyOrder(o) && isServedOrder(o)
+    (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isServedOrder(o)
   ), [orders, orderTaker]);
 
   const myCancelledOrders = useMemo(() => (orders || []).filter(o =>
-    o.orderType === 'Dine-In' && isMyOrder(o) && isCancelledOrder(o)
+    (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isCancelledOrder(o)
   ), [orders, orderTaker]);
 
   const myActiveOrderCount = myNewOrders.length + myServedOrders.length;
 
-  async function createOrder() {
+  async function createOrder(orderStatus = 'Pending', paymentOpts = {}) {
     if (!cart.length) { setMessage('Cart is empty'); return; }
     if (activeType === 'Dine-In' && !tableNumber) { setMessage('Please select a table or room'); return; }
+    const isTakeaway = activeType === 'Take Away';
     setLoading(true);
     try {
       const payload = {
         items: cart.map(i => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity, code: i.code || '', weight: i.weight || '', flavor: i.flavor || '' })),
-        orderType: 'Dine-In',
-        customerName: customerName || '',
+        orderType: isTakeaway ? 'Takeaway' : 'Dine-In',
+        customerName: isTakeaway ? (customerName || 'Pickup') : (customerName || ''),
         phone,
-        tableNumber,
+        tableNumber: isTakeaway ? '' : tableNumber,
         notes,
         orderTaker: orderTaker?.name || orderTaker?.username || '',
         waiter: orderTaker?.name || orderTaker?.username || '',
-        status: 'Pending',
-        paymentStatus: 'Pending',
+        status: orderStatus,
+        paymentStatus: paymentOpts.paid ? 'Paid' : 'Pending',
         serviceType: '',
         deliveryFee: 0,
         discount: 0,
         taxPercent: 0,
         serviceCharge: 0,
-        paymentMethod: 'Cash',
+        paymentMethod: isTakeaway ? (paymentOpts.paymentMethod || 'Cash') : '',
       };
       const createdOrder = await fetchJson(`${apiBase}/pos/orders`, { method: 'POST', body: JSON.stringify(payload), token });
+      if (paymentOpts.paid) {
+        await fetchJson(`${apiBase}/pos/payments`, {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: createdOrder.id,
+            amount: createdOrder.total,
+            paymentMethod: paymentOpts.paymentMethod || 'Cash',
+            status: 'Completed',
+            description: `Payment for order ${createdOrder.orderNumber || createdOrder.id}`
+          }),
+          token
+        });
+      }
       setCart([]);
       setCustomerName('');
       setPhone('');
@@ -549,7 +565,8 @@ export function OrderTakerApp() {
       setNotes('');
       setShowCart(false);
       setShowDetails(false);
-      setMessage('Order created successfully');
+      setShowPaymentPopup(false);
+      setMessage(paymentOpts.paid ? 'Order created & payment completed ✅' : isTakeaway ? 'Takeaway order created 🛍️' : 'Order created successfully ✅');
       if (btConnected || btInfo || settings.btPrintEnabled) {
         const printOrder = { ...createdOrder, date: createdOrder.createdAt || new Date().toISOString() };
         printOrderBT(printOrder)
@@ -807,6 +824,16 @@ export function OrderTakerApp() {
         </div>
       </div>
 
+      {/* Order type tabs */}
+      <div className="px-3 pt-2 pb-1 flex gap-1.5">
+        <button onClick={() => setActiveType('Dine-In')} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition-all active:scale-95 ${activeType === 'Dine-In' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+          🍽️ Table
+        </button>
+        <button onClick={() => setActiveType('Take Away')} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition-all active:scale-95 ${activeType === 'Take Away' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+          🛍️ Take Away
+        </button>
+      </div>
+
       {/* Search */}
       <div className="px-3 pb-2">
         <div className="relative">
@@ -965,21 +992,23 @@ export function OrderTakerApp() {
 
             {/* Order details */}
             <div className="px-4 py-3 space-y-2.5 bg-slate-50 border-t border-slate-200">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Order Details</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{activeType === 'Take Away' ? '🛍️ Take Away Details' : 'Order Details'}</p>
+              {activeType === 'Dine-In' && (
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Table / Room <span className="text-rose-500">*</span></label>
+                  <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500">
+                    <option value="">Select table or room</option>
+                    {availableDineInTables.length ? availableDineInTables.map((table) => (
+                      <option key={table.id} value={getTableLabel(table)}>
+                        {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
+                      </option>
+                    )) : <option value="" disabled>No tables found</option>}
+                  </select>
+                  {!tableNumber && <p className="text-xs text-amber-600">Please select a table to place the order</p>}
+                </div>
+              )}
               <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">Table / Room <span className="text-rose-500">*</span></label>
-                <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500">
-                  <option value="">Select table or room</option>
-                  {availableDineInTables.length ? availableDineInTables.map((table) => (
-                    <option key={table.id} value={getTableLabel(table)}>
-                      {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
-                    </option>
-                  )) : <option value="" disabled>No tables found</option>}
-                </select>
-                {!tableNumber && <p className="text-xs text-amber-600">Please select a table to place the order</p>}
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">Customer Name</label>
+                <label className="text-xs font-semibold text-slate-600">{activeType === 'Take Away' ? 'Customer Name (optional)' : 'Customer Name'}</label>
                 <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
               </div>
               <div className="grid gap-1.5">
@@ -993,9 +1022,49 @@ export function OrderTakerApp() {
               <span className="text-sm text-slate-500">Total</span>
               <span className="text-lg font-bold text-emerald-600">{cartTotal} PKR</span>
             </div>
-            <button onClick={createOrder} disabled={loading || !cart.length || (activeType === 'Dine-In' && !tableNumber)} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50 active:scale-[0.99]">
-              {loading ? 'Creating...' : 'Place 🍽️ Dine-In Order'}
+            <button onClick={() => { if (activeType === 'Take Away') { setShowPaymentPopup(true); return; } createOrder(); }} disabled={loading || !cart.length || (activeType === 'Dine-In' && !tableNumber)} className="w-full rounded-xl py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 active:scale-[0.99]"
+              style={{ background: activeType === 'Take Away' ? 'linear-gradient(135deg, #f59e0b, #f97316)' : '#059669' }}>
+              {loading ? 'Creating...' : activeType === 'Take Away' ? 'Place 🛍️ Take Away Order' : 'Place 🍽️ Dine-In Order'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Takeaway payment popup */}
+      {showPaymentPopup && (
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70" onClick={() => setShowPaymentPopup(false)}>
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-700 bg-slate-950 p-5 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Payment</p>
+                <h3 className="mt-2 text-xl font-semibold text-white">🛍️ Take Away Payment</h3>
+              </div>
+              <button onClick={() => setShowPaymentPopup(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">✕</button>
+            </div>
+            <div className="mt-6 space-y-4">
+              <div className="grid gap-3">
+                <p className="text-sm text-slate-400">Order type: <span className="font-semibold text-slate-100">Takeaway</span></p>
+                <div className="grid grid-cols-3 gap-2">
+                  {['Cash', 'Card', 'Online'].map((method) => (
+                    <button key={method} onClick={() => setPaymentMethod(method)} className={`rounded-full px-3 py-2 text-sm font-semibold transition ${paymentMethod === method ? 'bg-emerald-600 text-slate-950 shadow-[0_8px_0_rgba(16,185,129,0.22)]' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-3xl border border-slate-800 bg-slate-900 p-4">
+                <span className="text-sm text-slate-400">Total</span>
+                <span className="text-xl font-bold text-emerald-400">{cartTotal} PKR</span>
+              </div>
+              <div className="grid gap-2">
+                <button onClick={() => createOrder('Pay Later', {})} disabled={loading} className="w-full rounded-3xl bg-slate-700 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-600 disabled:opacity-50">
+                  {loading ? 'Saving...' : '⏳ Pay Later'}
+                </button>
+                <button onClick={() => createOrder('Completed', { paid: true, paymentMethod })} disabled={loading} className="w-full rounded-3xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-emerald-500 disabled:opacity-50">
+                  {loading ? 'Saving...' : `💳 Pay Now (${paymentMethod})`}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1025,7 +1094,7 @@ export function OrderTakerApp() {
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {(ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : myCancelledOrders).length === 0 && (
                 <p className="text-sm text-slate-500 text-center py-8">
-                  {ordersTab === 'new' ? 'No new dine-in orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
+                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
                 </p>
               )}
               {(ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : myCancelledOrders)
