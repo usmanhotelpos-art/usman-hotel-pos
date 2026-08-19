@@ -4,14 +4,43 @@ import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPr
 
 const API = '/api';
 
-function fetchJson(url, opts = {}) {
+async function refreshOrderTakerToken() {
+  const stored = typeof window !== 'undefined' ? localStorage.getItem('orderTakerToken') : null;
+  if (!stored) return null;
+  try {
+    const res = await fetch(`${API}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${stored}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.token) return null;
+    localStorage.setItem('orderTakerToken', data.token);
+    window.dispatchEvent(new CustomEvent('orderTakerTokenRefreshed', { detail: data.token }));
+    return data.token;
+  } catch { return null; }
+}
+
+function getTokenExpiry(tok) {
+  try {
+    const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.exp ? payload.exp * 1000 : 0;
+  } catch { return 0; }
+}
+
+async function fetchJson(url, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
-  if (opts.token) headers['Authorization'] = `Bearer ${opts.token}`;
-  return fetch(url, { ...opts, headers }).then(async (r) => {
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'Request failed');
-    return data;
-  });
+  const tk = opts.token;
+  if (tk) headers['Authorization'] = `Bearer ${tk}`;
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401 && tk && !opts.retried && !url.includes('/auth/refresh')) {
+    const newToken = await refreshOrderTakerToken();
+    if (newToken) {
+      return fetchJson(url, { ...opts, token: newToken, retried: true });
+    }
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
 }
 
 const CATEGORY_ICONS = {
@@ -112,7 +141,18 @@ export function OrderTakerApp() {
     if (saved && savedUser) {
       setToken(saved);
       try { setOrderTaker(JSON.parse(savedUser)); } catch {}
+      // Proactively renew token before it expires (6h window)
+      const exp = getTokenExpiry(saved);
+      if (exp && exp < Date.now() + 30 * 60 * 1000) {
+        refreshOrderTakerToken();
+      }
     }
+  }, []);
+
+  useEffect(() => {
+    const onRefresh = (e) => { if (e.detail) setToken(e.detail); };
+    window.addEventListener('orderTakerTokenRefreshed', onRefresh);
+    return () => window.removeEventListener('orderTakerTokenRefreshed', onRefresh);
   }, []);
 
   useEffect(() => {

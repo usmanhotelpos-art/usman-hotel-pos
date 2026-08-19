@@ -188,6 +188,17 @@ router.get('/auth/me', authenticate, (req, res) => {
   res.send({ id: user.id, name: user.name, email: user.email, role: user.role });
 });
 
+// Sliding token renewal: issue a fresh token while the current one is still valid.
+router.post('/auth/refresh', authenticate, safe(async (req, res) => {
+  const db = readDb();
+  let user = db.users?.find((item) => item.id === req.user.id);
+  if (!user) user = (db.staff || []).find((s) => s.id === req.user.id);
+  if (!user) return res.status(401).send({ error: 'User not found' });
+  const email = user.username || user.email || req.user.email || '';
+  const token = createToken({ id: user.id, email, role: user.role, name: user.name });
+  res.send({ token, user: { id: user.id, name: user.name, email, role: user.role } });
+}));
+
 // Rider Authentication Routes
 router.post('/auth/rider-login', safe(async (req, res) => {
   const clientIp = req.ip || req.socket?.remoteAddress || 'unknown';
