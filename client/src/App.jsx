@@ -753,7 +753,10 @@ function App() {
     menuFront: '',
     menuBack: '',
     categoryPhotos: {},
-    recommendedIds: []
+    recommendedIds: [],
+    categoryBlockColor: '#ffffff',
+    categoryTextColor: '#10b981',
+    highlightCategories: true
   });
   const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
   const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
@@ -778,6 +781,7 @@ function App() {
     return /\/?(menu|catalogue|qr)(\/|$|\?)/.test(path);
   });
   const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [catalogueOrderPlacing, setCatalogueOrderPlacing] = useState(false);
   const [qrCatalogueSubTab, setQrCatalogueSubTab] = useState('qr');
   const [qrCatalogueRevealed, setQrCatalogueRevealed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -1662,9 +1666,9 @@ try {
     }
   }
 
-  async function loadOrdersData() {
-    setLoading(true);
-    setMessage('');
+  async function loadOrdersData(silent) {
+    if (!silent) setLoading(true);
+    if (!silent) setMessage('');
     try {
       const orders = await fetchJson(`${apiBase}/pos/orders`);
       setPosOrders(orders);
@@ -1698,9 +1702,9 @@ try {
         return [...prev, ...tempAdded];
       });
     } catch (error) {
-      setMessage(error.message);
+      if (!silent) setMessage(error.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -1883,7 +1887,7 @@ try {
     // polling fallback to ensure updates even if SSE unsupported
     const intervalMs = 1000;
     pollingRef.current = setInterval(() => {
-      loadOrdersData();
+      loadOrdersData(true);
     }, intervalMs);
 
     return () => {
@@ -9079,7 +9083,7 @@ try {
       paymentMethod: cataloguePaymentMethod
     };
 
-    setLoading(true);
+    setCatalogueOrderPlacing(true);
     setCatalogueMessage('');
     try {
       const order = await fetchJson(`${apiBase}/pos/orders`, {
@@ -9094,7 +9098,7 @@ try {
     } catch (error) {
       setCatalogueMessage(error.message);
     } finally {
-      setLoading(false);
+      setCatalogueOrderPlacing(false);
     }
   }
 
@@ -9126,8 +9130,9 @@ try {
           @keyframes catGlow { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent-soft), 0 0 42px var(--accent-soft); transform: translateY(0); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 32px var(--accent-strong), 0 0 64px var(--accent-soft); transform: translateY(-3px); } }
           @keyframes catMenuRing { 0%,100% { box-shadow: 0 0 0 3px var(--accent), 0 0 16px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent), 0 0 28px var(--accent-soft); } }
           @keyframes catClickPop { 0% { transform: scale(1); } 40% { transform: scale(0.9); } 100% { transform: scale(1.06); } }
-          .cat-glow-block { position: relative; isolation: isolate; border-radius: 1.25rem; background: linear-gradient(135deg, #ffffff, #f7fdf9); border: 1px solid var(--accent-soft); animation: catGlow 2.2s ease-in-out infinite; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-          .cat-glow-block:hover { transform: translateY(-6px) scale(1.05); }
+          .cat-glow-block { position: relative; isolation: isolate; border-radius: 1.75rem; background: var(--block-bg, #ffffff); border: 1px solid var(--accent-soft); box-shadow: 0 6px 18px rgba(0,0,0,0.07); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+          .cat-glow-block.hl { animation: catGlow 2.2s ease-in-out infinite; }
+          .cat-glow-block:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 26px var(--accent-soft); border-color: var(--accent); }
           .cat-glow-block:active { animation: catClickPop 0.3s ease-out; }
           .cat-glow-block.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
           .cat-menu-circle { animation: catMenuRing 2.6s ease-in-out infinite; }
@@ -9173,27 +9178,33 @@ try {
             )}
 
             {catalogueView === 'categories' && catalogueLayout.showCategories !== false && (
-              <div className="flex flex-wrap items-center justify-center gap-5">
+              <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
                   const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
+                  const blockBg = catalogueLayout.categoryBlockColor || '#ffffff';
+                  const blockText = catalogueLayout.categoryTextColor || accent;
+                  const blockSubText = `${blockText}99`;
+                  const highlightCat = catalogueLayout.highlightCategories !== false;
                   return (
                     <button
                       key={cat.name + idx}
                       onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); setCatalogueView('items'); }}
-                      className="cat-glow-block flex min-w-[150px] flex-col items-center justify-center gap-2 px-5 py-4 text-center"
-                      style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, animationDelay: `${idx * 0.15}s` }}
+                      className={`cat-glow-block flex h-16 w-full flex-row items-center gap-3 px-4 text-left ${highlightCat ? 'hl' : ''}`}
+                      style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, '--block-bg': blockBg, animationDelay: `${idx * 0.15}s` }}
                     >
-                      <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-white/80 bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-gradient-to-br from-slate-100 to-slate-200 shadow-md">
                         {catPhoto ? (
                           <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
                         ) : cat.name !== 'All' && hotelLogo ? (
                           <img src={hotelLogo} alt="Usman Hotel" className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-2xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
+                          <span className="text-xl">{cat.name === 'All' ? '🎯' : getCategoryIcon(cat.name)}</span>
                         )}
                       </span>
-                      <span className="block w-full max-w-[8.5rem] truncate text-[13px] font-black">{cat.name}</span>
-                      <span className="block text-[10px] font-semibold opacity-70">{countFor(cat.name)} items</span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[13px] font-black" style={{ color: blockText }}>{cat.name}</span>
+                        <span className="text-[10px] font-bold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
+                      </span>
                     </button>
                   );
                 })}
@@ -9452,10 +9463,10 @@ try {
                     </div>
                   </div>
                   <button onClick={saveOnlineCatalogueOrder}
-                    disabled={loading}
+                    disabled={catalogueOrderPlacing}
                     className="w-full rounded-2xl px-4 py-3.5 text-sm font-black text-white transition-all active:scale-95 disabled:opacity-50"
                     style={{ background: `linear-gradient(135deg, ${accent}, #10b981)`, boxShadow: `0 8px 24px ${accentSoft}` }}>
-                    {loading ? '⏳ Placing order...' : `✅ Place Order · ${summary.total} PKR`}
+                    {catalogueOrderPlacing ? '⏳ Placing order...' : `✅ Place Order · ${summary.total} PKR`}
                   </button>
                   {catalogueMessage && (
                     <div className={`rounded-2xl p-3 text-sm ${catalogueMessage.includes('success') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
@@ -12223,9 +12234,13 @@ try {
                   <p className="text-center text-xs font-bold" style={{ color: previewTheme ? 'white' : 'black' }}>{catalogueLayout.pageTitle || 'Our Menu'}</p>
                   <p className="mt-0.5 text-center text-[8px] leading-tight text-slate-500">{catalogueLayout.pageDescription || ''}</p>
                   {catalogueLayout.showCategories && (
-                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                    <div className="mt-2 grid grid-cols-2 gap-1">
                       {previewCategories.map((c) => (
-                        <span key={c} className="rounded-full px-2 py-0.5 text-[8px] font-bold text-white" style={{ background: catalogueLayout.accentColor || '#10b981' }}>{c}</span>
+                        <span key={c} className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[7px] font-bold"
+                          style={{ background: catalogueLayout.categoryBlockColor || '#ffffff', borderColor: `${catalogueLayout.accentColor || '#10b981'}66`, color: catalogueLayout.categoryTextColor || catalogueLayout.accentColor || '#10b981' }}>
+                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-[5px]">🍲</span>
+                          {c}
+                        </span>
                       ))}
                     </div>
                   )}
@@ -12325,6 +12340,61 @@ try {
                       style={{ background: color, borderColor: catalogueLayout.accentColor === color ? 'white' : 'transparent' }}
                     />
                   ))}
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-slate-700 bg-slate-950 p-3">
+                <p className="text-xs font-bold text-white">🏷️ Category Blocks</p>
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2">
+                  <p className="text-[10px] font-bold text-slate-300">✨ Highlight Categories (glow)</p>
+                  <button
+                    onClick={() => setCatalogueLayout((prev) => ({ ...prev, highlightCategories: !prev.highlightCategories }))}
+                    className={`rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.highlightCategories !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                  >
+                    {catalogueLayout.highlightCategories !== false ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Block Color</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={catalogueLayout.categoryBlockColor || '#ffffff'}
+                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, categoryBlockColor: e.target.value }))}
+                      className="h-10 w-14 cursor-pointer rounded-xl border border-slate-700 bg-slate-800"
+                    />
+                    {['#ffffff', '#f0fdf4', '#fffbeb', '#eff6ff', '#fdf4ff', '#fff7ed'].map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, categoryBlockColor: color }))}
+                        className="h-8 w-8 rounded-full border-2 transition-all active:scale-90"
+                        style={{ background: color, borderColor: catalogueLayout.categoryBlockColor === color ? 'white' : 'transparent' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Text Color</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={catalogueLayout.categoryTextColor || catalogueLayout.accentColor || '#10b981'}
+                      onChange={(e) => setCatalogueLayout((prev) => ({ ...prev, categoryTextColor: e.target.value }))}
+                      className="h-10 w-14 cursor-pointer rounded-xl border border-slate-700 bg-slate-800"
+                    />
+                    {['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#0f172a'].map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, categoryTextColor: color }))}
+                        className="h-8 w-8 rounded-full border-2 transition-all active:scale-90"
+                        style={{ background: color, borderColor: catalogueLayout.categoryTextColor === color ? 'white' : 'transparent' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm shadow" style={{ background: catalogueLayout.categoryBlockColor || '#ffffff' }}>🍲</span>
+                  <span className="truncate text-[10px] font-black" style={{ color: catalogueLayout.categoryTextColor || catalogueLayout.accentColor || '#10b981' }}>Sample Category</span>
                 </div>
               </div>
 
