@@ -9319,10 +9319,10 @@ try {
                     <button
                       key={cat.name + idx}
                       onClick={() => { setCatalogueActiveCategory(cat.name); setCatalogueSearch(''); setCatalogueView('items'); }}
-                      className={`cat-block-card flex items-center gap-2.5 px-2.5 py-3 text-left ${idx < 2 ? 'w-[calc(44%-0.5rem)] max-w-[220px]' : 'w-[calc(50%-0.5rem)] max-w-[280px]'} ${highlightCat ? 'hl' : ''}`}
+                      className={`cat-block-card flex items-center gap-2.5 px-2.5 py-3 text-left ${idx < 2 || (idx >= 4 && idx <= 5) ? 'w-[calc(44%-0.5rem)] max-w-[210px]' : 'w-[calc(50%-0.5rem)] max-w-[270px]'} ${highlightCat ? 'hl' : ''}`}
                       style={{ '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong, '--block-bg': blockBg, animationDelay: `${idx * 0.12}s` }}
                     >
-                      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm"
+                      <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm"
                         style={{ borderColor: `${blockText}55`, background: `${blockText}22` }}>
                         {catPhoto ? (
                           <img src={catPhoto} alt={cat.name} className="h-full w-full object-cover" />
@@ -9333,8 +9333,8 @@ try {
                         )}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-bold leading-tight" style={{ color: blockText }}>{cat.name}</span>
-                        <span className="text-[10px] font-semibold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
+                        <span className="truncate text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 leading-tight" style={{ textShadow: '0 0 12px rgba(168,85,247,0.35), 0 0 24px rgba(236,72,153,0.2)' }}>{cat.name}</span>
+                        <span className="text-[10px] font-bold" style={{ color: blockSubText }}>{countFor(cat.name)} items</span>
                       </span>
                     </button>
                   );
