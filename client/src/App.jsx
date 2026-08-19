@@ -6906,8 +6906,13 @@ try {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="grid grid-cols-3 gap-1.5">
-                    {filteredProducts.map((product) => (
-                      <button key={product.id} type="button" className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-soft transition active:scale-[0.97]" onClick={() => addToCart(product)}>
+                    {filteredProducts.map((product) => {
+                      const cartQty = cart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
+                      return (
+                      <button key={product.id} type="button" className={`relative rounded-xl border p-1.5 shadow-soft transition active:scale-[0.97] ${cartQty > 0 ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/60' : 'border-slate-200 bg-white'}`} onClick={() => addToCart(product)}>
+                        {cartQty > 0 && (
+                          <span className="absolute -left-1.5 -top-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-black text-white shadow-md">{cartQty}</span>
+                        )}
                         <div className="flex flex-col items-center text-center mb-1">
                           {product.photo ? (
                             <img src={product.photo} alt={product.name} className="w-14 h-14 rounded-full object-cover mb-0.5 shadow-md" />
@@ -6918,7 +6923,8 @@ try {
                         <div className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 leading-tight line-clamp-2 mb-0.5" style={{textShadow: '0 0 12px rgba(168,85,247,0.4), 0 0 24px rgba(236,72,153,0.2)'}}>{product.name}</div>
                         <div className="text-xs font-extrabold text-emerald-500" style={{textShadow: '0 0 8px rgba(16,185,129,0.5)'}}>{product.weights?.length ? `From ${getProductStartingPrice(product)} PKR` : `${Number(product.price) || 0} PKR`}</div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -6971,13 +6977,18 @@ try {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.map((product) => {
+                    const cartQty = cart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
+                    return (
                     <button
                       key={product.id}
                       type="button"
-                      className="rounded-2xl border border-slate-200 bg-white p-3 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md active:scale-[0.97]"
+                      className={`relative rounded-2xl border p-3 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] ${cartQty > 0 ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400/60' : 'border-slate-200 bg-white hover:border-sky-300'}`}
                       onClick={() => addToCart(product)}
                     >
+                      {cartQty > 0 && (
+                        <span className="absolute -left-2 -top-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-xs font-black text-white shadow-lg">{cartQty}</span>
+                      )}
                       <div className="flex flex-col items-center text-center mb-1.5">
                         {product.photo ? (
                           <img src={product.photo} alt={product.name} className="w-16 h-16 rounded-full object-cover mb-1 shadow-md" />
@@ -6992,7 +7003,8 @@ try {
                         </div>
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -9288,10 +9300,15 @@ try {
                     const chefSpecial = isChefSpecialName(product.name);
                     const recommended = (catalogueLayout.recommendedIds || []).includes(product.id);
                     const glow = chefSpecial || recommended;
+                    const cartQty = catalogueCart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
                     return (
                     <div key={product.id}
-                      className={`rounded-3xl border-2 bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.14)] active:scale-[0.97] ${glow ? 'cat-item-recommended border-transparent' : 'border-slate-200'}`}
+                      className={`relative rounded-3xl border-2 bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.14)] active:scale-[0.97] ${glow ? 'cat-item-recommended border-transparent' : cartQty > 0 ? 'border-emerald-500 ring-2 ring-emerald-400/50' : 'border-slate-200'}`}
                       style={glow ? { '--accent': accent, '--accent-soft': accentSoft, '--accent-strong': accentStrong } : undefined}>
+                      {cartQty > 0 && (
+                        <span className="absolute -left-2 -top-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-xs font-black text-white shadow-lg"
+                          style={{ background: `linear-gradient(135deg, ${accent}, #10b981)` }}>{cartQty}</span>
+                      )}
                       {product.photoUrl || product.photo ? (
                         <img src={product.photoUrl || product.photo} alt={product.name} loading="lazy"
                           className="w-full h-40 rounded-2xl object-cover mb-3" />

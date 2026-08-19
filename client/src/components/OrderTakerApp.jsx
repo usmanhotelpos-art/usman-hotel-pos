@@ -761,10 +761,16 @@ export function OrderTakerApp() {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1.5">
-              {filteredProducts.map(product => (
+              {filteredProducts.map(product => {
+                const cartQty = cart.filter(i => i.id === product.id).reduce((s, i) => s + i.quantity, 0);
+                return (
                 <button key={product.id} type="button" onClick={() => addToCart(product)}
                   className={`relative rounded-xl border p-1.5 shadow-soft transition active:scale-[0.97] ${
-                    orderedItems[product.id] ? 'border-emerald-500 bg-emerald-50 scale-105' : 'border-slate-200 bg-white hover:border-emerald-300'
+                    orderedItems[product.id]
+                      ? 'border-emerald-500 bg-emerald-50 scale-105'
+                      : cartQty > 0
+                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/60'
+                        : 'border-slate-200 bg-white hover:border-emerald-300'
                   }`}>
                   <div className="flex flex-col items-center text-center mb-1">
                     {product.photo ? (
@@ -775,11 +781,12 @@ export function OrderTakerApp() {
                   </div>
                   <div className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 leading-tight line-clamp-2 mb-0.5" style={{textShadow: '0 0 12px rgba(168,85,247,0.4), 0 0 24px rgba(236,72,153,0.2)'}}>{product.name}</div>
                   <div className="text-xs font-extrabold text-emerald-500" style={{textShadow: '0 0 8px rgba(16,185,129,0.5)'}}>{Number(product.price) || 0} PKR</div>
-                  {orderedItems[product.id] && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white shadow-lg ring-2 ring-white">✓</span>
+                  {cartQty > 0 && (
+                    <span className="absolute -left-1.5 -top-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-black text-white shadow-md">{cartQty}</span>
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
