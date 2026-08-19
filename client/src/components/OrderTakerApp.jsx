@@ -846,56 +846,12 @@ export function OrderTakerApp() {
 
       {/* Floating cart button */}
       {cart.length > 0 && !showCart && !showDetails && (
-        <button onClick={() => setShowDetails(true)}
+        <button onClick={() => setShowCart(true)}
           className="fixed right-4 z-[60] flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_32px_rgba(16,185,129,0.5)] active:scale-95 transition-all duration-200 hover:shadow-[0_8px_32px_rgba(16,185,129,0.7)]"
           style={{ bottom: 80 }}>
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs">🛒</span>
           <span>{cartCount} items · {cartTotal} PKR</span>
         </button>
-      )}
-
-      {/* Order details popup (customer name / notes / table selection) */}
-      {showDetails && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60" onClick={() => setShowDetails(false)}>
-          <div className="w-full sm:max-w-md max-h-[85vh] rounded-t-3xl sm:rounded-3xl border border-slate-700 bg-slate-950 p-5 shadow-[0_35px_120px_-30px_rgba(0,0,0,0.8)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Order details</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">🍽️ Dine-In order</h3>
-              </div>
-              <button onClick={() => setShowDetails(false)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">✕</button>
-            </div>
-            <div className="mt-6 space-y-4">
-              <div className="grid gap-3">
-                <label className="text-sm text-slate-400">Table / Room</label>
-                <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500">
-                  <option value="">Select table or room</option>
-                  {availableDineInTables.length ? availableDineInTables.map((table) => (
-                    <option key={table.id} value={getTableLabel(table)}>
-                      {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
-                    </option>
-                  )) : <option value="" disabled>No tables found</option>}
-                </select>
-                {!tableNumber && <p className="text-xs text-amber-400">Select a table to continue</p>}
-              </div>
-              <div className="grid gap-3">
-                <label className="text-sm text-slate-400">Phone <span className="text-slate-500">(optional)</span></label>
-                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
-              </div>
-              <div className="grid gap-3">
-                <label className="text-sm text-slate-400">Notes <span className="text-slate-500">(optional)</span></label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Order notes" rows={3} className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none focus:border-emerald-500" />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setShowDetails(false)} className="rounded-3xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-800">Cancel</button>
-                <button onClick={() => { setShowDetails(false); setShowCart(true); }} disabled={activeType === 'Dine-In' && !tableNumber}
-                  className="rounded-3xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Save & Continue →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Variant / flavor selection popup */}
@@ -931,53 +887,80 @@ export function OrderTakerApp() {
         </div>
       )}
 
-      {/* Cart screen */}
+      {/* Cart / Place Order screen */}
       {showCart && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-            <h3 className="text-base font-bold text-slate-900">🛒 Cart ({cartCount} items)</h3>
-            <div className="flex items-center gap-2">
-              <button onClick={() => { setShowCart(false); setShowDetails(true); }} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Edit Details</button>
-              <button onClick={() => setShowCart(false)} className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100">✕</button>
+            <h3 className="text-base font-bold text-slate-900">🛒 Place Order ({cartCount} items)</h3>
+            <button onClick={() => setShowCart(false)} className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100">✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {/* Order details */}
+            <div className="px-4 py-3 space-y-2.5 bg-slate-50 border-b border-slate-200">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Order Details</p>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-slate-600">Table / Room <span className="text-rose-500">*</span></label>
+                <select value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500">
+                  <option value="">Select table or room</option>
+                  {availableDineInTables.length ? availableDineInTables.map((table) => (
+                    <option key={table.id} value={getTableLabel(table)}>
+                      {getTableLabel(table)}{table.isOccupied ? ' (Busy)' : ''}
+                    </option>
+                  )) : <option value="" disabled>No tables found</option>}
+                </select>
+                {!tableNumber && <p className="text-xs text-amber-600">Please select a table to place the order</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Customer Name</label>
+                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Phone <span className="text-slate-400">(optional)</span></label>
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-slate-600">Notes <span className="text-slate-400">(optional)</span></label>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Order notes" rows={2} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500" />
+              </div>
             </div>
-          </div>
-          <div className="px-4 py-2 border-b border-slate-100 text-xs text-slate-500 space-y-0.5">
-            <p>🍽️ Dine-In {tableNumber && <span className="font-semibold text-slate-700">• Table: {tableNumber}</span>}</p>
-            {phone && <p>📞 {phone}</p>}
-            {notes && <p className="truncate">📝 {notes}</p>}
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            {cart.map(item => (
-              <div key={item.itemId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">{item.name}</p>
-                  {(item.flavor || item.weight) && (
-                    <p className="text-[10px] text-slate-500 truncate">{item.flavor}{item.flavor && item.weight ? ' • ' : ''}{item.weight}</p>
-                  )}
-                  <p className="text-xs text-slate-400">{item.price} PKR each</p>
+
+            {/* Cart items */}
+            <div className="px-4 py-3 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Items</p>
+              {cart.map(item => (
+                <div key={item.itemId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{item.name}</p>
+                    {(item.flavor || item.weight) && (
+                      <p className="text-[10px] text-slate-500 truncate">{item.flavor}{item.flavor && item.weight ? ' • ' : ''}{item.weight}</p>
+                    )}
+                    <p className="text-xs text-slate-400">{item.price} PKR each</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => updateCartQty(item.itemId, -1)} className="h-8 w-8 rounded-full bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200 active:scale-95">−</button>
+                    <span className="w-6 text-center text-sm font-bold text-slate-900">{item.quantity}</span>
+                    <button onClick={() => updateCartQty(item.itemId, 1)} className="h-8 w-8 rounded-full bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 active:scale-95">+</button>
+                    <button onClick={() => removeFromCart(item.itemId)} className="ml-1 h-8 w-8 rounded-full bg-rose-50 text-rose-500 text-xs font-bold hover:bg-rose-100">✕</button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => updateCartQty(item.itemId, -1)} className="h-8 w-8 rounded-full bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200 active:scale-95">−</button>
-                  <span className="w-6 text-center text-sm font-bold text-slate-900">{item.quantity}</span>
-                  <button onClick={() => updateCartQty(item.itemId, 1)} className="h-8 w-8 rounded-full bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 active:scale-95">+</button>
-                  <button onClick={() => removeFromCart(item.itemId)} className="ml-1 h-8 w-8 rounded-full bg-rose-50 text-rose-500 text-xs font-bold hover:bg-rose-100">✕</button>
+              ))}
+              {cart.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <div className="text-4xl mb-2">🛒</div>
+                  <p className="text-sm">Cart is empty</p>
+                  <button onClick={() => setShowCart(false)} className="mt-3 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white">Back to Menu</button>
                 </div>
-              </div>
-            ))}
-            {cart.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                <div className="text-4xl mb-2">🛒</div>
-                <p className="text-sm">Cart is empty</p>
-                <button onClick={() => setShowCart(false)} className="mt-3 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white">Back to Menu</button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
           <div className="px-4 py-3 border-t border-slate-200 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">Total</span>
               <span className="text-lg font-bold text-emerald-600">{cartTotal} PKR</span>
             </div>
-            <button onClick={createOrder} disabled={loading || !cart.length} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50 active:scale-[0.99]">
+            <button onClick={createOrder} disabled={loading || !cart.length || (activeType === 'Dine-In' && !tableNumber)} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50 active:scale-[0.99]">
               {loading ? 'Creating...' : 'Place 🍽️ Dine-In Order'}
             </button>
           </div>
