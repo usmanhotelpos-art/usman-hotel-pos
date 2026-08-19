@@ -130,7 +130,22 @@ export async function disconnectDevice(device) {
   }
 }
 
-export async function printToBluetooth(device, data, { chunkSize = 128 } = {}) {
+// Global print queue: only one slip is written to the printer at a time.
+// Without this, 2-3 prints fired together interleave and print as one
+// continuous garbage stream. Jobs run one after another (slip by slip).
+let printQueue = Promise.resolve();
+
+function enqueuePrint(job) {
+  const run = printQueue.then(job, job);
+  printQueue = run.catch(() => {});
+  return run;
+}
+
+export function printToBluetooth(device, data, { chunkSize = 256 } = {}) {
+  return enqueuePrint(() => printToBluetoothJob(device, data, chunkSize));
+}
+
+async function printToBluetoothJob(device, data, chunkSize) {
   let characteristic;
 
   try {
@@ -145,15 +160,18 @@ export async function printToBluetooth(device, data, { chunkSize = 128 } = {}) {
 
   const initCmd = new Uint8Array(CMD.INIT);
   await writeWithRetry(characteristic, initCmd);
-  await new Promise((r) => setTimeout(r, 120));
+  await new Promise((r) => setTimeout(r, 60));
 
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize);
     await writeWithRetry(characteristic, chunk);
     if (i + chunkSize < data.length) {
-      await new Promise((r) => setTimeout(r, 15));
+      await new Promise((r) => setTimeout(r, 5));
     }
   }
+
+  // Let the printer flush its buffer before the next queued slip starts
+  await new Promise((r) => setTimeout(r, 60));
 
   return true;
 }
