@@ -774,8 +774,10 @@ function App() {
     bannerTextPosition: 'bottom-left',
     bannerAnimation: 'slide',
     bannerAutoSwipe: 0,
+    bannerSlideSpeed: 0.45,
     bannerShape: 'card',
     bannerStickers: true,
+    bannerSwipeHintEnabled: true,
     variantPhotos: {},
     menuExtra: ''
   });
@@ -878,7 +880,7 @@ function App() {
       } catch {
         // ignore
       }
-    }, 3600);
+    }, 1300);
     return () => clearTimeout(t);
   }, [bannerSwipeHint, cataloguePage]);
 
@@ -9434,10 +9436,10 @@ try {
           .cat-banner-fade { animation: catFadeIn 0.5s ease-out; }
           .cat-banner-zoom { animation: catZoomIn 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
           .cat-banner-flip { animation: catFlipIn 0.5s cubic-bezier(0.22, 0.8, 0.3, 1); }
-          @keyframes catHintFade { 0% { opacity: 0; } 14% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
-          .cat-swipe-hint { animation: catHintFade 3.4s ease-in-out forwards; }
-          @keyframes catStickerFloat { 0%,100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-14px) rotate(8deg); } }
-          .cat-banner-sticker { animation: catStickerFloat 2.6s ease-in-out infinite; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
+          @keyframes catHintFade { 0% { opacity: 0; } 12% { opacity: 1; } 72% { opacity: 1; } 100% { opacity: 0; } }
+          .cat-swipe-hint { animation: catHintFade 1.2s ease-in-out forwards; }
+          @keyframes catStickerFloat { 0%,100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-10px) rotate(8deg); } }
+          .cat-banner-sticker { animation: catStickerFloat 1s ease-in-out infinite; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
         `}</style>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="space-y-6">
@@ -9529,7 +9531,8 @@ try {
                       }}>
                       {curPhoto ? (
                         <>
-                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} ${bannerImgSizeClass} select-none object-cover`} />
+                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} ${bannerImgSizeClass} select-none object-cover`}
+                            style={{ animationDuration: `${Number(catalogueLayout.bannerSlideSpeed) || 0.45}s` }} />
                           {catalogueLayout.bannerText && (
                             <p className={`pointer-events-none absolute max-w-[85%] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 text-lg font-black leading-snug sm:text-2xl ${textPosClass}`}
                               style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,0.7))' }}>{catalogueLayout.bannerText}</p>
@@ -9538,7 +9541,7 @@ try {
                             <div className="cat-banner-stickers pointer-events-none absolute inset-0 z-[6] overflow-hidden">
                               {bannerStickers.map((st, i) => (
                                 <span key={i} className="cat-banner-sticker absolute select-none"
-                                  style={{ left: st.l, top: st.t, fontSize: `${st.s}px`, animationDelay: `${st.d}s`, animationDuration: `${2.4 + (i % 3) * 0.5}s` }}>
+                                  style={{ left: st.l, top: st.t, fontSize: `${st.s}px`, animationDelay: `${st.d}s` }}>
                                   {st.e}
                                 </span>
                               ))}
@@ -9579,7 +9582,7 @@ try {
                               ))}
                             </div>
                           )}
-                          {bannerSwipeHint && bannerPhotos.length > 1 && (
+                          {bannerSwipeHint && catalogueLayout.bannerSwipeHintEnabled !== false && bannerPhotos.length > 1 && (
                             <div className="cat-swipe-hint pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                               <span className="rounded-full bg-black/55 px-5 py-2.5 text-sm font-black text-white shadow-xl backdrop-blur-sm">
                                 ‹  Swipe for next banner  ›
@@ -10040,7 +10043,7 @@ try {
                       { e: '🎊', l: '84%', t: '76%', s: 30, d: 1.6 }
                     ].map((st, i) => (
                       <span key={i} className="cat-banner-sticker absolute select-none"
-                        style={{ left: st.l, top: st.t, fontSize: `${st.s}px`, animationDelay: `${st.d}s`, animationDuration: `${2.6 + (i % 2) * 0.5}s` }}>
+                        style={{ left: st.l, top: st.t, fontSize: `${st.s}px`, animationDelay: `${st.d}s` }}>
                         {st.e}
                       </span>
                     ))}
@@ -13223,6 +13226,32 @@ try {
                   </div>
                 </div>
                 <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Slide Speed <span className="normal-case text-slate-600">(slow motion)</span></p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      [0.2, '⚡', 'Fast', '0.2s'],
+                      [0.45, '🚶', 'Normal', '0.45s'],
+                      [1.2, '🐢', 'Slow', '1.2s'],
+                      [2.5, '🐌', 'Very Slow', '2.5s']
+                    ].map(([val, icon, label, hint]) => (
+                      <button
+                        key={String(val)}
+                        type="button"
+                        title={hint}
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerSlideSpeed: val }))}
+                        className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[9px] font-bold transition-all active:scale-90 ${
+                          Number(catalogueLayout.bannerSlideSpeed ?? 0.45) === val
+                            ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        <span className="text-base">{icon}</span>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2.5">
                   <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Auto-Swipe to Next Photo</p>
                   <div className="grid grid-cols-4 gap-1.5">
                     {[
@@ -13285,6 +13314,18 @@ try {
                     className={`rounded-xl px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.bannerStickers !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
                   >
                     {catalogueLayout.bannerStickers !== false ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">👆 Swipe Hint on Refresh</p>
+                    <p className="mt-0.5 text-[8px] text-slate-600">"Swipe for next banner" hint for 1s when screen opens</p>
+                  </div>
+                  <button
+                    onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerSwipeHintEnabled: !(prev.bannerSwipeHintEnabled !== false) }))}
+                    className={`rounded-xl px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.bannerSwipeHintEnabled !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                  >
+                    {catalogueLayout.bannerSwipeHintEnabled !== false ? 'ON' : 'OFF'}
                   </button>
                 </div>
                 <div className="mt-2.5">
