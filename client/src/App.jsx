@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
+﻿import { useEffect, useMemo, useRef, useState, startTransition, Fragment } from 'react';
 import { Lock, Bluetooth, BluetoothConnected, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
 import { OrderTakerApp } from './components/OrderTakerApp';
@@ -772,6 +772,7 @@ function App() {
     bannerStart: 0,
     bannerPhotos: [],
     bannerTextPosition: 'bottom-left',
+    variantPhotos: {},
     menuExtra: ''
   });
   const [cataloguePhotoViewer, setCataloguePhotoViewer] = useState(null);
@@ -812,6 +813,8 @@ function App() {
     setPhotoViewerZoom(1);
     setPhotoViewerPan({ x: 0, y: 0 });
   };
+
+  const getVariantPhotoKey = (product, flavor, variant) => `${product.id}::${flavor?.label || ''}::${variant?.label || ''}`;
   const [catalogueActiveCategory, setCatalogueActiveCategory] = useState(null);
   const [catalogueView, setCatalogueView] = useState('categories');
   const [catalogueHost, setCatalogueHost] = useState('');
@@ -9211,6 +9214,10 @@ try {
     setCatalogueVariantStep('flavors');
   }
 
+  function addCatalogueVariantDirect(product, flavor, variant) {
+    addCatalogueVariantToCart(product, flavor, variant);
+  }
+
   function updateCatalogueCartItem(itemId, change) {
     setCatalogueCart((prev) =>
       prev
@@ -9341,6 +9348,37 @@ try {
     const categoryProducts = catalogueActiveCategory
       ? filteredProducts.filter((p) => catalogueActiveCategory === 'All' || (p.category || '') === catalogueActiveCategory)
       : [];
+    const variantPhotoKey = getVariantPhotoKey;
+    const getCatalogueVariantEntries = (product) => {
+      const variantPhotos = catalogueLayout.variantPhotos || {};
+      const entries = [];
+      (product.flavors || []).forEach((flavor) => {
+        if (flavor.variants && flavor.variants.length > 0) {
+          flavor.variants.forEach((variant) => {
+            entries.push({
+              key: `catvar-${product.id}-${flavor.label}-${variant.label}`,
+              product,
+              flavor,
+              variant,
+              name: `${product.name} (${flavor.label} · ${variant.label})`,
+              price: Number(variant.price) || Number(product.price) || 0,
+              photo: variantPhotos[variantPhotoKey(product, flavor, variant)] || product.photoUrl || product.photo || ''
+            });
+          });
+        } else {
+          entries.push({
+            key: `catvar-${product.id}-${flavor.label}`,
+            product,
+            flavor,
+            variant: null,
+            name: `${product.name} (${flavor.label})`,
+            price: Number(product.price) || 0,
+            photo: variantPhotos[variantPhotoKey(product, flavor, null)] || product.photoUrl || product.photo || ''
+          });
+        }
+      });
+      return entries;
+    };
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/40 text-slate-900">
@@ -9589,8 +9627,10 @@ try {
                     const recommended = (catalogueLayout.recommendedIds || []).includes(product.id);
                     const glow = chefSpecial || recommended;
                     const cartQty = catalogueCart.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0);
+                    const variantEntries = getCatalogueVariantEntries(product);
                     return (
-                    <div key={product.id}
+                    <Fragment key={product.id}>
+                    <div
                       onTouchStart={() => handleCataloguePressStart(product)}
                       onTouchEnd={handleCataloguePressEnd}
                       onTouchCancel={handleCataloguePressEnd}
@@ -9638,6 +9678,37 @@ try {
                         </button>
                       </div>
                     </div>
+                    {variantEntries.map((entry) => {
+                      const vQty = catalogueCart.filter((i) => i.productId === entry.product.id && (i.flavor || '') === entry.flavor.label && (i.weight || '') === (entry.variant?.label || '')).reduce((s, i) => s + i.quantity, 0);
+                      return (
+                        <div key={entry.key}
+                          onClick={() => addCatalogueVariantDirect(entry.product, entry.flavor, entry.variant)}
+                          className="relative cursor-pointer rounded-3xl border-2 border-sky-200 bg-gradient-to-br from-sky-50/80 to-white p-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.14)] active:scale-[0.97]"
+                          style={vQty > 0 ? { borderColor: accent, boxShadow: `0 0 0 2px ${accentSoft}` } : undefined}>
+                          <span className="absolute -top-2 left-2 z-10 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow"
+                            style={{ background: `linear-gradient(135deg, ${accent}, #0ea5e9)` }}>
+                            ✨ {entry.flavor.label}{entry.variant ? ` · ${entry.variant.label}` : ''}
+                          </span>
+                          {vQty > 0 && (
+                            <span className="absolute -left-2 -top-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-xs font-black text-white shadow-lg"
+                              style={{ background: `linear-gradient(135deg, ${accent}, #10b981)` }}>{vQty}</span>
+                          )}
+                          {entry.photo ? (
+                            <img src={entry.photo} alt={entry.name} loading="lazy"
+                              className="w-full h-28 rounded-2xl object-cover mb-1.5 shadow-md" />
+                          ) : (
+                            <div className="w-full h-28 rounded-2xl bg-gradient-to-br from-sky-50 to-white flex items-center justify-center mb-1.5 text-slate-300 text-3xl shadow-md">
+                              🍽️
+                            </div>
+                          )}
+                          <div className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-blue-500 to-indigo-500 leading-tight line-clamp-2 mb-0.5" style={{ textShadow: '0 0 12px rgba(14,165,233,0.3)' }}>{entry.name}</div>
+                          {catalogueLayout.showPrices && (
+                            <div className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600" style={{ textShadow: '0 0 10px rgba(245,158,11,0.4)' }}>{entry.price} PKR</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    </Fragment>
                     );
                   })}
                   {!categoryProducts.length && !catalogueLoading && (
@@ -12555,8 +12626,10 @@ try {
                     const assigned = assignedIds.has(product.id);
                     const stock = product.stock === '' || product.stock === null || product.stock === undefined ? null : Number(product.stock);
                     const out = stock !== null && stock <= 0;
+                    const hasFlavors = Array.isArray(product.flavors) && product.flavors.length > 0;
                     return (
-                      <div key={product.id} className={`flex items-center gap-2.5 rounded-2xl border p-2 transition ${assigned ? 'border-emerald-700 bg-emerald-950/40' : 'border-slate-800 bg-slate-950/60'}`}>
+                      <Fragment key={product.id}>
+                      <div className={`flex items-center gap-2.5 rounded-2xl border p-2 transition ${assigned ? 'border-emerald-700 bg-emerald-950/40' : 'border-slate-800 bg-slate-950/60'}`}>
                         {product.photo ? (
                           <img src={product.photo} alt={product.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
                         ) : (
@@ -12591,6 +12664,60 @@ try {
                           {assigned ? '− Remove' : '+ Add'}
                         </button>
                       </div>
+                      {hasFlavors && (
+                        <div className="ml-2 space-y-1.5 rounded-xl border border-sky-900/50 bg-sky-950/20 p-2">
+                          <p className="text-[8px] font-bold uppercase tracking-wider text-sky-400">Variant Photos — shown on separate cards in the menu</p>
+                          {(product.flavors || []).map((flavor) => {
+                            const variants = (flavor.variants && flavor.variants.length > 0) ? flavor.variants : [null];
+                            return variants.map((variant, vi) => {
+                              const vKey = getVariantPhotoKey(product, flavor, variant);
+                              const vPhoto = (catalogueLayout.variantPhotos || {})[vKey];
+                              const vLabel = flavor.label + (variant ? ` · ${variant.label}` : '');
+                              const vPrice = variant ? (Number(variant.price) || Number(product.price) || 0) : (Number(product.price) || 0);
+                              return (
+                                <div key={vKey} className="flex items-center gap-2 rounded-lg bg-slate-950/60 p-1.5">
+                                  <img src={vPhoto || product.photo} alt={vLabel} className="h-8 w-8 shrink-0 rounded-md object-cover" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-[10px] font-bold text-sky-200">{vLabel}</p>
+                                    <p className="text-[9px] text-slate-400">{vPrice} PKR</p>
+                                  </div>
+                                  <label className="shrink-0 cursor-pointer rounded-lg bg-sky-600 px-2 py-1 text-[9px] font-bold text-white transition hover:bg-sky-500">
+                                    📷 Photo
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={async (e) => {
+                                        const file = e.target.files && e.target.files[0];
+                                        e.target.value = '';
+                                        if (!file) return;
+                                        const dataUrl = await resizeImageFile(file, 600, 0.85);
+                                        setCatalogueLayout((prev) => ({
+                                          ...prev,
+                                          variantPhotos: { ...(prev.variantPhotos || {}), [vKey]: dataUrl }
+                                        }));
+                                      }}
+                                    />
+                                  </label>
+                                  {vPhoto && (
+                                    <button
+                                      onClick={() => setCatalogueLayout((prev) => {
+                                        const next = { ...(prev.variantPhotos || {}) };
+                                        delete next[vKey];
+                                        return { ...prev, variantPhotos: next };
+                                      })}
+                                      className="shrink-0 rounded-lg bg-rose-600 px-2 py-1 text-[9px] font-bold text-white transition hover:bg-rose-500"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            });
+                          })}
+                        </div>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </div>
