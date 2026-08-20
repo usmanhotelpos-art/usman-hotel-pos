@@ -772,6 +772,8 @@ function App() {
     bannerStart: 0,
     bannerPhotos: [],
     bannerTextPosition: 'bottom-left',
+    bannerAnimation: 'slide',
+    bannerAutoSwipe: 0,
     variantPhotos: {},
     menuExtra: ''
   });
@@ -779,6 +781,7 @@ function App() {
   const [photoViewerZoom, setPhotoViewerZoom] = useState(1);
   const [photoViewerPan, setPhotoViewerPan] = useState({ x: 0, y: 0 });
   const [bannerIndex, setBannerIndex] = useState(0);
+  const [bannerSlideDir, setBannerSlideDir] = useState(1);
   const photoPinchRef = useRef(null);
   const photoDragRef = useRef(null);
   const bannerSwipeRef = useRef(null);
@@ -876,6 +879,22 @@ function App() {
     }, 3600);
     return () => clearTimeout(t);
   }, [bannerSwipeHint, cataloguePage]);
+
+  useEffect(() => {
+    if (!cataloguePage) return;
+    const secs = Number(catalogueLayout.bannerAutoSwipe) || 0;
+    const photos = Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : [];
+    const bannerOn = catalogueLayout.bannerEnabled === true && photos.length > 1;
+    if (!bannerOn || secs <= 0) return;
+    const id = setInterval(() => {
+      setBannerSlideDir(1);
+      setBannerIndex((prev) => {
+        const idx = prev % photos.length;
+        return (idx + 1) % photos.length;
+      });
+    }, secs * 1000);
+    return () => clearInterval(id);
+  }, [cataloguePage, catalogueLayout.bannerEnabled, catalogueLayout.bannerAutoSwipe, catalogueLayout.bannerPhotos]);
 
   // Fast loader for the public QR catalogue page: only settings + categories + lightweight products
   async function loadCatalogueData() {
@@ -9403,6 +9422,16 @@ try {
           .cat-float-cart { animation: catMenuRing 2s ease-in-out infinite; }
           @keyframes catBannerIn { from { opacity: 0.35; transform: scale(1.03); } to { opacity: 1; transform: scale(1); } }
           .cat-banner-in { animation: catBannerIn 0.4s ease-out; }
+          @keyframes catInFromRight { from { opacity: 0.4; transform: translateX(60px) scale(1.03); } to { opacity: 1; transform: translateX(0) scale(1); } }
+          @keyframes catInFromLeft { from { opacity: 0.4; transform: translateX(-60px) scale(1.03); } to { opacity: 1; transform: translateX(0) scale(1); } }
+          @keyframes catFadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes catZoomIn { from { opacity: 0.3; transform: scale(0.82); } to { opacity: 1; transform: scale(1); } }
+          @keyframes catFlipIn { from { opacity: 0; transform: perspective(900px) rotateY(26deg) scale(0.95); } to { opacity: 1; transform: perspective(900px) rotateY(0) scale(1); } }
+          .cat-banner-slide-right { animation: catInFromRight 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-slide-left { animation: catInFromLeft 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-fade { animation: catFadeIn 0.5s ease-out; }
+          .cat-banner-zoom { animation: catZoomIn 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-flip { animation: catFlipIn 0.5s cubic-bezier(0.22, 0.8, 0.3, 1); }
           @keyframes catHintFade { 0% { opacity: 0; } 14% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
           .cat-swipe-hint { animation: catHintFade 3.4s ease-in-out forwards; }
         `}</style>
@@ -9455,16 +9484,33 @@ try {
                     'bottom-center': 'bottom-3 left-1/2 -translate-x-1/2 text-center',
                     'bottom-right': 'bottom-3 right-4 text-right'
                   }[textPos] || 'bottom-3 left-4 text-left';
+                  const bannerAnim = catalogueLayout.bannerAnimation || 'slide';
+                  const bannerAnimClass = {
+                    slide: bannerSlideDir === 1 ? 'cat-banner-slide-right' : 'cat-banner-slide-left',
+                    fade: 'cat-banner-fade',
+                    zoom: 'cat-banner-zoom',
+                    flip: 'cat-banner-flip'
+                  }[bannerAnim] || 'cat-banner-slide-right';
+                  const goBanner = (dir) => {
+                    setBannerSlideDir(dir);
+                    setBannerIndex((safeBannerIndex + dir + bannerPhotos.length) % bannerPhotos.length);
+                  };
+                  const goBannerTo = (i) => {
+                    setBannerSlideDir(i > safeBannerIndex ? 1 : -1);
+                    setBannerIndex(i);
+                  };
                   return (
                     <div className="cat-banner mt-5 relative overflow-hidden rounded-3xl border"
                       style={{
                         borderColor: accentStrong,
                         boxShadow: `0 10px 28px ${accentSoft}`,
-                        background: curPhoto ? undefined : `linear-gradient(135deg, ${accent}, #f59e0b)`
+                        background: curPhoto ? undefined : `linear-gradient(135deg, ${accent}, #f59e0b)`,
+                        touchAction: 'pan-y',
+                        overscrollBehavior: 'contain'
                       }}>
                       {curPhoto ? (
                         <>
-                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className="cat-banner-in h-52 w-full select-none object-cover sm:h-64" />
+                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} h-52 w-full select-none object-cover sm:h-64`} />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/25" />
                           {catalogueLayout.bannerText && (
                             <p className={`pointer-events-none absolute max-w-[85%] text-base font-black leading-snug text-white sm:text-lg ${textPosClass}`}
@@ -9485,7 +9531,7 @@ try {
                               const dy = t.clientY - bannerSwipeRef.current.y;
                               bannerSwipeRef.current = null;
                               if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-                              setBannerIndex((safeBannerIndex + (dx < 0 ? 1 : -1) + bannerPhotos.length) % bannerPhotos.length);
+                              goBanner(dx < 0 ? 1 : -1);
                             }}
                             className="absolute inset-0 z-[5] cursor-pointer"
                           />
@@ -9498,7 +9544,7 @@ try {
                                 <button
                                   key={i}
                                   type="button"
-                                  onClick={() => setBannerIndex(i)}
+                                  onClick={() => goBannerTo(i)}
                                   title={`Banner ${i + 1}`}
                                   className={`h-2 rounded-full transition-all ${i === safeBannerIndex ? 'w-5 bg-white' : 'w-2 bg-white/60'}`}
                                 />
@@ -13104,6 +13150,59 @@ try {
                         }`}
                       >
                         {icon}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Slide Animation</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      ['slide', '↔️', 'Slide'],
+                      ['fade', '🌫️', 'Fade'],
+                      ['zoom', '🔍', 'Zoom'],
+                      ['flip', '🔄', 'Flip']
+                    ].map(([val, icon, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerAnimation: val }))}
+                        className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[9px] font-bold transition-all active:scale-90 ${
+                          (catalogueLayout.bannerAnimation || 'slide') === val
+                            ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        <span className="text-base">{icon}</span>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Auto-Swipe to Next Photo</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      [0, 'Off', 'Manual only'],
+                      [3, '3s', 'Every 3 sec'],
+                      [5, '5s', 'Every 5 sec'],
+                      [10, '10s', 'Every 10 sec'],
+                      [20, '20s', 'Every 20 sec'],
+                      [30, '30s', 'Every 30 sec'],
+                      [60, '1 min', 'Every 1 minute']
+                    ].map(([val, label, hint]) => (
+                      <button
+                        key={String(val)}
+                        type="button"
+                        title={hint}
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerAutoSwipe: val }))}
+                        className={`rounded-lg px-1 py-1.5 text-[9px] font-bold transition-all active:scale-90 ${
+                          (catalogueLayout.bannerAutoSwipe || 0) === val
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {label}
                       </button>
                     ))}
                   </div>
