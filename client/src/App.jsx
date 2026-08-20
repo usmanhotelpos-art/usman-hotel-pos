@@ -774,7 +774,7 @@ function App() {
     bannerTextPosition: 'bottom-left',
     bannerAnimation: 'slide',
     bannerAutoSwipe: 0,
-    bannerSlideSpeed: 0.45,
+    bannerSlideSpeed: 1.5,
     bannerShape: 'card',
     bannerStickers: true,
     bannerSwipeHintEnabled: true,
@@ -786,6 +786,8 @@ function App() {
   const [photoViewerPan, setPhotoViewerPan] = useState({ x: 0, y: 0 });
   const [bannerIndex, setBannerIndex] = useState(0);
   const [bannerSlideDir, setBannerSlideDir] = useState(1);
+  const [bannerPrevPhoto, setBannerPrevPhoto] = useState(null);
+  const prevBannerIndexRef = useRef(0);
   const photoPinchRef = useRef(null);
   const photoDragRef = useRef(null);
   const bannerSwipeRef = useRef(null);
@@ -899,6 +901,15 @@ function App() {
     }, secs * 1000);
     return () => clearInterval(id);
   }, [cataloguePage, catalogueLayout.bannerEnabled, catalogueLayout.bannerAutoSwipe, catalogueLayout.bannerPhotos]);
+
+  useEffect(() => {
+    if (prevBannerIndexRef.current === bannerIndex) return;
+    const photos = Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : [];
+    const prev = photos.length > 0 ? photos[prevBannerIndexRef.current % photos.length] : null;
+    const next = photos.length > 0 ? photos[bannerIndex % photos.length] : null;
+    setBannerPrevPhoto(prev && next && prev !== next ? prev : null);
+    prevBannerIndexRef.current = bannerIndex;
+  }, [bannerIndex, catalogueLayout.bannerPhotos]);
 
   // Fast loader for the public QR catalogue page: only settings + categories + lightweight products
   async function loadCatalogueData() {
@@ -9426,16 +9437,20 @@ try {
           .cat-float-cart { animation: catMenuRing 2s ease-in-out infinite; }
           @keyframes catBannerIn { from { opacity: 0.35; transform: scale(1.03); } to { opacity: 1; transform: scale(1); } }
           .cat-banner-in { animation: catBannerIn 0.4s ease-out; }
-          @keyframes catInFromRight { from { opacity: 0.4; transform: translateX(60px) scale(1.03); } to { opacity: 1; transform: translateX(0) scale(1); } }
-          @keyframes catInFromLeft { from { opacity: 0.4; transform: translateX(-60px) scale(1.03); } to { opacity: 1; transform: translateX(0) scale(1); } }
+          @keyframes catInFromRight { from { opacity: 0.5; transform: translateX(100%) scale(1); } to { opacity: 1; transform: translateX(0) scale(1); } }
+          @keyframes catInFromLeft { from { opacity: 0.5; transform: translateX(-100%) scale(1); } to { opacity: 1; transform: translateX(0) scale(1); } }
           @keyframes catFadeIn { from { opacity: 0; } to { opacity: 1; } }
           @keyframes catZoomIn { from { opacity: 0.3; transform: scale(0.82); } to { opacity: 1; transform: scale(1); } }
           @keyframes catFlipIn { from { opacity: 0; transform: perspective(900px) rotateY(26deg) scale(0.95); } to { opacity: 1; transform: perspective(900px) rotateY(0) scale(1); } }
-          .cat-banner-slide-right { animation: catInFromRight 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
-          .cat-banner-slide-left { animation: catInFromLeft 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
-          .cat-banner-fade { animation: catFadeIn 0.5s ease-out; }
-          .cat-banner-zoom { animation: catZoomIn 0.45s cubic-bezier(0.22, 0.8, 0.3, 1); }
-          .cat-banner-flip { animation: catFlipIn 0.5s cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-slide-right { animation: catInFromRight var(--cat-banner-speed, 0.45s) cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-slide-left { animation: catInFromLeft var(--cat-banner-speed, 0.45s) cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-fade { animation: catFadeIn var(--cat-banner-speed, 0.45s) ease-out; }
+          .cat-banner-zoom { animation: catZoomIn var(--cat-banner-speed, 0.45s) cubic-bezier(0.22, 0.8, 0.3, 1); }
+          .cat-banner-flip { animation: catFlipIn var(--cat-banner-speed, 0.45s) cubic-bezier(0.22, 0.8, 0.3, 1); }
+          @keyframes catOutToLeft { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 1; transform: translateX(-100%) scale(1); } }
+          @keyframes catOutToRight { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 1; transform: translateX(100%) scale(1); } }
+          .cat-banner-out-left { animation: catOutToLeft var(--cat-banner-speed, 0.45s) cubic-bezier(0.22, 0.8, 0.3, 1) forwards; }
+          .cat-banner-out-right { animation: catOutToRight var(--cat-banner-speed, 0.45s) cubic-bezier(0.22, 0.8, 0.3, 1) forwards; }
           @keyframes catHintFade { 0% { opacity: 0; } 12% { opacity: 1; } 72% { opacity: 1; } 100% { opacity: 0; } }
           .cat-swipe-hint { animation: catHintFade 1.2s ease-in-out forwards; }
           @keyframes catStickerFloat { 0%,100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-10px) rotate(8deg); } }
@@ -9520,6 +9535,9 @@ try {
                     { e: '⭐', l: '70%', t: '60%', s: 24, d: 1.3 },
                     { e: '🎊', l: '45%', t: '12%', s: 26, d: 1.7 }
                   ];
+                  const bannerSpeed = `${Number(catalogueLayout.bannerSlideSpeed) || 0.45}s`;
+                  const bannerOutClass = bannerSlideDir === 1 ? 'cat-banner-out-left' : 'cat-banner-out-right';
+                  const showPrev = bannerPrevPhoto && bannerAnim === 'slide' && bannerPrevPhoto !== curPhoto;
                   return (
                     <>
                     <div className={`cat-banner mt-5 relative overflow-hidden border ${bannerShapeClass}`}
@@ -9532,8 +9550,12 @@ try {
                       }}>
                       {curPhoto ? (
                         <>
-                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} ${bannerImgSizeClass} select-none object-cover`}
-                            style={{ animationDuration: `${Number(catalogueLayout.bannerSlideSpeed) || 0.45}s` }} />
+                          {showPrev && (
+                            <img src={bannerPrevPhoto} alt="Previous banner" className={`${bannerOutClass} absolute inset-0 h-full w-full select-none object-cover`}
+                              style={{ zIndex: 0, pointerEvents: 'none', animationDuration: bannerSpeed }} />
+                          )}
+                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} ${bannerImgSizeClass} relative z-[1] select-none object-cover`}
+                            style={{ animationDuration: bannerSpeed }} />
                           {catalogueLayout.bannerText && safeBannerIndex !== 0 && (
                             <p className={`pointer-events-none absolute max-w-[85%] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 text-lg font-black leading-snug sm:text-2xl ${textPosClass}`}
                               style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,0.7))' }}>{catalogueLayout.bannerText}</p>
@@ -13242,8 +13264,8 @@ try {
                     {[
                       [0.2, '⚡', 'Fast', '0.2s'],
                       [0.45, '🚶', 'Normal', '0.45s'],
-                      [1.2, '🐢', 'Slow', '1.2s'],
-                      [2.5, '🐌', 'Very Slow', '2.5s']
+                      [1.5, '🐢', 'Slow', '1.5s'],
+                      [3.5, '🐌', 'Very Slow', '3.5s']
                     ].map(([val, icon, label, hint]) => (
                       <button
                         key={String(val)}
@@ -13251,7 +13273,7 @@ try {
                         title={hint}
                         onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerSlideSpeed: val }))}
                         className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[9px] font-bold transition-all active:scale-90 ${
-                          Number(catalogueLayout.bannerSlideSpeed ?? 0.45) === val
+                          Number(catalogueLayout.bannerSlideSpeed ?? 1.5) === val
                             ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow'
                             : 'bg-slate-800 text-slate-400'
                         }`}
