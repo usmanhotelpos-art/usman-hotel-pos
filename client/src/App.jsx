@@ -771,6 +771,7 @@ function App() {
     bannerDays: 7,
     bannerStart: 0,
     bannerPhotos: [],
+    bannerTextPosition: 'bottom-left',
     menuExtra: ''
   });
   const [cataloguePhotoViewer, setCataloguePhotoViewer] = useState(null);
@@ -779,6 +780,15 @@ function App() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const photoPinchRef = useRef(null);
   const photoDragRef = useRef(null);
+  const bannerSwipeRef = useRef(null);
+  const [bannerSwipeHint, setBannerSwipeHint] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      return window.sessionStorage.getItem('posCatBannerSwipeHint') !== '1';
+    } catch {
+      return true;
+    }
+  });
 
   const openPhotoViewer = (photos, index = 0) => {
     if (!photos || !photos.length) return;
@@ -850,6 +860,19 @@ function App() {
     if (!cataloguePage) return;
     loadCatalogueData();
   }, [cataloguePage]);
+
+  useEffect(() => {
+    if (!bannerSwipeHint || !cataloguePage) return;
+    const t = setTimeout(() => {
+      setBannerSwipeHint(false);
+      try {
+        window.sessionStorage.setItem('posCatBannerSwipeHint', '1');
+      } catch {
+        // ignore
+      }
+    }, 3600);
+    return () => clearTimeout(t);
+  }, [bannerSwipeHint, cataloguePage]);
 
   // Fast loader for the public QR catalogue page: only settings + categories + lightweight products
   async function loadCatalogueData() {
@@ -9340,6 +9363,10 @@ try {
           .cat-screen-in { animation: catScreenIn 0.4s ease-out; }
           .cat-glow-title { animation: catTitleGlow 2s ease-in-out infinite; color: var(--accent); }
           .cat-float-cart { animation: catMenuRing 2s ease-in-out infinite; }
+          @keyframes catBannerIn { from { opacity: 0.35; transform: scale(1.03); } to { opacity: 1; transform: scale(1); } }
+          .cat-banner-in { animation: catBannerIn 0.4s ease-out; }
+          @keyframes catHintFade { 0% { opacity: 0; } 14% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+          .cat-swipe-hint { animation: catHintFade 3.4s ease-in-out forwards; }
         `}</style>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="space-y-6">
@@ -9380,6 +9407,16 @@ try {
                   if (!showBanner) return null;
                   const safeBannerIndex = bannerPhotos.length > 0 ? bannerIndex % bannerPhotos.length : 0;
                   const curPhoto = bannerPhotos.length > 0 ? bannerPhotos[safeBannerIndex] : null;
+                  const textPos = catalogueLayout.bannerTextPosition || 'bottom-left';
+                  const textPosClass = {
+                    'top-left': 'left-4 top-3 text-left',
+                    'top-center': 'left-1/2 top-3 -translate-x-1/2 text-center',
+                    'top-right': 'right-4 top-3 text-right',
+                    'center': 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center',
+                    'bottom-left': 'bottom-3 left-4 text-left',
+                    'bottom-center': 'bottom-3 left-1/2 -translate-x-1/2 text-center',
+                    'bottom-right': 'bottom-3 right-4 text-right'
+                  }[textPos] || 'bottom-3 left-4 text-left';
                   return (
                     <div className="cat-banner mt-5 relative overflow-hidden rounded-3xl border"
                       style={{
@@ -9389,32 +9426,29 @@ try {
                       }}>
                       {curPhoto ? (
                         <>
-                          <img src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className="h-52 w-full select-none object-cover sm:h-64" />
+                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className="cat-banner-in h-52 w-full select-none object-cover sm:h-64" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/25" />
                           {catalogueLayout.bannerText && (
-                            <p className="pointer-events-none absolute bottom-3 left-4 right-4 text-base font-black leading-snug text-white sm:text-lg"
+                            <p className={`pointer-events-none absolute max-w-[85%] text-base font-black leading-snug text-white sm:text-lg ${textPosClass}`}
                               style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>{catalogueLayout.bannerText}</p>
-                          )}
-                          {bannerPhotos.length > 1 && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setBannerIndex((safeBannerIndex - 1 + bannerPhotos.length) % bannerPhotos.length)}
-                                title="Previous banner"
-                                className="absolute left-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-xl font-black text-slate-800 shadow-lg transition hover:bg-white active:scale-90"
-                              >‹</button>
-                              <button
-                                type="button"
-                                onClick={() => setBannerIndex((safeBannerIndex + 1) % bannerPhotos.length)}
-                                title="Next banner"
-                                className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-xl font-black text-slate-800 shadow-lg transition hover:bg-white active:scale-90"
-                              >›</button>
-                            </>
                           )}
                           <button
                             type="button"
                             title="View full size"
                             onClick={() => openPhotoViewer(bannerPhotos, safeBannerIndex)}
+                            onTouchStart={(e) => {
+                              const t = e.touches[0];
+                              bannerSwipeRef.current = { x: t.clientX, y: t.clientY };
+                            }}
+                            onTouchEnd={(e) => {
+                              if (!bannerSwipeRef.current || bannerPhotos.length <= 1) return;
+                              const t = e.changedTouches[0];
+                              const dx = t.clientX - bannerSwipeRef.current.x;
+                              const dy = t.clientY - bannerSwipeRef.current.y;
+                              bannerSwipeRef.current = null;
+                              if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+                              setBannerIndex((safeBannerIndex + (dx < 0 ? 1 : -1) + bannerPhotos.length) % bannerPhotos.length);
+                            }}
                             className="absolute inset-0 z-[5] cursor-pointer"
                           />
                           <span className="absolute bottom-3 right-3 z-10 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-white">
@@ -9431,6 +9465,13 @@ try {
                                   className={`h-2 rounded-full transition-all ${i === safeBannerIndex ? 'w-5 bg-white' : 'w-2 bg-white/60'}`}
                                 />
                               ))}
+                            </div>
+                          )}
+                          {bannerSwipeHint && bannerPhotos.length > 1 && (
+                            <div className="cat-swipe-hint pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                              <span className="rounded-full bg-black/55 px-5 py-2.5 text-sm font-black text-white shadow-xl backdrop-blur-sm">
+                                ‹  Swipe for next banner  ›
+                              </span>
                             </div>
                           )}
                         </>
@@ -12891,7 +12932,7 @@ try {
                     {catalogueLayout.bannerEnabled ? 'Banner ON' : 'Banner OFF'}
                   </button>
                 </div>
-                <p className="mb-2 text-[9px] text-slate-500">Photos are shown as the banner image (no background color). Use the left/right arrows on the banner to scroll between photos. Tapping a photo opens it full screen with zoom.</p>
+                <p className="mb-2 text-[9px] text-slate-500">Photos are shown as the banner image (no background color). Swipe left/right on the banner to scroll between photos. Tapping a photo opens it full screen with zoom.</p>
                 <div>
                   <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Banner Text</p>
                   <input
@@ -12913,7 +12954,35 @@ try {
                   />
                 </div>
                 <div className="mt-2.5">
-                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — shown as banner images with left/right scroll arrows <span className="normal-case text-slate-600">(max 5)</span></p>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Text Position on Banner</p>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {[
+                      ['top-left', '↖', 'Top Left'],
+                      ['top-center', '↑', 'Top Center'],
+                      ['top-right', '↗', 'Top Right'],
+                      ['center', '●', 'Center'],
+                      ['bottom-left', '↙', 'Bottom Left'],
+                      ['bottom-center', '↓', 'Bottom Center'],
+                      ['bottom-right', '↘', 'Bottom Right']
+                    ].map(([val, icon, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        title={label}
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerTextPosition: val }))}
+                        className={`flex h-9 items-center justify-center rounded-lg text-xs font-bold transition-all active:scale-90 ${
+                          (catalogueLayout.bannerTextPosition || 'bottom-left') === val
+                            ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {icon}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — shown as banner images, swipe to scroll <span className="normal-case text-slate-600">(max 5)</span></p>
                   <div className="grid grid-cols-3 gap-2">
                     {(Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : []).map((photo, i) => (
                       <div key={i} className="rounded-xl border border-slate-700 bg-slate-900 p-1.5">
