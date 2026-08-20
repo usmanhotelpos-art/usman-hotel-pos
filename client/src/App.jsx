@@ -770,11 +770,38 @@ function App() {
     bannerText: '',
     bannerDays: 7,
     bannerStart: 0,
-    bannerPhotos: []
+    bannerPhotos: [],
+    menuExtra: ''
   });
-  const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
-  const [catalogueMenuSide, setCatalogueMenuSide] = useState('front');
-  const [catalogueBannerPhoto, setCatalogueBannerPhoto] = useState(null);
+  const [cataloguePhotoViewer, setCataloguePhotoViewer] = useState(null);
+  const [photoViewerZoom, setPhotoViewerZoom] = useState(1);
+  const [photoViewerPan, setPhotoViewerPan] = useState({ x: 0, y: 0 });
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const photoPinchRef = useRef(null);
+  const photoDragRef = useRef(null);
+
+  const openPhotoViewer = (photos, index = 0) => {
+    if (!photos || !photos.length) return;
+    setCataloguePhotoViewer({ photos, index: Math.min(Math.max(0, index), photos.length - 1) });
+    setPhotoViewerZoom(1);
+    setPhotoViewerPan({ x: 0, y: 0 });
+  };
+
+  const closePhotoViewer = () => {
+    setCataloguePhotoViewer(null);
+    setPhotoViewerZoom(1);
+    setPhotoViewerPan({ x: 0, y: 0 });
+  };
+
+  const stepPhotoViewer = (dir) => {
+    setCataloguePhotoViewer((prev) => {
+      if (!prev) return prev;
+      const len = prev.photos.length;
+      return { ...prev, index: (prev.index + dir + len) % len };
+    });
+    setPhotoViewerZoom(1);
+    setPhotoViewerPan({ x: 0, y: 0 });
+  };
   const [catalogueActiveCategory, setCatalogueActiveCategory] = useState(null);
   const [catalogueView, setCatalogueView] = useState('categories');
   const [catalogueHost, setCatalogueHost] = useState('');
@@ -6188,16 +6215,7 @@ try {
           </div>
         )}
 
-        {catalogueBannerPhoto && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" onClick={() => setCatalogueBannerPhoto(null)}>
-            <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" />
-            <div className="relative">
-              <img src={catalogueBannerPhoto} alt="Banner photo" className="max-h-[85vh] max-w-full rounded-3xl object-contain shadow-2xl" />
-              <button onClick={() => setCatalogueBannerPhoto(null)} className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800 shadow-xl">✕</button>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
     );
   }
 
@@ -9289,10 +9307,8 @@ try {
     const accent = catalogueLayout.accentColor || '#10b981';
     const accentSoft = `${accent}44`;
     const accentStrong = `${accent}cc`;
-    const showMenuCircle = catalogueLayout.showMenuButton !== false && (catalogueLayout.menuFront || settings.logo || settings.posHeaderPhoto || settings.riderAppLogo);
-    const menuCircleSrc = catalogueLayout.menuFront || settings.logo || settings.posHeaderPhoto || settings.riderAppLogo;
     const hotelLogo = settings.logo || settings.posHeaderPhoto || settings.riderAppLogo;
-    const menuImageSrc = catalogueMenuSide === 'back' && catalogueLayout.menuBack ? catalogueLayout.menuBack : catalogueLayout.menuFront;
+    const menuPhotos = [catalogueLayout.menuFront, catalogueLayout.menuBack, catalogueLayout.menuExtra].filter(Boolean);
     const blockCategories = catalogueAssignedCategories.length
       ? catalogueAssignedCategories
       : posCategories.map((c) => c.name);
@@ -9315,11 +9331,6 @@ try {
           .cat-block-card:active { animation: catClickPop 0.3s ease-out; }
           .cat-block-card.active { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; }
           .cat-menu-circle { animation: catMenuRing 2.6s ease-in-out infinite; }
-          .cat-flip-scene { perspective: 1200px; }
-          .cat-flip-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
-          .cat-flip-inner.flipped { transform: rotateY(180deg); }
-          .cat-flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-          .cat-flip-back { transform: rotateY(180deg); }
           @keyframes catItemGlow { 0%,100% { box-shadow: 0 0 10px var(--accent-soft), 0 0 0 2px var(--accent-soft); } 50% { box-shadow: 0 0 26px var(--accent-strong), 0 0 0 3px var(--accent-strong); } }
           @keyframes catRecText { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
           @keyframes catScreenIn { 0% { opacity: 0; transform: translateY(18px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
@@ -9336,28 +9347,28 @@ try {
               <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-soft">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    {catalogueLayout.showLogo !== false && hotelLogo && (
-                      <img src={hotelLogo} alt="Logo" className="h-20 w-20 shrink-0 rounded-full border-2 object-cover shadow-lg"
-                        style={{ borderColor: accent, boxShadow: `0 0 0 4px ${accentSoft}, 0 8px 24px ${accentSoft}` }} />
+                    {catalogueLayout.showLogo !== false && (hotelLogo || menuPhotos.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => { if (menuPhotos.length > 0 && catalogueLayout.showMenuButton !== false) openPhotoViewer(menuPhotos, 0); }}
+                        title="Click to view attached menu photos"
+                        className="cat-menu-circle relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 bg-white"
+                        style={{ borderColor: accent, boxShadow: `0 0 0 4px ${accentSoft}, 0 8px 24px ${accentSoft}` }}
+                      >
+                        {hotelLogo ? (
+                          <img src={hotelLogo} alt="Logo" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">📖</span>
+                        )}
+                      </button>
                     )}
                     <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Online Menu</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]"
+                        style={{ color: accent }}>Click on logo for main menu</p>
                       <h1 className="mt-2 text-3xl font-semibold text-slate-900">{catalogueLayout.pageTitle}</h1>
                       <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{catalogueLayout.pageDescription}</p>
                     </div>
                   </div>
-                  {showMenuCircle && (
-                    <button
-                      onClick={() => { setCatalogueMenuOpen(true); setCatalogueMenuSide('front'); }}
-                      title="View attached menu"
-                      className="cat-menu-circle relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white"
-                      style={{ '--accent': accent, '--accent-soft': accentSoft }}
-                    >
-                      <img src={menuCircleSrc} alt="Menu" className="h-full w-full object-cover" />
-                      <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] shadow"
-                        style={{ background: accent, color: '#fff' }}>📖</span>
-                    </button>
-                  )}
                 </div>
 
                 {(() => {
@@ -9367,25 +9378,68 @@ try {
                   const bannerPhotos = Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : [];
                   const showBanner = catalogueLayout.bannerEnabled === true && (catalogueLayout.bannerText || bannerPhotos.length > 0) && !bannerExpired;
                   if (!showBanner) return null;
+                  const safeBannerIndex = bannerPhotos.length > 0 ? bannerIndex % bannerPhotos.length : 0;
+                  const curPhoto = bannerPhotos.length > 0 ? bannerPhotos[safeBannerIndex] : null;
                   return (
-                    <div className="cat-banner mt-5 flex flex-wrap items-center justify-between gap-4 rounded-3xl border p-4"
-                      style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, borderColor: accentStrong, boxShadow: `0 10px 28px ${accentSoft}` }}>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/80">📢 Announcement</p>
-                        {catalogueLayout.bannerText ? (
-                          <p className="mt-1 text-lg font-black leading-snug text-white" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.25)' }}>{catalogueLayout.bannerText}</p>
-                        ) : null}
-                      </div>
-                      {bannerPhotos.length > 0 && (
-                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5">
-                          {bannerPhotos.map((photo, i) => (
-                            <button key={i} type="button" title="View photo"
-                              onClick={() => setCatalogueBannerPhoto(photo)}
-                              className="h-14 w-14 overflow-hidden bg-white shadow-lg transition active:scale-90"
-                              style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}>
-                              <img src={photo} alt={`Banner ${i + 1}`} className="h-full w-full object-cover" />
-                            </button>
-                          ))}
+                    <div className="cat-banner mt-5 relative overflow-hidden rounded-3xl border"
+                      style={{
+                        borderColor: accentStrong,
+                        boxShadow: `0 10px 28px ${accentSoft}`,
+                        background: curPhoto ? undefined : `linear-gradient(135deg, ${accent}, #f59e0b)`
+                      }}>
+                      {curPhoto ? (
+                        <>
+                          <img src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className="h-52 w-full select-none object-cover sm:h-64" />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/25" />
+                          {catalogueLayout.bannerText && (
+                            <p className="pointer-events-none absolute bottom-3 left-4 right-4 text-base font-black leading-snug text-white sm:text-lg"
+                              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>{catalogueLayout.bannerText}</p>
+                          )}
+                          {bannerPhotos.length > 1 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setBannerIndex((safeBannerIndex - 1 + bannerPhotos.length) % bannerPhotos.length)}
+                                title="Previous banner"
+                                className="absolute left-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-xl font-black text-slate-800 shadow-lg transition hover:bg-white active:scale-90"
+                              >‹</button>
+                              <button
+                                type="button"
+                                onClick={() => setBannerIndex((safeBannerIndex + 1) % bannerPhotos.length)}
+                                title="Next banner"
+                                className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-xl font-black text-slate-800 shadow-lg transition hover:bg-white active:scale-90"
+                              >›</button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            title="View full size"
+                            onClick={() => openPhotoViewer(bannerPhotos, safeBannerIndex)}
+                            className="absolute inset-0 z-[5] cursor-pointer"
+                          />
+                          <span className="absolute bottom-3 right-3 z-10 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-white">
+                            {safeBannerIndex + 1} / {bannerPhotos.length}
+                          </span>
+                          {bannerPhotos.length > 1 && (
+                            <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5">
+                              {bannerPhotos.map((_, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => setBannerIndex(i)}
+                                  title={`Banner ${i + 1}`}
+                                  className={`h-2 rounded-full transition-all ${i === safeBannerIndex ? 'w-5 bg-white' : 'w-2 bg-white/60'}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/80">📢 Announcement</p>
+                          {catalogueLayout.bannerText ? (
+                            <p className="mt-1 text-lg font-black leading-snug text-white" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.25)' }}>{catalogueLayout.bannerText}</p>
+                          ) : null}
                         </div>
                       )}
                     </div>
@@ -9455,14 +9509,14 @@ try {
                       <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-xs font-black"
                         style={{ color: accent }}>{cartCount}</span>
                     </button>
-                    {showMenuCircle && (
+                    {menuPhotos.length > 0 && catalogueLayout.showMenuButton !== false && (
                       <button
-                        onClick={() => { setCatalogueMenuOpen(true); setCatalogueMenuSide('front'); }}
-                        title="View attached menu"
-                        className="cat-menu-circle relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-md"
-                        style={{ '--accent': accent, '--accent-soft': accentSoft }}
+                        onClick={() => openPhotoViewer(menuPhotos, 0)}
+                        title="View attached menu photos"
+                        className="flex items-center gap-1 rounded-full px-3.5 py-2.5 text-sm font-black text-white shadow-md transition-all active:scale-95"
+                        style={{ background: accent }}
                       >
-                        <img src={menuCircleSrc} alt="Menu" className="h-full w-full object-cover" />
+                        📖 Menu
                       </button>
                     )}
                   </div>
@@ -9737,47 +9791,96 @@ try {
           </button>
         )}
 
-        {catalogueMenuOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setCatalogueMenuOpen(false)} />
-            <div className="relative w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-bold text-slate-800">📖 Attached Menu</p>
-                <button onClick={() => setCatalogueMenuOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">✕</button>
-              </div>
-              <div className="cat-flip-scene mx-auto h-[420px] w-full max-w-[300px]">
-                <div className={`cat-flip-inner ${catalogueMenuSide === 'back' ? 'flipped' : ''}`}>
-                  <div className="cat-flip-face overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                    {menuImageSrc ? (
-                      <img src={menuImageSrc} alt="Menu front" className="h-full w-full object-contain" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-slate-400">No front image</div>
-                    )}
-                  </div>
-                  <div className="cat-flip-face cat-flip-back overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                    {catalogueLayout.menuBack ? (
-                      <img src={catalogueLayout.menuBack} alt="Menu back" className="h-full w-full object-contain" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-slate-400">No back image</div>
-                    )}
-                  </div>
+        {cataloguePhotoViewer && (() => {
+          const photos = cataloguePhotoViewer.photos;
+          const idx = cataloguePhotoViewer.index;
+          const onImgWheel = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setPhotoViewerZoom((z) => Math.min(6, Math.max(1, +(z + (e.deltaY < 0 ? 0.25 : -0.25)).toFixed(2))));
+          };
+          const onImgTouchStart = (e) => {
+            if (e.touches.length === 2) {
+              const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+              photoPinchRef.current = { d, zoom: photoViewerZoom };
+            }
+          };
+          const onImgTouchMove = (e) => {
+            if (e.touches.length === 2 && photoPinchRef.current) {
+              const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+              const ratio = d / photoPinchRef.current.d;
+              setPhotoViewerZoom((z) => Math.min(6, Math.max(1, +(photoPinchRef.current.zoom * ratio).toFixed(2))));
+            }
+          };
+          const onImgDragStart = (e) => {
+            photoDragRef.current = { x: e.clientX, y: e.clientY, pan: photoViewerPan };
+          };
+          const onImgDragMove = (e) => {
+            if (!photoDragRef.current) return;
+            setPhotoViewerPan({
+              x: photoDragRef.current.pan.x + (e.clientX - photoDragRef.current.x),
+              y: photoDragRef.current.pan.y + (e.clientY - photoDragRef.current.y)
+            });
+          };
+          const endImgDrag = () => { photoDragRef.current = null; photoPinchRef.current = null; };
+          return (
+            <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" onTouchEnd={endImgDrag}>
+              <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={closePhotoViewer} />
+              <div className="relative flex h-full max-h-[92vh] w-full max-w-4xl flex-col items-center justify-center overflow-hidden">
+                <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between p-3">
+                  <span className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-bold text-white">{idx + 1} / {photos.length}</span>
+                  <button onClick={closePhotoViewer} className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800 shadow-xl transition hover:bg-slate-200">✕</button>
+                </div>
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => stepPhotoViewer(-1)}
+                      title="Previous"
+                      className="absolute left-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-2xl font-black text-slate-800 shadow-xl transition hover:bg-white active:scale-90"
+                    >‹</button>
+                    <button
+                      onClick={() => stepPhotoViewer(1)}
+                      title="Next"
+                      className="absolute right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-2xl font-black text-slate-800 shadow-xl transition hover:bg-white active:scale-90"
+                    >›</button>
+                  </>
+                )}
+                <img
+                  src={photos[idx]}
+                  alt={`Photo ${idx + 1}`}
+                  className="max-h-[80vh] max-w-full touch-none select-none rounded-2xl object-contain shadow-2xl"
+                  style={{
+                    transform: `scale(${photoViewerZoom}) translate(${photoViewerPan.x}px, ${photoViewerPan.y}px)`,
+                    transition: photoDragRef.current ? 'none' : 'transform 0.15s ease',
+                    cursor: photoViewerZoom > 1 ? 'grab' : 'zoom-in'
+                  }}
+                  onClick={(e) => { e.stopPropagation(); }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setPhotoViewerZoom((z) => (z > 1 ? 1 : 2.5));
+                    setPhotoViewerPan({ x: 0, y: 0 });
+                  }}
+                  onWheel={onImgWheel}
+                  onTouchStart={onImgTouchStart}
+                  onTouchMove={onImgTouchMove}
+                  onMouseDown={onImgDragStart}
+                  onMouseMove={onImgDragMove}
+                  onMouseUp={endImgDrag}
+                  onMouseLeave={endImgDrag}
+                />
+                <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/70 p-1.5">
+                  <button onClick={(e) => { e.stopPropagation(); setPhotoViewerZoom((z) => Math.max(1, +(z - 0.25).toFixed(2))); }} title="Zoom out"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800 active:scale-90">−</button>
+                  <span className="min-w-[52px] text-center text-xs font-bold text-white">{Math.round(photoViewerZoom * 100)}%</span>
+                  <button onClick={(e) => { e.stopPropagation(); setPhotoViewerZoom((z) => Math.min(6, +(z + 0.25).toFixed(2))); }} title="Zoom in"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800 active:scale-90">+</button>
+                  <button onClick={(e) => { e.stopPropagation(); setPhotoViewerZoom(1); setPhotoViewerPan({ x: 0, y: 0 }); }} title="Reset zoom"
+                    className="flex h-9 items-center justify-center rounded-full bg-white px-2.5 text-xs font-black text-slate-800 active:scale-90">⟲</button>
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-center gap-3">
-                <button
-                  onClick={() => setCatalogueMenuSide('front')}
-                  className={`rounded-full px-5 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueMenuSide === 'front' ? 'text-white shadow' : 'bg-slate-100 text-slate-600'}`}
-                  style={catalogueMenuSide === 'front' ? { background: accent } : undefined}
-                >Front</button>
-                <button
-                  onClick={() => setCatalogueMenuSide('back')}
-                  className={`rounded-full px-5 py-2 text-xs font-bold transition-all active:scale-95 ${catalogueMenuSide === 'back' ? 'text-white shadow' : 'bg-slate-100 text-slate-600'}`}
-                  style={catalogueMenuSide === 'back' ? { background: accent } : undefined}
-                >Back</button>
-              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {catalogueVariantProduct && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -12730,16 +12833,17 @@ try {
 
               <div className="mt-3 rounded-2xl border border-slate-700 bg-slate-950 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">🖼️ Attached Menu (PNG) — Front & Back</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">🖼️ Menu Photos (PNG) — up to 3, opened from the logo circle</p>
                   <button
                     onClick={() => setCatalogueLayout((prev) => ({ ...prev, showMenuButton: !prev.showMenuButton }))}
                     className={`rounded-xl px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.showMenuButton !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
                   >
-                    {catalogueLayout.showMenuButton !== false ? 'Circle Button Shown' : 'Circle Button Hidden'}
+                    {catalogueLayout.showMenuButton !== false ? 'Menu Photos Enabled' : 'Menu Photos Disabled'}
                   </button>
                 </div>
+                <p className="mb-2 text-[9px] text-slate-500">On the customer menu, the logo is shown in a circle. When the customer taps the logo, these photos open full screen with zoom & scroll arrows.</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {[['menuFront', '📄 Front', 'Front image'], ['menuBack', '📄 Back', 'Back image']].map(([key, label, emptyText]) => (
+                  {[['menuFront', '📄 Photo 1', 'Photo 1'], ['menuBack', '📄 Photo 2', 'Photo 2'], ['menuExtra', '📄 Photo 3', 'Photo 3']].map(([key, label, emptyText]) => (
                     <div key={key} className="rounded-xl border border-slate-700 bg-slate-900 p-2">
                       <p className="mb-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
                       <div className="mx-auto flex h-28 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-800">
@@ -12787,6 +12891,7 @@ try {
                     {catalogueLayout.bannerEnabled ? 'Banner ON' : 'Banner OFF'}
                   </button>
                 </div>
+                <p className="mb-2 text-[9px] text-slate-500">Photos are shown as the banner image (no background color). Use the left/right arrows on the banner to scroll between photos. Tapping a photo opens it full screen with zoom.</p>
                 <div>
                   <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Banner Text</p>
                   <input
@@ -12808,11 +12913,11 @@ try {
                   />
                 </div>
                 <div className="mt-2.5">
-                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — small star shapes, tap to view large <span className="normal-case text-slate-600">(min 2, max 5)</span></p>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — shown as banner images with left/right scroll arrows <span className="normal-case text-slate-600">(max 5)</span></p>
                   <div className="grid grid-cols-3 gap-2">
                     {(Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : []).map((photo, i) => (
                       <div key={i} className="rounded-xl border border-slate-700 bg-slate-900 p-1.5">
-                        <div className="flex h-16 w-full items-center justify-center overflow-hidden bg-slate-800" style={{ clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' }}>
+                        <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-800">
                           <img src={photo} alt={`Banner ${i + 1}`} className="h-full w-full object-cover" />
                         </div>
                         <button
