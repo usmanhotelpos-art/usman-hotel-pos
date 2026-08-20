@@ -774,6 +774,8 @@ function App() {
     bannerTextPosition: 'bottom-left',
     bannerAnimation: 'slide',
     bannerAutoSwipe: 0,
+    bannerShape: 'card',
+    bannerStickers: true,
     variantPhotos: {},
     menuExtra: ''
   });
@@ -9434,6 +9436,8 @@ try {
           .cat-banner-flip { animation: catFlipIn 0.5s cubic-bezier(0.22, 0.8, 0.3, 1); }
           @keyframes catHintFade { 0% { opacity: 0; } 14% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
           .cat-swipe-hint { animation: catHintFade 3.4s ease-in-out forwards; }
+          @keyframes catStickerFloat { 0%,100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-14px) rotate(8deg); } }
+          .cat-banner-sticker { animation: catStickerFloat 2.6s ease-in-out infinite; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
         `}</style>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="space-y-6">
@@ -9499,8 +9503,23 @@ try {
                     setBannerSlideDir(i > safeBannerIndex ? 1 : -1);
                     setBannerIndex(i);
                   };
+                  const bannerShape = catalogueLayout.bannerShape || 'card';
+                  const bannerShapeClass = {
+                    card: 'rounded-3xl',
+                    rectangle: 'rounded-none',
+                    square: 'rounded-2xl',
+                    circle: 'rounded-full'
+                  }[bannerShape] || 'rounded-3xl';
+                  const bannerImgSizeClass = (bannerShape === 'square' || bannerShape === 'circle') ? 'aspect-square w-full' : 'h-52 w-full sm:h-64';
+                  const bannerStickers = [
+                    { e: '🎉', l: '6%', t: '16%', s: 30, d: 0 },
+                    { e: '✨', l: '16%', t: '58%', s: 22, d: 0.5 },
+                    { e: '🔥', l: '82%', t: '18%', s: 28, d: 0.9 },
+                    { e: '⭐', l: '70%', t: '60%', s: 24, d: 1.3 },
+                    { e: '🎊', l: '45%', t: '12%', s: 26, d: 1.7 }
+                  ];
                   return (
-                    <div className="cat-banner mt-5 relative overflow-hidden rounded-3xl border"
+                    <div className={`cat-banner mt-5 relative overflow-hidden border ${bannerShapeClass}`}
                       style={{
                         borderColor: accentStrong,
                         boxShadow: `0 10px 28px ${accentSoft}`,
@@ -9510,11 +9529,20 @@ try {
                       }}>
                       {curPhoto ? (
                         <>
-                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} h-52 w-full select-none object-cover sm:h-64`} />
-                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/25" />
+                          <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} ${bannerImgSizeClass} select-none object-cover`} />
                           {catalogueLayout.bannerText && (
-                            <p className={`pointer-events-none absolute max-w-[85%] text-base font-black leading-snug text-white sm:text-lg ${textPosClass}`}
-                              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>{catalogueLayout.bannerText}</p>
+                            <p className={`pointer-events-none absolute max-w-[85%] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 text-lg font-black leading-snug sm:text-2xl ${textPosClass}`}
+                              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,0.7))' }}>{catalogueLayout.bannerText}</p>
+                          )}
+                          {catalogueLayout.bannerStickers !== false && (
+                            <div className="cat-banner-stickers pointer-events-none absolute inset-0 z-[6] overflow-hidden">
+                              {bannerStickers.map((st, i) => (
+                                <span key={i} className="cat-banner-sticker absolute select-none"
+                                  style={{ left: st.l, top: st.t, fontSize: `${st.s}px`, animationDelay: `${st.d}s`, animationDuration: `${2.4 + (i % 3) * 0.5}s` }}>
+                                  {st.e}
+                                </span>
+                              ))}
+                            </div>
                           )}
                           <button
                             type="button"
@@ -10002,6 +10030,21 @@ try {
                       className="absolute right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-2xl font-black text-slate-800 shadow-xl transition hover:bg-white active:scale-90"
                     >›</button>
                   </>
+                )}
+                {catalogueLayout.bannerStickers !== false && (
+                  <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+                    {[
+                      { e: '🎉', l: '8%', t: '12%', s: 34, d: 0 },
+                      { e: '✨', l: '86%', t: '14%', s: 28, d: 0.6 },
+                      { e: '⭐', l: '12%', t: '78%', s: 26, d: 1.1 },
+                      { e: '🎊', l: '84%', t: '76%', s: 30, d: 1.6 }
+                    ].map((st, i) => (
+                      <span key={i} className="cat-banner-sticker absolute select-none"
+                        style={{ left: st.l, top: st.t, fontSize: `${st.s}px`, animationDelay: `${st.d}s`, animationDuration: `${2.6 + (i % 2) * 0.5}s` }}>
+                        {st.e}
+                      </span>
+                    ))}
+                  </div>
                 )}
                 <img
                   src={photos[idx]}
@@ -13105,7 +13148,7 @@ try {
                     {catalogueLayout.bannerEnabled ? 'Banner ON' : 'Banner OFF'}
                   </button>
                 </div>
-                <p className="mb-2 text-[9px] text-slate-500">Photos are shown as the banner image (no background color). Swipe left/right on the banner to scroll between photos. Tapping a photo opens it full screen with zoom.</p>
+                <p className="mb-2 text-[9px] text-slate-500">Photos are shown full HD as the banner image (no background color or fade). Swipe left/right on the banner to scroll. Banner text shows in colorful bold. Tapping a photo opens it full screen with zoom & floating stickers.</p>
                 <div>
                   <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Banner Text</p>
                   <input
@@ -13208,7 +13251,44 @@ try {
                   </div>
                 </div>
                 <div className="mt-2.5">
-                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — shown as banner images, swipe to scroll <span className="normal-case text-slate-600">(max 5)</span></p>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Banner Shape</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      ['card', '🃏', 'Card'],
+                      ['rectangle', '▭', 'Rectangle'],
+                      ['square', '⬛', 'Square'],
+                      ['circle', '⭕', 'Circle']
+                    ].map(([val, icon, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerShape: val }))}
+                        className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[9px] font-bold transition-all active:scale-90 ${
+                          (catalogueLayout.bannerShape || 'card') === val
+                            ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        <span className="text-base">{icon}</span>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2.5 flex items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">🎉 Animated Stickers on Banner & Popup</p>
+                    <p className="mt-0.5 text-[8px] text-slate-600">Floating emoji stickers shown over the banner photo</p>
+                  </div>
+                  <button
+                    onClick={() => setCatalogueLayout((prev) => ({ ...prev, bannerStickers: !(prev.bannerStickers !== false) }))}
+                    className={`rounded-xl px-3 py-1.5 text-[10px] font-bold transition-all active:scale-95 ${catalogueLayout.bannerStickers !== false ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                  >
+                    {catalogueLayout.bannerStickers !== false ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                <div className="mt-2.5">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Photos — shown in full HD, swipe to scroll <span className="normal-case text-slate-600">(max 5)</span></p>
                   <div className="grid grid-cols-3 gap-2">
                     {(Array.isArray(catalogueLayout.bannerPhotos) ? catalogueLayout.bannerPhotos : []).map((photo, i) => (
                       <div key={i} className="rounded-xl border border-slate-700 bg-slate-900 p-1.5">
@@ -13235,7 +13315,7 @@ try {
                             const file = e.target.files && e.target.files[0];
                             e.target.value = '';
                             if (!file) return;
-                            const dataUrl = await resizeImageFile(file, 400, 0.8);
+                            const dataUrl = await resizeImageFile(file, 1920, 0.92);
                             setCatalogueLayout((prev) => ({ ...prev, bannerPhotos: [...(prev.bannerPhotos || []), dataUrl] }));
                           }}
                         />
