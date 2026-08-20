@@ -9521,6 +9521,7 @@ try {
                     { e: '🎊', l: '45%', t: '12%', s: 26, d: 1.7 }
                   ];
                   return (
+                    <>
                     <div className={`cat-banner mt-5 relative overflow-hidden border ${bannerShapeClass}`}
                       style={{
                         borderColor: accentStrong,
@@ -9533,7 +9534,7 @@ try {
                         <>
                           <img key={safeBannerIndex} src={curPhoto} alt={`Banner ${safeBannerIndex + 1}`} className={`${bannerAnimClass} ${bannerImgSizeClass} select-none object-cover`}
                             style={{ animationDuration: `${Number(catalogueLayout.bannerSlideSpeed) || 0.45}s` }} />
-                          {catalogueLayout.bannerText && (
+                          {catalogueLayout.bannerText && safeBannerIndex !== 0 && (
                             <p className={`pointer-events-none absolute max-w-[85%] bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 text-lg font-black leading-snug sm:text-2xl ${textPosClass}`}
                               style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,0.7))' }}>{catalogueLayout.bannerText}</p>
                           )}
@@ -9599,6 +9600,16 @@ try {
                         </div>
                       )}
                     </div>
+                    {curPhoto && safeBannerIndex === 0 && catalogueLayout.bannerText && (
+                      <div className="mt-2 rounded-2xl px-4 py-3 text-center"
+                        style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, boxShadow: `0 8px 24px ${accentSoft}` }}>
+                        <p className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-400 text-lg font-black leading-snug sm:text-xl"
+                          style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,0.7))' }}>
+                          {catalogueLayout.bannerText}
+                        </p>
+                      </div>
+                    )}
+                    </>
                   );
                 })()}
               </div>
