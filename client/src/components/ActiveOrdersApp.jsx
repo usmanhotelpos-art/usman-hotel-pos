@@ -51,6 +51,7 @@ export function ActiveOrdersApp() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [viewOrder, setViewOrder] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const seenIdsRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -442,6 +443,21 @@ export function ActiveOrdersApp() {
                 {String(order.notes || '').trim() && (
                   <p className="mt-1 rounded-lg bg-slate-800/80 px-2 py-1 text-[10px] text-amber-200">📝 {order.notes}</p>
                 )}
+                {order.paymentRequestImage && (
+                  <button onClick={() => setPreviewImage(order.paymentRequestImage)} className="mt-2 flex w-full items-center gap-2 rounded-xl border border-amber-600/40 bg-slate-950/70 p-2 text-left transition active:scale-[0.98]">
+                    <img src={order.paymentRequestImage} alt="Payment proof" className="h-12 w-12 rounded-lg border border-amber-500/50 object-cover" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10px] font-bold text-amber-400">📷 Payment photo attached</span>
+                      {order.paymentRequestedAt && (
+                        <span className="block text-[9px] text-slate-500">{fmt(order.paymentRequestedAt)}</span>
+                      )}
+                      {order.paymentRequestStatus === 'owner-request' && (
+                        <span className="block text-[9px] font-bold text-violet-400">✅ Request sent to owner{order.paymentMethod ? ` (${order.paymentMethod})` : ''}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-slate-500">🔍</span>
+                  </button>
+                )}
 
                 <div className="mt-2.5 grid grid-cols-5 gap-1.5">
                   <button onClick={() => markPaid(order)} disabled={busyId === order.id} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 py-2.5 text-white shadow transition-all active:scale-90 disabled:opacity-50">
@@ -470,6 +486,14 @@ export function ActiveOrdersApp() {
           })
         )}
       </div>
+
+      {/* Fullscreen payment photo preview */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-3" onClick={() => setPreviewImage(null)}>
+          <button onClick={() => setPreviewImage(null)} className="absolute right-4 top-4 z-10 rounded-full bg-slate-800 px-4 py-2 text-sm font-bold text-white">✕ Close</button>
+          <img src={previewImage} alt="Payment proof" className="max-h-full max-w-full rounded-2xl object-contain" />
+        </div>
+      )}
 
       {/* View modal */}
       {viewOrder && (
@@ -501,6 +525,16 @@ export function ActiveOrdersApp() {
                 <span>{Number(viewOrder.total || viewOrder.amount || 0)} Rs</span>
               </div>
             </div>
+            {viewOrder.paymentRequestImage && (
+              <button onClick={() => setPreviewImage(viewOrder.paymentRequestImage)} className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-amber-600/40 bg-slate-950 p-3 text-left transition active:scale-[0.98]">
+                <img src={viewOrder.paymentRequestImage} alt="Payment proof" className="h-14 w-14 rounded-xl border border-amber-500/50 object-cover" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-bold text-amber-400">📷 Payment photo attached</span>
+                  <span className="block text-[10px] text-slate-500">Tap to view full image</span>
+                </span>
+                <span className="shrink-0 text-slate-500">🔍</span>
+              </button>
+            )}
             <div className="mt-3 grid grid-cols-4 gap-1.5">
               <button onClick={() => { markPaid(viewOrder); setViewOrder(null); }} className="rounded-xl bg-emerald-600 py-2 text-[11px] font-black text-white">✅ PAID</button>
               <button onClick={() => { printOrder(viewOrder); }} className="rounded-xl bg-sky-600 py-2 text-[11px] font-black text-white">🖨️ PRINT</button>
