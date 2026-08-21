@@ -583,24 +583,31 @@ export function OrderTakerApp() {
   };
 
   const myNewOrders = useMemo(() => (orders || []).filter(o =>
-    (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o)
+    o.orderType === 'Dine-In' && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o)
   ), [orders, orderTaker]);
 
   const myServedOrders = useMemo(() => (orders || []).filter(o =>
-    (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isServedOrder(o)
+    o.orderType === 'Dine-In' && isMyOrder(o) && isServedOrder(o)
   ), [orders, orderTaker]);
 
-  const myCancelledOrders = useMemo(() => (orders || []).filter(o =>
-    (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isCancelledOrder(o)
-  ), [orders, orderTaker]);
+  const myCancelledOrders = useMemo(() => {
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return (orders || []).filter(o =>
+      o.orderType === 'Dine-In' && isMyOrder(o) && isCancelledOrder(o) &&
+      (!o.cancelledAt || new Date(o.cancelledAt).getTime() > dayAgo)
+    );
+  }, [orders, orderTaker]);
 
   const allTypeOrders = useMemo(() => ((orders || [])
-    .filter(o => o.orderType === 'Dine-In' || o.orderType === 'Takeaway'))
+    .filter(o => o.orderType === 'Dine-In'))
     .slice()
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
   , [orders]);
 
-  const popupOrders = ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : allTypeOrders;
+  const popupOrders = useMemo(() => {
+    const base = ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : allTypeOrders;
+    return base.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [ordersTab, myNewOrders, myServedOrders, myCancelledOrders, allTypeOrders]);
 
   async function createOrder(orderStatus = 'Pending', paymentOpts = {}) {
     if (!cart.length) { setMessage('Cart is empty'); return; }
