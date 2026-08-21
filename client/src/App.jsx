@@ -2,6 +2,7 @@
 import { Lock, Bluetooth, BluetoothConnected, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { RidersApp } from './components/RidersApp';
 import { OrderTakerApp } from './components/OrderTakerApp';
+import { ActiveOrdersApp } from './components/ActiveOrdersApp';
 import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from './utils/escpos.js';
 import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter, disconnectDevice } from './utils/btPrint.js';
 import { showOrderNotification, requestNotificationPermission, resetNotificationCount, isNotificationSupported, getNotificationPermission } from './utils/notifications.js';
@@ -24,6 +25,7 @@ function App() {
   const initialPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
   const isMobileRiderRoute = initialPath.startsWith('/rider');
   const isOrderTakerRoute = initialPath.startsWith('/order-taker');
+  const isActiveOrdersRoute = initialPath.startsWith('/active-orders');
   const initialTabFromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
   const isHelperRoute = initialPath.startsWith('/helper');
   const defaultTabs = ['dashboard', 'pos', 'orders', 'rider-book', 'rider-order-requests', 'tables', 'inventory', 'staff', 'sales', 'customers', 'riders-app', 'order-taker-app', 'restore', 'qr-catalogue', 'settings'];
@@ -273,6 +275,29 @@ function App() {
     } catch (error) {
       setMessage(`Unable to copy order taker link. Use: ${link}`);
     }
+  };
+
+  const copyActiveOrdersLink = async () => {
+    const link = `${window.location.origin}/active-orders`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setMessage(`Active Orders screen link copied: ${link}`);
+    } catch (error) {
+      setMessage(`Unable to copy link. Use: ${link}`);
+    }
+  };
+
+  const openActiveOrdersScreen = () => {
+    window.open(`${window.location.origin}/active-orders`, '_blank');
   };
 
   async function refreshOrderNumbers() {
@@ -8381,6 +8406,12 @@ try {
               <button onClick={copyOrderTakerAppLink} className={`rounded-full border border-violet-500 bg-violet-500/10 px-4 py-2 text-sm font-semibold transition hover:bg-violet-500/20 ${darkMode ? 'text-violet-100' : 'text-violet-700'}`}>
                 Copy Order Taker App Link
               </button>
+              <button onClick={openActiveOrdersScreen} className="rounded-full border border-fuchsia-500 bg-gradient-to-r from-fuchsia-600 to-violet-600 px-4 py-2 text-sm font-bold text-white shadow transition hover:opacity-90">
+                🆕 Open Active Orders Screen
+              </button>
+              <button onClick={copyActiveOrdersLink} className={`rounded-full border border-fuchsia-500 bg-fuchsia-500/10 px-4 py-2 text-sm font-semibold transition hover:bg-fuchsia-500/20 ${darkMode ? 'text-fuchsia-100' : 'text-fuchsia-700'}`}>
+                Copy Active Orders Link
+              </button>
             </div>
           </div>
 
@@ -13924,6 +13955,14 @@ try {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100">
         <OrderTakerApp />
+      </div>
+    );
+  }
+
+  if (isActiveOrdersRoute) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <ActiveOrdersApp />
       </div>
     );
   }
