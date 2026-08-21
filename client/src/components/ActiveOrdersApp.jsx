@@ -76,37 +76,16 @@ export function ActiveOrdersApp() {
         swRegRef.current = reg;
       }).catch(() => {});
     }
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        if (alertsRef.current) startKeepAlive();
-        loadData(true);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible);
-      stopKeepAlive();
-    };
+    return () => stopKeepAlive();
   }, []);
 
-  const pollInFlightRef = useRef(false);
-  const lastTablesAtRef = useRef(0);
-
   async function loadData(silent = true) {
-    if (!tokenRef.current || pollInFlightRef.current) return;
-    pollInFlightRef.current = true;
-    const ctrl = new AbortController();
-    const abortTimer = setTimeout(() => ctrl.abort(), 5000);
+    if (!tokenRef.current) return;
     try {
-      // Keep audio session alive in background so timers are never throttled
-      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume().catch(() => {});
-      if (keepAliveRef.current?.ctx.state === 'suspended') keepAliveRef.current.ctx.resume().catch(() => {});
-
       let data;
       try {
-        data = await fetchJson(`${API}/pos/orders`, { token: tokenRef.current, signal: ctrl.signal });
+        data = await fetchJson(`${API}/pos/orders`, { token: tokenRef.current });
       } catch (e) {
-        if (e.name === 'AbortError') return;
         const fresh = await refreshToken(tokenRef.current);
         if (fresh) {
           setToken(fresh);
@@ -120,14 +99,8 @@ export function ActiveOrdersApp() {
       setLastUpdated(new Date());
       setMessage('');
 
-      // Tables refresh every 15s only - orders stay ultra fast
-      const nowMs = Date.now();
-      if (nowMs - lastTablesAtRef.current > 15000) {
-        lastTablesAtRef.current = nowMs;
-        fetchJson(`${API}/pos/tables`, { token: tokenRef.current })
-          .then((tbls) => setTables(Array.isArray(tbls) ? tbls : []))
-          .catch(() => {});
-      }
+      const tbls = await fetchJson(`${API}/pos/tables`, { token: tokenRef.current }).catch(() => []);
+      setTables(Array.isArray(tbls) ? tbls : []);
 
       const active = list.filter((o) => o.orderType === 'Dine-In' && !ACTIVE_STATUSES_EXCLUDED.includes(norm(o.status)));
       const ids = new Set(active.map((o) => o.id));
@@ -145,22 +118,18 @@ export function ActiveOrdersApp() {
         setNewOrderBanner(freshOnes);
       }
     } catch (e) {
-      if (!silent && e.name !== 'AbortError') setMessage(e.message || 'Load failed');
+      if (!silent) setMessage(e.message || 'Load failed');
       if (String(e.message).toLowerCase().includes('token') || String(e.message).toLowerCase().includes('auth')) {
         setToken('');
         setUser(null);
         localStorage.removeItem('activeOrdersToken');
       }
-    } finally {
-      clearTimeout(abortTimer);
-      pollInFlightRef.current = false;
     }
   }
 
   useEffect(() => {
     if (token) loadData(true);
-    // Ultra fast: poll every 400ms (skips automatically while a request is in flight)
-    const id = setInterval(() => loadData(true), 400);
+    const id = setInterval(() => loadData(true), 1000);
     return () => clearInterval(id);
   }, [token]);
 
@@ -213,20 +182,18 @@ export function ActiveOrdersApp() {
       unlockAudio();
       const ctx = audioCtxRef.current;
       if (!ctx) return;
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      const t0 = ctx.currentTime + 0.02;
-      // Long emergency siren: ~5.5 seconds of alternating high tones at full volume
-      for (let i = 0; i < 24; i++) {
+      const t0 = ctx.currentTime + 0.05;
+      for (let i = 0; i < 10; i++) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'square';
-        osc.frequency.setValueAtTime(i % 2 ? 1500 : 950, t0 + i * 0.22);
-        gain.gain.setValueAtTime(1.0, t0 + i * 0.22);
-        gain.gain.exponentialRampToValueAtTime(0.01, t0 + i * 0.22 + 0.19);
+        osc.frequency.setValueAtTime(i % 2 ? 1400 : 900, t0 + i * 0.26);
+        gain.gain.setValueAtTime(1.0, t0 + i * 0.26);
+        gain.gain.exponentialRampToValueAtTime(0.01, t0 + i * 0.26 + 0.22);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(t0 + i * 0.22);
-        osc.stop(t0 + i * 0.22 + 0.21);
+        osc.start(t0 + i * 0.26);
+        osc.stop(t0 + i * 0.26 + 0.24);
       }
     } catch { /* ignore */ }
   }
@@ -236,7 +203,7 @@ export function ActiveOrdersApp() {
       .slice(0, 3)
       .map((o) => `Table ${o.tableNumber || '-'} · #${o.orderNumber || o.id} · ${(o.items || []).length} items · ${Number(o.total || o.amount || 0)} Rs`)
       .join('\n');
-    // 1st: service worker notification (works in background/lock screen, heads-up + vibration)
+    // 1st: service worker notification (works in background, WhatsApp-style heads-up + vibration)
     try {
       if (swRegRef.current?.active) {
         swRegRef.current.active.postMessage({ type: 'notify', orders: list, tag: 'ao-' + Date.now() });
@@ -260,10 +227,9 @@ export function ActiveOrdersApp() {
 
   function fireAlerts(freshOnes) {
     playLoudAlert();
-    setTimeout(playLoudAlert, 6000);
-    setTimeout(playLoudAlert, 12000);
+    setTimeout(playLoudAlert, 3200);
     try {
-      navigator.vibrate?.([800, 200, 800, 200, 800, 1000, 800, 200, 800, 200, 800, 1000, 800, 200, 800, 200, 800]);
+      navigator.vibrate?.([800, 200, 800, 200, 800]);
     } catch { /* ignore */ }
     showNotifications(freshOnes);
   }
@@ -474,7 +440,7 @@ export function ActiveOrdersApp() {
             <div>
               <h1 className="text-base font-bold leading-tight">Active Dine-In Orders</h1>
               <p className="text-[10px] text-slate-400">
-                {lastUpdated ? `Updated ${fmtTime(lastUpdated)} · ultra-fast live` : 'Loading...'}
+                {lastUpdated ? `Updated ${fmtTime(lastUpdated)} · auto-refresh 1s` : 'Loading...'}
               </p>
             </div>
             <span className={`ml-1 flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black ${activeOrders.length ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
