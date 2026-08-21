@@ -538,9 +538,11 @@ export function OrderTakerApp() {
 
   // Only this order taker's dine-in orders split into New / Served / Cancelled tabs
   const isMyOrder = (order) => {
-    const name = orderTaker?.name || '';
-    const username = orderTaker?.username || '';
-    return order.orderTaker === name || order.orderTaker === username || order.waiter === name || order.waiter === username;
+    const mine = [orderTaker?.name, orderTaker?.username, orderTaker?.email]
+      .map((v) => String(v || '').trim().toLowerCase())
+      .filter(Boolean);
+    const theirs = [order.orderTaker, order.waiter].map((v) => String(v || '').trim().toLowerCase());
+    return theirs.some((t) => t && mine.includes(t));
   };
 
   const isServedOrder = (order) => {
@@ -570,6 +572,14 @@ export function OrderTakerApp() {
   const myCancelledOrders = useMemo(() => (orders || []).filter(o =>
     (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isCancelledOrder(o)
   ), [orders, orderTaker]);
+
+  const allTypeOrders = useMemo(() => ((orders || [])
+    .filter(o => o.orderType === 'Dine-In' || o.orderType === 'Takeaway'))
+    .slice()
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  , [orders]);
+
+  const popupOrders = ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : allTypeOrders;
 
   async function createOrder(orderStatus = 'Pending', paymentOpts = {}) {
     if (!cart.length) { setMessage('Cart is empty'); return; }
@@ -1164,28 +1174,29 @@ export function OrderTakerApp() {
               <button onClick={() => setShowOrdersPopup(false)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
             </div>
 
-            {/* Tabs: New | Served | Cancelled */}
-            <div className="flex gap-1.5 p-3 border-b border-slate-800">
-              <button onClick={() => setOrdersTab('new')} className={`flex-1 rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${ordersTab === 'new' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
-                🆕 New Orders {myNewOrders.length > 0 && <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{myNewOrders.length}</span>}
+            {/* Tabs: New | Served | Cancelled | All */}
+            <div className="grid grid-cols-4 gap-1 p-3 border-b border-slate-800">
+              <button onClick={() => setOrdersTab('new')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'new' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                🆕 New {myNewOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myNewOrders.length}</span>}
               </button>
-              <button onClick={() => setOrdersTab('served')} className={`flex-1 rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${ordersTab === 'served' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
-                ✅ Served {myServedOrders.length > 0 && <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{myServedOrders.length}</span>}
+              <button onClick={() => setOrdersTab('served')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'served' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                ✅ Served {myServedOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myServedOrders.length}</span>}
               </button>
-              <button onClick={() => setOrdersTab('cancelled')} className={`flex-1 rounded-xl px-2 py-2 text-[11px] font-bold transition-all ${ordersTab === 'cancelled' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
-                ❌ Cancelled {myCancelledOrders.length > 0 && <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{myCancelledOrders.length}</span>}
+              <button onClick={() => setOrdersTab('cancelled')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'cancelled' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                ❌ Cancelled {myCancelledOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myCancelledOrders.length}</span>}
+              </button>
+              <button onClick={() => setOrdersTab('all')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                📋 All {allTypeOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{allTypeOrders.length}</span>}
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {(ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : myCancelledOrders).length === 0 && (
+              {popupOrders.length === 0 && (
                 <p className="text-sm text-slate-500 text-center py-8">
-                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
+                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'served' ? 'No served orders yet' : ordersTab === 'cancelled' ? 'No cancelled orders yet' : 'No orders yet'}
                 </p>
               )}
-              {(ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : myCancelledOrders)
-                .slice()
-                .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+              {popupOrders
                 .map(order => {
                 const isExpanded = expandedOrderId === order.id;
                 const { subtotal, total } = orderTotals(order);
@@ -1194,28 +1205,29 @@ export function OrderTakerApp() {
                 const servedAtMs = order.servedAt ? new Date(order.servedAt).getTime() : null;
                 const createdMs = order.createdAt ? new Date(order.createdAt).getTime() : null;
                 const cancelledMs = order.cancelledAt ? new Date(order.cancelledAt).getTime() : null;
+                const st = isCancelledOrder(order) ? 'cancelled' : isServedOrder(order) ? 'served' : 'new';
                 return (
-                  <div key={order.id} className={`rounded-xl border overflow-hidden ${ordersTab === 'cancelled' ? 'border-rose-900/60 bg-rose-950/20' : 'border-slate-800 bg-slate-900'}`}>
+                  <div key={order.id} className={`rounded-xl border overflow-hidden ${st === 'cancelled' ? 'border-rose-900/60 bg-rose-950/20' : 'border-slate-800 bg-slate-900'}`}>
                     {/* Header - tap to expand */}
                     <button onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="w-full p-3 text-left active:bg-slate-800/50 transition-colors">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-indigo-400">#{order.orderNumber || order.id}</span>
                         <span className="flex items-center gap-1.5">
                           {createdMs && <span className="text-[10px] text-slate-400">{new Date(createdMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>}
-                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${ordersTab === 'new' ? 'bg-amber-500/15 text-amber-400' : ordersTab === 'served' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
-                            ⏱ {formatDuration(now - (ordersTab === 'new' ? createdMs : ordersTab === 'served' ? servedAtMs : cancelledMs) || now)}
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${st === 'new' ? 'bg-amber-500/15 text-amber-400' : st === 'served' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                            ⏱ {formatDuration(now - (st === 'new' ? createdMs : st === 'served' ? servedAtMs : cancelledMs) || now)}
                           </span>
                           <span className={`text-[10px] ${isExpanded ? 'rotate-180' : ''} transition-transform text-slate-500`}>▼</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
-                        <span className={`font-semibold ${ordersTab === 'new' ? 'text-amber-400' : ordersTab === 'served' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {ordersTab === 'new' ? order.orderType : ordersTab === 'served' ? 'Served' : 'Cancelled'}
+                        <span className={`font-semibold ${st === 'new' ? 'text-amber-400' : st === 'served' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {st === 'new' ? order.orderType : st === 'served' ? 'Served' : 'Cancelled'}
                         </span>
                         <span>•</span>
                         <span>{order.customerName || order.tableNumber || '-'}</span>
                         <span>•</span>
-                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : ordersTab === 'cancelled' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
+                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : st === 'cancelled' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-emerald-400">{total} PKR</span>
@@ -1243,7 +1255,7 @@ export function OrderTakerApp() {
                           </div>
                         </div>
 
-                        {ordersTab === 'new' && (
+                        {st === 'new' && (
                           <div className="flex flex-wrap gap-1.5">
                             <button onClick={() => printOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">🖨️ Print</button>
                             <button onClick={() => openEditOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">✏️ Edit Order</button>
@@ -1252,7 +1264,7 @@ export function OrderTakerApp() {
                           </div>
                         )}
 
-                        {ordersTab === 'served' && (
+                        {st === 'served' && (
                           <>
                             {/* Payment request photo (dine-in) */}
                             {!isPaid && (
@@ -1299,7 +1311,7 @@ export function OrderTakerApp() {
                           </>
                         )}
 
-                        {ordersTab === 'cancelled' && (
+                        {st === 'cancelled' && (
                           <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-center text-[11px] font-bold text-rose-400">
                             ❌ Order cancelled{cancelledMs ? ` at ${new Date(cancelledMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}
                           </div>

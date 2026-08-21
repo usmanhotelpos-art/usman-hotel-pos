@@ -155,7 +155,7 @@ router.post('/auth/login', safe(async (req, res) => {
     clearLoginFailures(clientIp);
 
     const token = createToken({ id: staff.id, email: staff.username || staff.email, role: staff.role, name: staff.name });
-    return res.send({ token, user: { id: staff.id, name: staff.name, email: staff.username || staff.email, role: staff.role } });
+    return res.send({ token, user: { id: staff.id, name: staff.name, email: staff.username || staff.email, username: staff.username || '', role: staff.role } });
   }
 
   const valid = await bcrypt.compare(password || '', user.passwordHash);
@@ -176,7 +176,7 @@ router.get('/auth/me', authenticate, (req, res) => {
     // Try staff collection
     user = (db.staff || []).find((s) => s.id === req.user.id);
     if (user) {
-      return res.send({ id: user.id, name: user.name, email: user.username || user.email, role: user.role });
+      return res.send({ id: user.id, name: user.name, email: user.username || user.email, username: user.username || '', role: user.role });
     }
     // Try riders
     user = (db.riders || []).find((r) => r.id === req.user.id);
@@ -196,7 +196,7 @@ router.post('/auth/refresh', authenticate, safe(async (req, res) => {
   if (!user) return res.status(401).send({ error: 'User not found' });
   const email = user.username || user.email || req.user.email || '';
   const token = createToken({ id: user.id, email, role: user.role, name: user.name });
-  res.send({ token, user: { id: user.id, name: user.name, email, role: user.role } });
+  res.send({ token, user: { id: user.id, name: user.name, email, username: user.username || '', role: user.role } });
 }));
 
 // Rider Authentication Routes
