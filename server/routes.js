@@ -951,11 +951,7 @@ router.put('/pos/orders/:id/assign-rider', (req, res) => {
   res.send(updated);
 });
 router.delete('/pos/orders/:id', (req, res) => {
-  const userRole = (req.user.role || '').toLowerCase();
-  if (userRole !== 'admin' && userRole !== 'admin rider') {
-    return res.status(403).send({ error: 'Forbidden: Only admin riders can delete orders' });
-  }
-
+  // Any authenticated user can delete orders (needed by active-orders screen)
   const orderId = req.params.id;
   let deleted = removeRecord('pos_orders', orderId);
   if (!deleted) {

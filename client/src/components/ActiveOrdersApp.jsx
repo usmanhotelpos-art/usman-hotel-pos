@@ -53,6 +53,13 @@ export function ActiveOrdersApp() {
   const [busyId, setBusyId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [newOrderBanner, setNewOrderBanner] = useState([]);
+
+  useEffect(() => {
+    if (!newOrderBanner.length) return;
+    const t = setTimeout(() => setNewOrderBanner([]), 8000);
+    return () => clearTimeout(t);
+  }, [newOrderBanner]);
 
   const seenIdsRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -132,6 +139,10 @@ export function ActiveOrdersApp() {
       seenIdsRef.current = ids;
       if (freshOnes.length > 0 && alertsRef.current) {
         fireAlerts(freshOnes);
+      }
+      // Always flash an on-screen banner for new orders - even while watching, no permission needed
+      if (freshOnes.length > 0) {
+        setNewOrderBanner(freshOnes);
       }
     } catch (e) {
       if (!silent && e.name !== 'AbortError') setMessage(e.message || 'Load failed');
@@ -393,14 +404,18 @@ export function ActiveOrdersApp() {
   }
 
   async function deleteOrder(order) {
-    if (!confirm(`DELETE order #${order.orderNumber || order.id}? This cannot be undone.`)) return;
     setBusyId(order.id);
     try {
       await fetchJson(`${API}/pos/orders/${order.id}`, { method: 'DELETE', token: tokenRef.current });
+      seenIdsRef.current?.delete(order.id);
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
       setMessage(`Order #${order.orderNumber || order.id} deleted 🗑️`);
-      await loadData(true);
+      setTimeout(() => setMessage(''), 3000);
+      loadData(true);
     } catch (e) {
-      setMessage(e.message);
+      setMessage(e.message || 'Delete failed');
+      setTimeout(() => setMessage(''), 4000);
+      loadData(true);
     } finally {
       setBusyId(null);
     }
@@ -489,6 +504,18 @@ export function ActiveOrdersApp() {
           </div>
         )}
       </div>
+
+      {/* On-screen new order alert - shows even while watching, no permission needed */}
+      {newOrderBanner.length > 0 && (
+        <div className="pointer-events-none fixed left-1/2 top-14 z-[80] w-[92%] max-w-md -translate-x-1/2">
+          <div className="animate-bounce rounded-2xl border-2 border-fuchsia-400 bg-gradient-to-r from-fuchsia-700 via-violet-700 to-fuchsia-700 px-4 py-3 text-center shadow-[0_0_30px_rgba(217,70,239,0.8)]">
+            <p className="text-sm font-black text-white">🆕 {newOrderBanner.length > 1 ? `${newOrderBanner.length} NEW ORDERS!` : 'NEW ORDER!'}</p>
+            <p className="mt-0.5 text-[11px] font-bold text-fuchsia-100">
+              {newOrderBanner.slice(0, 3).map((o) => `Table ${o.tableNumber || '-'} (#${o.orderNumber || o.id})`).join(' · ')}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Orders */}
       <div className="mx-auto max-w-3xl space-y-3 px-3 pt-3">
