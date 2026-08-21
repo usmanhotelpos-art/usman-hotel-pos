@@ -835,6 +835,8 @@ function App() {
   const [catalogueSearch, setCatalogueSearch] = useState('');
   const [catalogueCategory, setCatalogueCategory] = useState('All');
   const [catalogueCart, setCatalogueCart] = useState([]);
+  const [showNaanRotiPopup, setShowNaanRotiPopup] = useState(false);
+  const [naanRotiSelections, setNaanRotiSelections] = useState({});
   const [catalogueCustomer, setCatalogueCustomer] = useState({ name: '', phone: '', address: '' });
   const [catalogueOrderNote, setCatalogueOrderNote] = useState('');
   const [cataloguePaymentMethod, setCataloguePaymentMethod] = useState('Online');
@@ -9294,6 +9296,65 @@ try {
     addToCatalogueCart(product);
   }
 
+  function isNaanRotiCategory(categoryName) {
+    const normalizedCategory = normalizeText(categoryName);
+    return normalizedCategory.includes('naan') || normalizedCategory.includes('roti');
+  }
+
+  function getNaanRotiProducts() {
+    const assignedNames = catalogueAssignedCategories.length
+      ? catalogueAssignedCategories
+      : posCategories.map((category) => category.name);
+    const sourceNames = assignedNames.length ? assignedNames : posProducts.map((product) => product.category).filter(Boolean);
+    const categoryNames = sourceNames.filter(isNaanRotiCategory);
+    return posProducts.filter((product) => categoryNames.includes(product.category) || isNaanRotiCategory(product.category));
+  }
+
+  function openCatalogueCart() {
+    const naanRotiProducts = getNaanRotiProducts();
+    if (!naanRotiProducts.length) {
+      setCatalogueView('cart');
+      return;
+    }
+    setNaanRotiSelections((prev) => {
+      const next = {};
+      naanRotiProducts.forEach((product) => {
+        next[product.id] = prev[product.id] || 0;
+      });
+      return next;
+    });
+    setShowNaanRotiPopup(true);
+  }
+
+  function addNaanRotiSelectionsToCart() {
+    const selectedProducts = getNaanRotiProducts();
+    setCatalogueCart((prev) => {
+      let next = [...prev];
+      selectedProducts.forEach((product) => {
+        const quantity = Number(naanRotiSelections[product.id]) || 0;
+        if (quantity <= 0) return;
+        const existingIndex = next.findIndex((item) => item.productId === product.id && !item.flavor && !item.weight);
+        if (existingIndex >= 0) {
+          next[existingIndex] = { ...next[existingIndex], quantity: next[existingIndex].quantity + quantity };
+          return;
+        }
+        next.push({
+          itemId: `${product.id}-base-${Date.now()}`,
+          productId: product.id,
+          name: product.name,
+          price: Number(product.price) || 0,
+          quantity,
+          photo: product.photoUrl || product.photo || '',
+          weight: '',
+          flavor: ''
+        });
+      });
+      return next;
+    });
+    setShowNaanRotiPopup(false);
+    setCatalogueView('cart');
+  }
+
   function getCatalogueCartSummary() {
     const subtotal = catalogueCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     return { subtotal, total: subtotal };
@@ -9376,6 +9437,7 @@ try {
     const blockCategories = catalogueAssignedCategories.length
       ? catalogueAssignedCategories
       : posCategories.map((c) => c.name);
+    const visibleBlockCategories = blockCategories.filter((category) => !isNaanRotiCategory(category));
     const countFor = (catName) => catName === 'All'
       ? posProducts.filter((p) => !blockCategories.length || blockCategories.includes(p.category)).length
       : posProducts.filter((p) => (p.category || '') === catName).length;
@@ -9639,7 +9701,7 @@ try {
 
             {catalogueView === 'categories' && catalogueLayout.showCategories !== false && (
               <div className="flex flex-wrap justify-center gap-3">
-                {[{ name: 'All' }, ...blockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
+                {[{ name: 'All' }, ...visibleBlockCategories.map((c) => ({ name: c }))].map((cat, idx) => {
                   const catPhoto = cat.name !== 'All' && catalogueLayout.categoryPhotos && catalogueLayout.categoryPhotos[cat.name];
                   const blockBg = catalogueLayout.categoryBlockColor || '#ffffff';
                   const blockText = catalogueLayout.categoryTextColor || accent;
@@ -9690,7 +9752,7 @@ try {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setCatalogueView('cart')}
+                      onClick={openCatalogueCart}
                       className="cat-float-cart relative flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-black text-white shadow-md transition-all active:scale-95"
                       style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, '--accent': accent, '--accent-soft': accentSoft }}
                     >
@@ -10005,13 +10067,68 @@ try {
 
         {cartCount > 0 && catalogueView !== 'cart' && catalogueView !== 'checkout' && (
           <button
-            onClick={() => setCatalogueView('cart')}
+            onClick={openCatalogueCart}
             className="cat-float-cart fixed bottom-5 right-5 z-[60] flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-black text-white shadow-2xl transition-all active:scale-95"
             style={{ background: `linear-gradient(135deg, ${accent}, #f59e0b)`, '--accent': accent, '--accent-soft': accentSoft }}
           >
             🛒 <span>{cartCount}</span> · {summary.total} PKR
           </button>
         )}
+
+        {showNaanRotiPopup && (() => {
+          const naanRotiProducts = getNaanRotiProducts();
+          const selectedTotal = naanRotiProducts.reduce(
+            (total, product) => total + (Number(naanRotiSelections[product.id]) || 0) * (Number(product.price) || 0),
+            0
+          );
+          return (
+            <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:items-center">
+              <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white p-5 shadow-2xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-600">Optional add-on</p>
+                    <h2 className="mt-1 text-xl font-black text-slate-900">Naan & Roti</h2>
+                    <p className="mt-1 text-sm text-slate-500">Select quantity and price before opening your cart.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNaanRotiPopup(false); setCatalogueView('cart'); }}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg font-bold text-slate-500"
+                    aria-label="Close naan and roti selection"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {naanRotiProducts.map((product) => {
+                    const quantity = Number(naanRotiSelections[product.id]) || 0;
+                    return (
+                      <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-black text-slate-800">{product.name}</div>
+                          <div className="text-xs font-semibold text-slate-500">{Number(product.price) || 0} PKR each</div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button type="button" onClick={() => setNaanRotiSelections((prev) => ({ ...prev, [product.id]: Math.max(0, quantity - 1) }))} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-black text-slate-600 shadow">-</button>
+                          <span className="w-6 text-center text-base font-black text-slate-800">{quantity}</span>
+                          <button type="button" onClick={() => setNaanRotiSelections((prev) => ({ ...prev, [product.id]: quantity + 1 }))} className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-lg font-black text-white shadow">+</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+                  <span>Selected total</span>
+                  <span>{selectedTotal} PKR</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => { setShowNaanRotiPopup(false); setCatalogueView('cart'); }} className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200">Skip</button>
+                  <button type="button" onClick={addNaanRotiSelectionsToCart} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-500">Add to Cart</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {cataloguePhotoViewer && (() => {
           const photos = cataloguePhotoViewer.photos;
