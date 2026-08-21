@@ -3692,6 +3692,40 @@ try {
     }
   }
 
+  async function restoreCancelledOrder(order) {
+    setLoading(true);
+    setMessage('');
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          status: 'Pending',
+          cancelledAt: '',
+          items: order.items || [],
+          customerName: order.customerName || '',
+          phone: order.phone || '',
+          address: order.address || '',
+          tableNumber: order.tableNumber || '',
+          deliveryAgent: order.deliveryAgent || '',
+          serviceType: order.serviceType || '',
+          deliveryFee: order.deliveryFee || 0,
+          discount: order.discount || 0,
+          taxPercent: order.taxPercent || 0,
+          serviceCharge: order.serviceCharge || 0,
+          paymentMethod: order.paymentMethod || 'Cash',
+          notes: order.notes || ''
+        })
+      });
+      setMessage(`Order #${order.orderNumber || order.id} restored successfully.`);
+      await loadOrdersData();
+      await loadPosData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // ---- Order Backup / Restore / Reset ----
   async function loadBackups() {
     try {
@@ -9434,19 +9468,7 @@ try {
   }
 
   function openCatalogueCart() {
-    const naanRotiProducts = getNaanRotiProducts();
-    if (!naanRotiProducts.length) {
-      setCatalogueView('cart');
-      return;
-    }
-    setNaanRotiSelections((prev) => {
-      const next = {};
-      naanRotiProducts.forEach((product) => {
-        next[product.id] = prev[product.id] || 0;
-      });
-      return next;
-    });
-    setShowNaanRotiPopup(true);
+    setCatalogueView('cart');
   }
 
   function addNaanRotiSelectionsToCart() {
@@ -9560,7 +9582,7 @@ try {
     const blockCategories = catalogueAssignedCategories.length
       ? catalogueAssignedCategories
       : posCategories.map((c) => c.name);
-    const visibleBlockCategories = blockCategories.filter((category) => !isNaanRotiCategory(category));
+    const visibleBlockCategories = blockCategories;
     const countFor = (catName) => catName === 'All'
       ? posProducts.filter((p) => !blockCategories.length || blockCategories.includes(p.category)).length
       : posProducts.filter((p) => (p.category || '') === catName).length;
@@ -12138,7 +12160,10 @@ try {
     if (dineinSubTab === 'paid') {
       statusFiltered = filteredBySearch.filter((order) => ['Completed', 'Payment Collected'].includes(order.status));
     } else if (dineinSubTab === 'due') {
-      statusFiltered = filteredBySearch.filter((order) => order.status === 'Payment Pending' || order.status === 'Pay Later' || order.paymentStatus === 'Due');
+      statusFiltered = filteredBySearch.filter((order) =>
+        order.status === 'Payment Pending' || order.status === 'Pay Later' || order.paymentStatus === 'Due');
+    } else if (dineinSubTab === 'cancelled') {
+      statusFiltered = filteredBySearch.filter((order) => (order.status || '').toLowerCase() === 'cancelled' || Boolean(order.cancelledAt));
     } else {
       statusFiltered = dineinOrderStatusFilter === 'all'
         ? filteredBySearch
@@ -12198,7 +12223,7 @@ try {
         {/* Desktop */}
         <div className="hidden md:block space-y-6">
           <div className="flex flex-wrap items-center gap-3">
-            {['tables', 'paid', 'due'].map((tab) => (
+            {['tables', 'paid', 'due', 'cancelled'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -12207,7 +12232,7 @@ try {
                   if (tab === 'due') setDineinOrderStatusFilter('pending');
                 }}
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${dineinSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-                {tab === 'tables' ? '🍽️ Table Management' : tab === 'paid' ? '💳 Paid Orders' : '📍 Due Orders'}
+                {tab === 'tables' ? '🍽️ Table Management' : tab === 'paid' ? '💳 Paid Orders' : tab === 'due' ? '📍 Due Orders' : '❌ Cancelled Orders'}
               </button>
             ))}
           </div>
@@ -12474,12 +12499,79 @@ try {
               </div>
             </div>
           )}
+
+          {dineinSubTab === 'cancelled' && (
+            <div className="space-y-4">
+              <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-sm font-bold text-white">❌ Cancelled Orders ({statusFiltered.length})</span>
+                  <span className="text-sm text-slate-400">Showing {pagedDineinOrders.length} of {statusFiltered.length}</span>
+                </div>
+              </div>
+              <div className="grid gap-4">
+                <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950 p-4">
+                  <table className="w-full min-w-[1000px] divide-y divide-slate-700 text-left text-sm text-slate-300">
+                    <thead className="bg-slate-900 text-slate-200">
+                      <tr>
+                        <th className="px-4 py-3">Order #</th>
+                        <th className="px-4 py-3">Table</th>
+                        <th className="px-4 py-3">Order Taker</th>
+                        <th className="px-4 py-3">Customer</th>
+                        <th className="px-4 py-3">Items</th>
+                        <th className="px-4 py-3">Total</th>
+                        <th className="px-4 py-3">Payment</th>
+                        <th className="px-4 py-3">Created</th>
+                        <th className="px-4 py-3">Cancelled At</th>
+                        <th className="px-4 py-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 bg-slate-950">
+                      {pagedDineinOrders.map((order) => (
+                        <tr key={order.id}>
+                          <td className="px-4 py-3">{order.orderNumber || order.id}</td>
+                          <td className="px-4 py-3">{order.tableNumber || 'N/A'}</td>
+                          <td className="px-4 py-3 font-semibold text-violet-300">{order.orderTaker || order.waiter || '-'}</td>
+                          <td className="px-4 py-3">{order.customerName || 'TABLE'}</td>
+                          <td className="px-4 py-3">{(order.items || []).reduce((c, it) => c + Number(it.quantity || 0), 0)}</td>
+                          <td className="px-4 py-3">{order.total || order.amount || 0} PKR</td>
+                          <td className="px-4 py-3">{order.paymentMethod || order.paymentStatus || '-'}</td>
+                          <td className="px-4 py-3">{order.createdAt ? new Date(order.createdAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'}</td>
+                          <td className="px-4 py-3 text-rose-300">{order.cancelledAt ? new Date(order.cancelledAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }) : '-'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => openOrderForEditInPos(order)} className="rounded px-2 py-1 bg-violet-500 text-white text-xs">Edit</button>
+                              <button onClick={() => restoreCancelledOrder(order)} className="rounded px-2 py-1 bg-emerald-600 text-white text-xs">Restore</button>
+                              <button onClick={() => printReceipt(order)} className="rounded px-2 py-1 bg-sky-600 text-white text-xs">Print</button>
+                              <button onClick={() => deleteOrder(order.id)} className="rounded px-2 py-1 bg-rose-600 text-white text-xs">Delete</button>
+                              <button onClick={() => setQuickOrderDetail(order)} className="rounded px-2 py-1 bg-slate-700 text-white text-xs">View</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {!pagedDineinOrders.length && (
+                        <tr>
+                          <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">No cancelled orders.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-400">
+                  <span>Page {dineinPageIndex + 1} of {totalDineinPages}</span>
+                  <div className="flex items-center gap-2">
+                    <button disabled={dineinPageIndex <= 0} onClick={() => setDineinPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+                    <button disabled={dineinPageIndex >= totalDineinPages - 1} onClick={() => setDineinPageIndex((prev) => Math.min(prev + 1, totalDineinPages - 1))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Mobile */}
         <div className="md:hidden space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            {['tables', 'paid', 'due'].map((tab) => (
+            {['tables', 'paid', 'due', 'cancelled'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -12488,7 +12580,7 @@ try {
                   if (tab === 'due') setDineinOrderStatusFilter('pending');
                 }}
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${dineinSubTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-                {tab === 'tables' ? '🍽️ Active' : tab === 'paid' ? '💳 Paid' : '📍 Due'}
+                {tab === 'tables' ? '🍽️ Active' : tab === 'paid' ? '💳 Paid' : tab === 'due' ? '📍 Due' : '❌ Cancelled'}
               </button>
             ))}
             <button
@@ -12813,6 +12905,66 @@ try {
                 </div>
               )}
             </>
+          )}
+
+          {dineinSubTab === 'cancelled' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2.5">
+                <span className="text-xs font-bold text-white">❌ Cancelled Orders</span>
+                <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-[10px] font-bold text-white">{statusFiltered.length}</span>
+              </div>
+              {pagedDineinOrders.length === 0 ? (
+                <div className="text-center text-sm text-slate-500 py-8">No cancelled orders</div>
+              ) : (
+                pagedDineinOrders.map((order) => (
+                  <div key={order.id} className="rounded-2xl border border-rose-900/60 bg-slate-900 p-3 text-xs text-slate-200">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-semibold text-white text-sm truncate">#{order.orderNumber || order.id}</div>
+                      <div className="font-semibold text-white shrink-0">{Number(order.total || order.amount || 0)} Rs</div>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 truncate">👤 {order.customerName || 'TABLE'} {order.tableNumber ? `(${order.tableNumber})` : ''}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold text-violet-300">🧑‍💼 Taker: {order.orderTaker || order.waiter || '-'}</span>
+                      {order.waiter && order.waiter !== order.orderTaker && <><span className="text-slate-600">|</span><span className="text-[11px] text-slate-400">Waiter: {order.waiter}</span></>}
+                      <span className="text-slate-600">|</span>
+                      <span className="text-[11px] text-slate-400">{(order.items || []).reduce((c, it) => c + Number(it.quantity || 0), 0)} items</span>
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400 leading-tight line-clamp-2">
+                      {(order.items || []).map((item, idx) => (
+                        <span key={idx}>{item.quantity}x {item.name}{idx < (order.items || []).length - 1 ? ', ' : ''}</span>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getStatusBadge(order.status)}`}>{order.status || 'Cancelled'}</span>
+                      <span className="font-bold text-cyan-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '-'}</span>
+                      <span className="font-bold text-amber-400 text-[10px]">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}</span>
+                    </div>
+                    {order.cancelledAt && (
+                      <div className="mt-1 rounded-lg border border-rose-900/60 bg-rose-950/30 px-2 py-1 text-[10px] font-bold text-rose-300">
+                        ❌ Cancelled: {new Date(order.cancelledAt).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true })}
+                      </div>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <button onClick={() => openOrderForEditInPos(order)} className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-500 active:scale-95 transition-all">✏️ Edit</button>
+                      <button onClick={() => restoreCancelledOrder(order)} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 active:scale-95 transition-all">♻️ Restore</button>
+                      <button onClick={() => printReceipt(order)} className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500 active:scale-95 transition-all">🖨️ Print</button>
+                      <button onClick={() => deleteOrder(order.id)} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-500 active:scale-95 transition-all">🗑 Delete</button>
+                      <button onClick={() => setQuickOrderDetail(order)} className="rounded-full bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-600 active:scale-95 transition-all">👁 View</button>
+                    </div>
+                  </div>
+                ))
+              )}
+              {pagedDineinOrders.length > 0 && (
+                <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-300">
+                  <div>{statusFiltered.length ? `${dineinPageIndex * dineinPageSize + 1}-${Math.min((dineinPageIndex + 1) * dineinPageSize, statusFiltered.length)} of ${statusFiltered.length}` : 'No orders'}</div>
+                  <div className="flex items-center gap-2">
+                    <button disabled={dineinPageIndex <= 0} onClick={() => setDineinPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 disabled:opacity-50">←</button>
+                    <span className="text-[10px] text-slate-400">{dineinPageIndex + 1}/{totalDineinPages}</span>
+                    <button disabled={dineinPageIndex >= totalDineinPages - 1} onClick={() => setDineinPageIndex((prev) => Math.min(prev + 1, totalDineinPages - 1))} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 disabled:opacity-50">→</button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
 </div>

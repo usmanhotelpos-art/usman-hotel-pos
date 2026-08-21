@@ -508,18 +508,22 @@ export function OrderTakerApp() {
     return ['All', MASHALLAH_CATEGORY, ...names];
   }, [categories]);
 
-  // Tables data
+  // Tables data - occupancy decided by active dine-in orders only (stale table.status ignored)
   const tablesList = useMemo(() => {
+    const norm = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const occupiedTableNumbers = new Set(
-      orders.filter(o => o.orderType === 'Dine-In' && !['completed', 'payment collected'].includes((o.status || '').toLowerCase())).map(o => o.tableNumber).filter(Boolean)
+      orders
+        .filter(o => o.orderType === 'Dine-In' && !['completed', 'payment collected', 'cancelled'].includes(norm(o.status)))
+        .map(o => norm(o.tableNumber))
+        .filter(Boolean)
     );
-    return { occupied: occupiedTableNumbers };
+    return { occupied: occupiedTableNumbers, norm };
   }, [orders]);
 
   const availableDineInTables = useMemo(() => {
     return (tables || []).map(table => ({
       ...table,
-      isOccupied: tablesList.occupied.has(getTableLabel(table)) || ['occupied', 'reserved'].includes((table.status || '').toLowerCase()),
+      isOccupied: tablesList.occupied.has(tablesList.norm(getTableLabel(table))) || ['reserved'].includes((table.status || '').toLowerCase()),
     }));
   }, [tables, tablesList]);
 
