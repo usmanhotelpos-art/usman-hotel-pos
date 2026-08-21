@@ -43,9 +43,8 @@ self.addEventListener('message', (event) => {
     badge: ICON,
     tag: d.tag || 'active-orders-' + Date.now(),
     renotify: true,
-    vibrate: [1000, 200, 1000, 200, 1000, 1500, 1000, 200, 1000, 200, 1000],
+    vibrate: [800, 200, 800, 200, 800, 200, 800],
     requireInteraction: false,
-    silent: false,
-    priority: 'high'
+    silent: false
   });
 });
