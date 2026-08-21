@@ -863,15 +863,20 @@ export function OrderTakerApp() {
             <p className="text-[10px] text-slate-400">{orderTaker?.role || 'Order Taker'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleBtConnect} disabled={btConnecting}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${btConnected ? 'bg-emerald-600 text-white' : 'bg-sky-100 text-sky-700 hover:bg-sky-200'}`}>
-            {btConnecting ? 'Connecting...' : btConnected ? `🖨️ ${btInfo?.name || 'Printer'}` : '🖨️ Attach Bluetooth Printer'}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={handleBtConnect} disabled={btConnecting} title={btConnected ? `Printer: ${btInfo?.name || ''}` : 'Attach Bluetooth Printer'}
+            className={`shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold ${btConnected ? 'bg-emerald-600 text-white' : 'bg-sky-100 text-sky-700 hover:bg-sky-200'}`}>
+            {btConnecting ? '⏳' : btConnected ? `🖨️ ${(btInfo?.name || 'Printer').slice(0, 10)}` : '🖨️'}
           </button>
-          <button onClick={() => setShowOrdersPopup(true)} className="relative rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
-            📋 Orders {myNewOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({myNewOrders.length})</span>}
+          <button onClick={() => setShowOrdersPopup(true)} className="relative shrink-0 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-200 active:scale-95 transition">
+            📋 Orders
+            {myNewOrders.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-black text-white ring-2 ring-white shadow">
+                {myNewOrders.length}
+              </span>
+            )}
           </button>
-          <button onClick={handleLogout} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Logout</button>
+          <button onClick={handleLogout} className="shrink-0 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Logout</button>
         </div>
       </div>
 
