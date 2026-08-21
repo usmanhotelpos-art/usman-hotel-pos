@@ -75,6 +75,8 @@ function App() {
     posHeaderSubtitle: 'POS Header',
     posHeaderTitle: 'POS Counter',
     posHeaderPhoto: '',
+    tableSectionLabelFloor: 'Floor',
+    tableSectionLabelOutside: 'Outside',
     developerPhoto: '',
     riderAppTitle: 'Rider Portal',
     riderAppSubtitle: 'Fast delivery management for riders',
@@ -2514,6 +2516,25 @@ try {
       reader.readAsDataURL(file);
     }
   };
+
+  async function saveTableSectionLabels() {
+    setLoading(true);
+    setMessage('');
+    try {
+      const floorLabel = (settings.tableSectionLabelFloor || '').trim() || 'Floor';
+      const outsideLabel = (settings.tableSectionLabelOutside || '').trim() || 'Outside';
+      await fetchJson(`${apiBase}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify({ tableSectionLabelFloor: floorLabel, tableSectionLabelOutside: outsideLabel })
+      });
+      setSettings((prev) => ({ ...prev, tableSectionLabelFloor: floorLabel, tableSectionLabelOutside: outsideLabel }));
+      setMessage('Table section names saved.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function updateSettings() {
     setLoading(true);
@@ -6212,26 +6233,44 @@ try {
   }
 
   function renderTables() {
+    const floorLabel = settings.tableSectionLabelFloor || 'Floor';
+    const outsideLabel = settings.tableSectionLabelOutside || 'Outside';
+    const sectionDisplayName = (section) => ((section || 'Floor') === 'Outside' ? outsideLabel : floorLabel);
     const floorTables = items.filter((table) => (table.section || 'Floor') === 'Floor');
     const outsideTables = items.filter((table) => (table.section || 'Floor') === 'Outside');
     const displayTables = tableSectionFilter === 'Outside' ? outsideTables : floorTables;
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Table Management</p>
-            <h3 className="mt-2 text-2xl font-semibold text-white">In hotel and outside tables</h3>
+        <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Table Management</p>
+              <h3 className="mt-2 text-2xl font-semibold text-white">In hotel and outside tables</h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => setTableSectionFilter('Floor')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${tableSectionFilter === 'Floor' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+                {floorLabel} Tables
+              </button>
+              <button onClick={() => setTableSectionFilter('Outside')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${tableSectionFilter === 'Outside' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+                {outsideLabel} Tables
+              </button>
+              <button onClick={() => openTableModal()} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">
+                Add Table
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setTableSectionFilter('Floor')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${tableSectionFilter === 'Floor' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-              Floor Tables
-            </button>
-            <button onClick={() => setTableSectionFilter('Outside')} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${tableSectionFilter === 'Outside' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-              Outside Tables
-            </button>
-            <button onClick={() => openTableModal()} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">
-              Add Table
+          <div className="mt-4 flex flex-wrap items-end gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">✏️ Rename "{floorLabel}" section</label>
+              <input value={settings.tableSectionLabelFloor ?? 'Floor'} onChange={(e) => setSettings((prev) => ({ ...prev, tableSectionLabelFloor: e.target.value }))} placeholder="Floor" className="w-40 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500" />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">✏️ Rename "{outsideLabel}" section</label>
+              <input value={settings.tableSectionLabelOutside ?? 'Outside'} onChange={(e) => setSettings((prev) => ({ ...prev, tableSectionLabelOutside: e.target.value }))} placeholder="Outside" className="w-40 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500" />
+            </div>
+            <button onClick={saveTableSectionLabels} disabled={loading} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-500 active:scale-95 disabled:opacity-50">
+              💾 Save Names
             </button>
           </div>
         </div>
@@ -6243,7 +6282,7 @@ try {
                 <div>
                   <div className="text-2xl font-semibold text-white">{table.label || table.name || `Table ${table.number || table.id}`}</div>
                   <div className="mt-1 text-sm text-slate-400">{table.capacity ? `${table.capacity} seats` : table.type || 'Table'}</div>
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500 mt-1">{(table.section || 'Floor').toUpperCase()}</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500 mt-1">{sectionDisplayName(table.section)}</div>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${table.status === 'occupied' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}>
                   {table.status}
@@ -6278,8 +6317,8 @@ try {
                 <input value={tableForm.label} onChange={(e) => setTableForm((prev) => ({ ...prev, label: e.target.value }))} className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none" />
                 <label className="block text-sm text-slate-400">Section</label>
                 <select value={tableForm.section} onChange={(e) => setTableForm((prev) => ({ ...prev, section: e.target.value }))} className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none">
-                  <option value="Floor">Floor</option>
-                  <option value="Outside">Outside</option>
+                  <option value="Floor">{settings.tableSectionLabelFloor || 'Floor'}</option>
+                  <option value="Outside">{settings.tableSectionLabelOutside || 'Outside'}</option>
                 </select>
                 <label className="block text-sm text-slate-400">Type</label>
                 <select value={tableForm.type} onChange={(e) => setTableForm((prev) => ({ ...prev, type: e.target.value }))} className="rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none">
@@ -12180,7 +12219,7 @@ try {
                 <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Floor tables</p>
+                      <p className="text-sm uppercase tracking-[0.2em] text-slate-400">{settings.tableSectionLabelFloor || 'Floor'} tables</p>
                       <h4 className="mt-2 text-lg font-semibold text-white">In hotel floor</h4>
                     </div>
                     <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{floorTables.length}</span>
@@ -12266,7 +12305,7 @@ try {
                 <div className="rounded-[32px] border border-slate-800 bg-slate-900 p-5 shadow-soft">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Outside tables</p>
+                      <p className="text-sm uppercase tracking-[0.2em] text-slate-400">{settings.tableSectionLabelOutside || 'Outside'} tables</p>
                       <h4 className="mt-2 text-lg font-semibold text-white">Outside hotel</h4>
                     </div>
                     <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{outsideTables.length}</span>
