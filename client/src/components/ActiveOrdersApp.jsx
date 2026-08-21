@@ -581,29 +581,6 @@ export function ActiveOrdersApp() {
     }
   }
 
-  function printOrder(order) {
-    const win = window.open('', '_blank', 'width=380,height=600');
-    if (!win) return;
-    const rows = (order.items || [])
-      .map((it) => `<tr><td>${it.quantity}x</td><td>${it.name}</td><td style="text-align:right">${(Number(it.price) || 0) * (Number(it.quantity) || 0)}</td></tr>`)
-      .join('');
-    win.document.write(`<!doctype html><html><head><title>#${order.orderNumber || order.id}</title>
-      <style>body{font-family:'Courier New',monospace;font-size:12px;padding:8px}h2{text-align:center;margin:4px 0}
-      table{width:100%;border-collapse:collapse;margin-top:6px}td{padding:2px 0}.tot{font-weight:bold;border-top:1px dashed #000;margin-top:6px;padding-top:4px;display:flex;justify-content:space-between}</style></head><body>
-      <h2>ACTIVE ORDER TICKET</h2>
-      <div style="text-align:center">#${order.orderNumber || order.id} · TABLE ${order.tableNumber || '-'}</div><hr/>
-      <div>Taker: ${order.orderTaker || order.waiter || '-'}</div>
-      <div>Customer: ${order.customerName || '-'}</div>
-      <div>Placed: ${fmt(order.createdAt)}</div><hr/>
-      <table>${rows}</table>
-      <div class="tot"><span>TOTAL</span><span>${Number(order.total || order.amount || 0)} Rs</span></div>
-      <div style="text-align:center;margin-top:10px">Status: ${order.status || '-'}</div>
-      </body></html>`);
-    win.document.close();
-    win.focus();
-    win.print();
-  }
-
   if (!token) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-slate-100">
@@ -754,7 +731,7 @@ export function ActiveOrdersApp() {
                   </button>
                 )}
 
-                <div className="mt-2.5 grid grid-cols-6 gap-1.5">
+                <div className="mt-2.5 grid grid-cols-5 gap-1.5">
                   <button onClick={() => markPaid(order)} disabled={busyId === order.id} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 py-2.5 text-white shadow transition-all active:scale-90 disabled:opacity-50">
                     <span className="text-lg leading-none">✅</span>
                     <span className="text-[9px] font-black">PAID</span>
@@ -763,13 +740,9 @@ export function ActiveOrdersApp() {
                     <span className="text-lg leading-none">🍽️</span>
                     <span className="text-[9px] font-black">{served ? 'SERVED' : 'SERVE'}</span>
                   </button>
-                  <button onClick={() => printOrder(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-sky-500 to-sky-700 py-2.5 text-white shadow transition-all active:scale-90">
+                  <button onClick={() => printOrderBT(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-sky-500 to-sky-700 py-2.5 text-white shadow transition-all active:scale-90">
                     <span className="text-lg leading-none">🖨️</span>
                     <span className="text-[9px] font-black">PRINT</span>
-                  </button>
-                  <button onClick={() => printOrderBT(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-fuchsia-500 to-fuchsia-700 py-2.5 text-white shadow transition-all active:scale-90">
-                    <span className="text-lg leading-none">📶</span>
-                    <span className="text-[9px] font-black">BT</span>
                   </button>
                   <button onClick={() => setViewOrder(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-700 py-2.5 text-white shadow transition-all active:scale-90">
                     <span className="text-lg leading-none">👁️</span>
@@ -834,10 +807,9 @@ export function ActiveOrdersApp() {
                 <span className="shrink-0 text-slate-500">🔍</span>
               </button>
             )}
-            <div className="mt-3 grid grid-cols-5 gap-1.5">
+            <div className="mt-3 grid grid-cols-4 gap-1.5">
               <button onClick={() => { markPaid(viewOrder); setViewOrder(null); }} className="rounded-xl bg-emerald-600 py-2 text-[11px] font-black text-white">✅ PAID</button>
-              <button onClick={() => { printOrder(viewOrder); }} className="rounded-xl bg-sky-600 py-2 text-[11px] font-black text-white">🖨️ PRINT</button>
-              <button onClick={() => { printOrderBT(viewOrder); }} className="rounded-xl bg-fuchsia-600 py-2 text-[11px] font-black text-white">📶 BT</button>
+              <button onClick={() => { printOrderBT(viewOrder); }} className="rounded-xl bg-sky-600 py-2 text-[11px] font-black text-white">🖨️ PRINT</button>
               <button onClick={() => { deleteOrder(viewOrder); setViewOrder(null); }} className="rounded-xl bg-rose-600 py-2 text-[11px] font-black text-white">🗑️ DEL</button>
               <button onClick={() => setViewOrder(null)} className="rounded-xl bg-slate-700 py-2 text-[11px] font-black text-white">CLOSE</button>
             </div>
