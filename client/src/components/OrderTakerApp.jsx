@@ -571,8 +571,6 @@ export function OrderTakerApp() {
     (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isCancelledOrder(o)
   ), [orders, orderTaker]);
 
-  const myActiveOrderCount = myNewOrders.length + myServedOrders.length;
-
   async function createOrder(orderStatus = 'Pending', paymentOpts = {}) {
     if (!cart.length) { setMessage('Cart is empty'); return; }
     if (activeType === 'Dine-In' && !tableNumber) { setMessage('Please select a table or room'); return; }
@@ -871,7 +869,7 @@ export function OrderTakerApp() {
             {btConnecting ? 'Connecting...' : btConnected ? `🖨️ ${btInfo?.name || 'Printer'}` : '🖨️ Attach Bluetooth Printer'}
           </button>
           <button onClick={() => setShowOrdersPopup(true)} className="relative rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
-            📋 Orders {myActiveOrderCount > 0 && <span className="ml-1 text-emerald-600 font-bold">({myActiveOrderCount})</span>}
+            📋 Orders {myNewOrders.length > 0 && <span className="ml-1 text-emerald-600 font-bold">({myNewOrders.length})</span>}
           </button>
           <button onClick={handleLogout} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Logout</button>
         </div>
