@@ -123,6 +123,7 @@ export function OrderTakerApp() {
   // Orders list UX
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [ordersTab, setOrdersTab] = useState('new');
+  const [popupRefreshing, setPopupRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [paymentMethodOrder, setPaymentMethodOrder] = useState(null);
   const [editAddSearch, setEditAddSearch] = useState('');
@@ -192,6 +193,26 @@ export function OrderTakerApp() {
       if (!silent && tbls === null) setMessage('Could not load tables from server - check connection or re-login');
     } catch (e) { if (!silent) setMessage(e.message); }
   }
+
+  async function refreshOrdersOnly(showSpin = false) {
+    if (showSpin) setPopupRefreshing(true);
+    try {
+      const ords = await fetchJson(`${apiBase}/pos/orders`, { token });
+      if (Array.isArray(ords)) setOrders(ords);
+    } catch (e) {
+      if (!showSpin) setMessage(e.message);
+    } finally {
+      if (showSpin) setTimeout(() => setPopupRefreshing(false), 500);
+    }
+  }
+
+  // Auto-refresh popup orders every 2s while open
+  useEffect(() => {
+    if (!showOrdersPopup || !token) return;
+    refreshOrdersOnly();
+    const id = setInterval(() => refreshOrdersOnly(), 2000);
+    return () => clearInterval(id);
+  }, [showOrdersPopup, token]);
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -1171,7 +1192,12 @@ export function OrderTakerApp() {
           <div className="relative w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-800">
               <h3 className="text-base font-bold text-white">📋 My Orders</h3>
-              <button onClick={() => setShowOrdersPopup(false)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
+              <div className="flex items-center gap-2">
+                <span onClick={() => refreshOrdersOnly(true)} className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-slate-800 text-sm text-emerald-400 transition active:scale-90 hover:bg-slate-700" title="Refresh orders">
+                  <span className={`inline-block ${popupRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+                </span>
+                <button onClick={() => setShowOrdersPopup(false)} className="rounded-full p-1 text-slate-300 hover:bg-slate-800">✕</button>
+              </div>
             </div>
 
             {/* Tabs: New | Served | Cancelled | All */}
