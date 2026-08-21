@@ -9302,12 +9302,14 @@ try {
   }
 
   function getNaanRotiProducts() {
-    const assignedNames = catalogueAssignedCategories.length
-      ? catalogueAssignedCategories
-      : posCategories.map((category) => category.name);
-    const sourceNames = assignedNames.length ? assignedNames : posProducts.map((product) => product.category).filter(Boolean);
-    const categoryNames = sourceNames.filter(isNaanRotiCategory);
-    return posProducts.filter((product) => categoryNames.includes(product.category) || isNaanRotiCategory(product.category));
+    const assignedNames = catalogueAssignedCategories.map((category) => normalizeText(category));
+    const hasAssignedCategories = assignedNames.length > 0;
+    return posProducts.filter((product) => {
+      const productCategory = product.category || product.categoryName || product.type || product.group || '';
+      const isNaanRoti = isNaanRotiCategory(productCategory);
+      const isAssigned = !hasAssignedCategories || assignedNames.includes(normalizeText(productCategory));
+      return isNaanRoti && isAssigned;
+    });
   }
 
   function openCatalogueCart() {
