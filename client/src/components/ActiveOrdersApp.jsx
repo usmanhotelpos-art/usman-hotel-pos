@@ -52,15 +52,24 @@ export function ActiveOrdersApp() {
   const [viewOrder, setViewOrder] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const seenIdsRef = useRef(null);
   const audioCtxRef = useRef(null);
   const alertsRef = useRef(false);
+  const keepAliveRef = useRef(null);
+  const swRegRef = useRef(null);
   const tokenRef = useRef(token);
   tokenRef.current = token;
 
   useEffect(() => {
     document.title = 'Active Dine-In Orders';
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw-active-orders.js').then((reg) => {
+        swRegRef.current = reg;
+      }).catch(() => {});
+    }
+    return () => stopKeepAlive();
   }, []);
 
   async function loadData(silent = true) {
@@ -109,9 +118,43 @@ export function ActiveOrdersApp() {
 
   useEffect(() => {
     if (token) loadData(true);
-    const id = setInterval(() => loadData(true), 10000);
+    const id = setInterval(() => loadData(true), 1000);
     return () => clearInterval(id);
   }, [token]);
+
+  // Keep tab "playing audio" so Chrome does not throttle timers in background
+  function startKeepAlive() {
+    try {
+      if (keepAliveRef.current) return;
+      unlockAudio();
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 55;
+      gain.gain.value = 0.003;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      keepAliveRef.current = { ctx, osc, gain };
+    } catch { /* ignore */ }
+  }
+
+  function stopKeepAlive() {
+    try {
+      if (keepAliveRef.current) {
+        keepAliveRef.current.osc.stop();
+        keepAliveRef.current = null;
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function manualRefresh() {
+    setRefreshing(true);
+    await loadData(true);
+    setTimeout(() => setRefreshing(false), 500);
+  }
 
   function unlockAudio() {
     try {
@@ -145,18 +188,28 @@ export function ActiveOrdersApp() {
   }
 
   function showNotifications(list) {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const title = list.length > 1 ? `🆕 ${list.length} New Dine-In Orders` : '🆕 New Dine-In Order';
     const body = list
       .slice(0, 3)
-      .map((o) => `#${o.orderNumber || o.id} · Table ${o.tableNumber || '-'} · ${(o.items || []).length} items · ${Number(o.total || o.amount || 0)} Rs`)
+      .map((o) => `Table ${o.tableNumber || '-'} · #${o.orderNumber || o.id} · ${(o.items || []).length} items · ${Number(o.total || o.amount || 0)} Rs`)
       .join('\n');
+    // 1st: service worker notification (works in background, WhatsApp-style heads-up + vibration)
     try {
-      const n = new Notification(title, { body, tag: 'active-orders', renotify: true, requireInteraction: false });
+      if (swRegRef.current?.active) {
+        swRegRef.current.active.postMessage({ type: 'notify', orders: list, tag: 'ao-' + Date.now() });
+        return;
+      }
+    } catch { /* ignore */ }
+    // Fallback: page notification
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const title = list.length > 1 ? `🆕 ${list.length} New Dine-In Orders` : '🆕 New Dine-In Order';
+    try {
+      const n = new Notification(title, { body, tag: 'active-orders', renotify: true });
       setTimeout(() => n.close(), 15000);
     } catch {
       try {
-        navigator.serviceWorker?.ready?.then((reg) => reg.showNotification(title, { body, tag: 'active-orders' })).catch(() => {});
+        navigator.serviceWorker?.ready
+          ?.then((reg) => reg.showNotification(title, { body, tag: 'active-orders' }))
+          .catch(() => {});
       } catch { /* ignore */ }
     }
   }
@@ -165,7 +218,7 @@ export function ActiveOrdersApp() {
     playLoudAlert();
     setTimeout(playLoudAlert, 3200);
     try {
-      navigator.vibrate?.([600, 200, 600, 200, 600]);
+      navigator.vibrate?.([800, 200, 800, 200, 800]);
     } catch { /* ignore */ }
     showNotifications(freshOnes);
   }
@@ -181,8 +234,9 @@ export function ActiveOrdersApp() {
     setNotifState(perm);
     alertsRef.current = true;
     setAlertsEnabled(true);
+    startKeepAlive();
     playLoudAlert();
-    setMessage('Alerts enabled - loud sound will play on every new order ✅');
+    setMessage('Alerts enabled - sound + vibration even with screen off ✅');
     setTimeout(() => setMessage(''), 4000);
   }
 
@@ -371,21 +425,26 @@ export function ActiveOrdersApp() {
             <div>
               <h1 className="text-base font-bold leading-tight">Active Dine-In Orders</h1>
               <p className="text-[10px] text-slate-400">
-                {lastUpdated ? `Updated ${fmtTime(lastUpdated)} · auto-refresh 10s` : 'Loading...'}
+                {lastUpdated ? `Updated ${fmtTime(lastUpdated)} · auto-refresh 1s` : 'Loading...'}
               </p>
             </div>
             <span className={`ml-1 flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black ${activeOrders.length ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
               {activeOrders.length}
             </span>
           </div>
-          <button
-            onClick={enableAlerts}
-            className={`rounded-full px-3 py-2 text-xs font-bold transition-all active:scale-95 ${
-              alertsEnabled ? 'bg-emerald-600 text-white shadow-[0_0_16px_rgba(16,185,129,0.6)]' : 'animate-pulse bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white'
-            }`}
-          >
-            {alertsEnabled ? '🔔 Alerts ON' : '🔔 Enable Sound + Alerts'}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={manualRefresh} title="Refresh orders" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-base text-emerald-400 transition-all active:scale-90 hover:bg-slate-700">
+              <span className={`inline-block ${refreshing ? 'animate-spin' : ''}`}>🔄</span>
+            </button>
+            <button
+              onClick={enableAlerts}
+              className={`rounded-full px-3 py-2 text-xs font-bold transition-all active:scale-95 ${
+                alertsEnabled ? 'bg-emerald-600 text-white shadow-[0_0_16px_rgba(16,185,129,0.6)]' : 'animate-pulse bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white'
+              }`}
+            >
+              {alertsEnabled ? '🔔 Alerts ON' : '🔔 Enable Sound + Alerts'}
+            </button>
+          </div>
         </div>
         {message && <div className="mx-auto max-w-3xl px-3 pb-2"><p className="rounded-lg bg-emerald-950/70 px-3 py-1.5 text-xs font-semibold text-emerald-300">{message}</p></div>}
         {notifState === 'denied' && (
