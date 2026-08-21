@@ -9298,7 +9298,11 @@ try {
 
   function isNaanRotiCategory(categoryName) {
     const normalizedCategory = normalizeText(categoryName);
-    return normalizedCategory.includes('naan') || normalizedCategory.includes('roti');
+    return normalizedCategory.includes('naan') ||
+      normalizedCategory.includes('roti') ||
+      normalizedCategory.includes('نان') ||
+      normalizedCategory.includes('روٹی') ||
+      normalizedCategory.includes('روتي');
   }
 
   function getNaanRotiProducts() {
