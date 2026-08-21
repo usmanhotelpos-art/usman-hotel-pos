@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { requestBluetoothPrinter, printToBluetooth, getSavedPrinterInfo, clearPrinterInfo, autoConnectSavedPrinter, disconnectDevice } from '../utils/btPrint.js';
+import { buildEscposReceipt, renderReceiptToCanvas, canvasToEscposRaster, CMD } from '../utils/escpos.js';
 
 const API = '/api';
 
@@ -54,6 +56,14 @@ export function ActiveOrdersApp() {
   const [previewImage, setPreviewImage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderBanner, setNewOrderBanner] = useState([]);
+  const [activeTab, setActiveTab] = useState('active');
+  const [settings, setSettings] = useState({});
+
+  // Bluetooth printer
+  const [btDevice, setBtDevice] = useState(null);
+  const [btConnected, setBtConnected] = useState(false);
+  const [btInfo, setBtInfo] = useState(null);
+  const [btConnecting, setBtConnecting] = useState(false);
 
   useEffect(() => {
     if (!newOrderBanner.length) return;
@@ -131,6 +141,23 @@ export function ActiveOrdersApp() {
     if (token) loadData(true);
     const id = setInterval(() => loadData(true), 1000);
     return () => clearInterval(id);
+  }, [token]);
+
+  // Load printer/receipt settings once per login
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    fetchJson(`${API}/settings`)
+      .then((sets) => {
+        if (cancelled || !sets) return;
+        const recFmt = sets.receiptDateTimeFormat || 'DD/MM/YYYY hh:mm A';
+        setSettings({
+          ...sets,
+          receiptDateTimeFormat: recFmt.includes('HH') ? `${recFmt.replace('HH', 'hh')} A` : (recFmt.includes('hh') && !recFmt.includes('A') ? `${recFmt} A` : recFmt)
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [token]);
 
   // Keep tab "playing audio" so Chrome does not throttle timers in background
@@ -274,10 +301,20 @@ export function ActiveOrdersApp() {
   const activeOrders = useMemo(
     () =>
       orders
-        .filter((o) => o.orderType === 'Dine-In' && !ACTIVE_STATUSES_EXCLUDED.includes(norm(o.status)))
+        .filter((o) => o.orderType === 'Dine-In' && !ACTIVE_STATUSES_EXCLUDED.includes(norm(o.status)) && norm(o.status) !== 'served')
         .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)),
     [orders]
   );
+
+  const servedOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => o.orderType === 'Dine-In' && !ACTIVE_STATUSES_EXCLUDED.includes(norm(o.status)) && norm(o.status) === 'served')
+        .sort((a, b) => new Date(b.servedAt || b.createdAt || b.date || 0) - new Date(a.servedAt || a.createdAt || a.date || 0)),
+    [orders]
+  );
+
+  const displayOrders = activeTab === 'served' ? servedOrders : activeOrders;
 
   const tableStatusFor = (label) => {
     const t = tables.find((x) => String(x.label || x.name || x.number || '') === String(label || ''));
@@ -387,6 +424,163 @@ export function ActiveOrdersApp() {
     }
   }
 
+  async function handleBtConnect() {
+    if (btConnected && btDevice) {
+      await disconnectDevice(btDevice);
+      setBtDevice(null);
+      setBtConnected(false);
+      setBtInfo(null);
+      clearPrinterInfo();
+      setMessage('Bluetooth printer disconnected');
+      setTimeout(() => setMessage(''), 2500);
+      return;
+    }
+    setBtConnecting(true);
+    try {
+      let device, info;
+      const savedPrinter = getSavedPrinterInfo();
+      if (savedPrinter?.id) {
+        try {
+          const result = await autoConnectSavedPrinter();
+          device = result.device;
+          info = result.info;
+        } catch (err) {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          info = result.info;
+        }
+      } else {
+        const result = await requestBluetoothPrinter();
+        device = result.device;
+        info = result.info;
+      }
+      setBtDevice(device);
+      setBtInfo(info);
+      setBtConnected(true);
+      setMessage(`Bluetooth printer connected: ${info.name}`);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setMessage(err.message || 'Bluetooth connection failed');
+      setTimeout(() => setMessage(''), 4000);
+    } finally {
+      setBtConnecting(false);
+    }
+  }
+
+  async function printRaster(device, order) {
+    const canvas = renderReceiptToCanvas(order, settings);
+    const rasterData = canvasToEscposRaster(canvas);
+    const cutCmd = new Uint8Array(CMD.CUT);
+    const feedCmd = new Uint8Array(CMD.FEED_LINES(8));
+    const finalData = new Uint8Array(rasterData.length + feedCmd.length + cutCmd.length);
+    let offset = 0;
+    finalData.set(rasterData, offset); offset += rasterData.length;
+    finalData.set(feedCmd, offset); offset += feedCmd.length;
+    finalData.set(cutCmd, offset);
+    await printToBluetooth(device, finalData);
+  }
+
+  async function printOrderBT(orderInput) {
+    const order = { ...orderInput, date: orderInput.date || orderInput.createdAt };
+    let device = btDevice;
+
+    if (!btConnected || !device) {
+      try {
+        const result = await autoConnectSavedPrinter();
+        device = result.device;
+        setBtDevice(device);
+        setBtConnected(true);
+        setBtInfo(result.info);
+      } catch (err) {
+        try {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          setBtDevice(device);
+          setBtConnected(true);
+          setBtInfo(result.info);
+        } catch (pairErr) {
+          setMessage(pairErr.message || 'No printer selected');
+          setTimeout(() => setMessage(''), 4000);
+          return;
+        }
+      }
+    }
+
+    const attemptPrint = async () => {
+      if (settings.btEncoding === 'bmp') {
+        await printRaster(device, order);
+      } else {
+        try {
+          await printToBluetooth(device, buildEscposReceipt(order, settings));
+        } catch (textErr) {
+          console.warn('Text BT print failed, trying bitmap:', textErr.message);
+          await printRaster(device, order);
+        }
+      }
+
+      const shouldPrintTokenSlip = settings.tokenSlipEnabled && (
+        (order.orderType === 'Dine-In' && settings.btTokenSlipDineIn !== false) ||
+        (order.orderType === 'Takeaway' && settings.btTokenSlipTakeaway !== false) ||
+        (order.orderType === 'Delivery' && settings.btTokenSlipDelivery !== false) ||
+        (!order.orderType && settings.btTokenSlipDineIn !== false)
+      );
+      if (shouldPrintTokenSlip) {
+        const tokenOrder = { ...order, items: [] };
+        await new Promise((r) => setTimeout(r, 500));
+        if (settings.btEncoding === 'bmp') {
+          const tokenCanvas = renderReceiptToCanvas(tokenOrder, { ...settings, _tokenOnly: true });
+          const tokenRaster = canvasToEscposRaster(tokenCanvas);
+          const tokenFeed = new Uint8Array(CMD.FEED_LINES(8));
+          const tokenCut = new Uint8Array(CMD.CUT);
+          const tokenFinal = new Uint8Array(tokenRaster.length + tokenFeed.length + tokenCut.length);
+          let to = 0;
+          tokenFinal.set(tokenRaster, to); to += tokenRaster.length;
+          tokenFinal.set(tokenFeed, to); to += tokenFeed.length;
+          tokenFinal.set(tokenCut, to);
+          await printToBluetooth(device, tokenFinal);
+        } else {
+          const tokenData = buildEscposReceipt(tokenOrder, { ...settings, _tokenOnly: true });
+          await printToBluetooth(device, tokenData);
+        }
+      }
+    };
+
+    try {
+      await attemptPrint();
+      setMessage(`Order #${order.orderNumber || order.id} sent to printer 🖨️`);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.warn('BT print attempt failed, reconnecting and retrying:', err.message);
+      try { await disconnectDevice(device); } catch {}
+      try {
+        const result = await autoConnectSavedPrinter();
+        device = result.device;
+        setBtDevice(device);
+        setBtConnected(true);
+      } catch {
+        try {
+          const result = await requestBluetoothPrinter();
+          device = result.device;
+          setBtDevice(device);
+          setBtConnected(true);
+          setBtInfo(result.info);
+        } catch {
+          setMessage(`Bluetooth print failed: ${err.message}`);
+          setTimeout(() => setMessage(''), 5000);
+          return;
+        }
+      }
+      try {
+        await attemptPrint();
+        setMessage(`Order #${order.orderNumber || order.id} sent to printer 🖨️`);
+        setTimeout(() => setMessage(''), 3000);
+      } catch (retryErr) {
+        setMessage(`Bluetooth print failed: ${retryErr.message}`);
+        setTimeout(() => setMessage(''), 5000);
+      }
+    }
+  }
+
   function printOrder(order) {
     const win = window.open('', '_blank', 'width=380,height=600');
     if (!win) return;
@@ -451,6 +645,9 @@ export function ActiveOrdersApp() {
             <button onClick={manualRefresh} title="Refresh orders" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-base text-emerald-400 transition-all active:scale-90 hover:bg-slate-700">
               <span className={`inline-block ${refreshing ? 'animate-spin' : ''}`}>🔄</span>
             </button>
+            <button onClick={handleBtConnect} disabled={btConnecting} title={btConnected ? `Printer: ${btInfo?.name || ''}` : 'Attach Bluetooth Printer'} className={`flex h-9 w-9 items-center justify-center rounded-full text-base transition-all active:scale-90 ${btConnected ? 'bg-emerald-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.6)]' : 'bg-slate-800 text-sky-400 hover:bg-slate-700'} ${btConnecting ? 'animate-pulse' : ''}`}>
+              {btConnected ? '📶' : '🖨️'}
+            </button>
             <button
               onClick={enableAlerts}
               className={`rounded-full px-3 py-2 text-xs font-bold transition-all active:scale-95 ${
@@ -471,6 +668,18 @@ export function ActiveOrdersApp() {
         )}
       </div>
 
+      {/* Tabs: Active (default) / Served */}
+      <div className="mx-auto max-w-3xl px-3 pt-2">
+        <div className="flex gap-1.5 rounded-2xl border border-slate-800 bg-slate-900 p-1">
+          <button onClick={() => setActiveTab('active')} className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-black transition-all active:scale-[0.97] ${activeTab === 'active' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
+            🔥 ACTIVE ({activeOrders.length})
+          </button>
+          <button onClick={() => setActiveTab('served')} className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-black transition-all active:scale-[0.97] ${activeTab === 'served' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
+            🍽️ SERVED ({servedOrders.length})
+          </button>
+        </div>
+      </div>
+
       {/* On-screen new order alert - shows even while watching, no permission needed */}
       {newOrderBanner.length > 0 && (
         <div className="pointer-events-none fixed left-1/2 top-14 z-[80] w-[92%] max-w-md -translate-x-1/2">
@@ -485,14 +694,14 @@ export function ActiveOrdersApp() {
 
       {/* Orders */}
       <div className="mx-auto max-w-3xl space-y-3 px-3 pt-3">
-        {activeOrders.length === 0 ? (
+        {displayOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-slate-500">
-            <div className="text-5xl">🎉</div>
-            <p className="mt-2 text-sm font-semibold">No active dine-in orders</p>
-            <p className="text-xs">New orders will appear here with a loud alert</p>
+            <div className="text-5xl">{activeTab === 'served' ? '🍽️' : '🎉'}</div>
+            <p className="mt-2 text-sm font-semibold">{activeTab === 'served' ? 'No served orders yet' : 'No active dine-in orders'}</p>
+            <p className="text-xs">{activeTab === 'served' ? 'Marked-served orders move here' : 'New orders will appear here with a loud alert'}</p>
           </div>
         ) : (
-          activeOrders.map((order) => {
+          displayOrders.map((order) => {
             const isNew = Date.now() - new Date(order.createdAt || 0).getTime() < 5 * 60 * 1000;
             const served = norm(order.status) === 'served';
             return (
@@ -545,7 +754,7 @@ export function ActiveOrdersApp() {
                   </button>
                 )}
 
-                <div className="mt-2.5 grid grid-cols-5 gap-1.5">
+                <div className="mt-2.5 grid grid-cols-6 gap-1.5">
                   <button onClick={() => markPaid(order)} disabled={busyId === order.id} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 py-2.5 text-white shadow transition-all active:scale-90 disabled:opacity-50">
                     <span className="text-lg leading-none">✅</span>
                     <span className="text-[9px] font-black">PAID</span>
@@ -557,6 +766,10 @@ export function ActiveOrdersApp() {
                   <button onClick={() => printOrder(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-sky-500 to-sky-700 py-2.5 text-white shadow transition-all active:scale-90">
                     <span className="text-lg leading-none">🖨️</span>
                     <span className="text-[9px] font-black">PRINT</span>
+                  </button>
+                  <button onClick={() => printOrderBT(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-fuchsia-500 to-fuchsia-700 py-2.5 text-white shadow transition-all active:scale-90">
+                    <span className="text-lg leading-none">📶</span>
+                    <span className="text-[9px] font-black">BT</span>
                   </button>
                   <button onClick={() => setViewOrder(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-700 py-2.5 text-white shadow transition-all active:scale-90">
                     <span className="text-lg leading-none">👁️</span>
@@ -621,9 +834,10 @@ export function ActiveOrdersApp() {
                 <span className="shrink-0 text-slate-500">🔍</span>
               </button>
             )}
-            <div className="mt-3 grid grid-cols-4 gap-1.5">
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
               <button onClick={() => { markPaid(viewOrder); setViewOrder(null); }} className="rounded-xl bg-emerald-600 py-2 text-[11px] font-black text-white">✅ PAID</button>
               <button onClick={() => { printOrder(viewOrder); }} className="rounded-xl bg-sky-600 py-2 text-[11px] font-black text-white">🖨️ PRINT</button>
+              <button onClick={() => { printOrderBT(viewOrder); }} className="rounded-xl bg-fuchsia-600 py-2 text-[11px] font-black text-white">📶 BT</button>
               <button onClick={() => { deleteOrder(viewOrder); setViewOrder(null); }} className="rounded-xl bg-rose-600 py-2 text-[11px] font-black text-white">🗑️ DEL</button>
               <button onClick={() => setViewOrder(null)} className="rounded-xl bg-slate-700 py-2 text-[11px] font-black text-white">CLOSE</button>
             </div>
