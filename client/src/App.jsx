@@ -3576,6 +3576,7 @@ try {
 
   async function deleteSelectedDineinOrders() {
     if (!selectedDineinOrders.length) return;
+    if (!confirm(`Delete ${selectedDineinOrders.length} selected order(s)? This cannot be undone.`)) return;
     setLoading(true);
     setMessage('');
     try {
@@ -3583,6 +3584,83 @@ try {
         selectedDineinOrders.map((orderId) => fetchJson(`${apiBase}/pos/orders/${orderId}`, { method: 'DELETE' }))
       );
       setMessage(`${selectedDineinOrders.length} orders deleted successfully.`);
+      setSelectedDineinOrders([]);
+      await loadOrdersData();
+      await loadPosData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleSelectAllDineinOrders(orderIds) {
+    setSelectedDineinOrders((prev) => {
+      const allSelected = orderIds.length > 0 && orderIds.every((id) => prev.includes(id));
+      return allSelected ? prev.filter((id) => !orderIds.includes(id)) : [...new Set([...prev, ...orderIds])];
+    });
+  }
+
+  function clearDineinOrderSelection() {
+    setSelectedDineinOrders([]);
+  }
+
+  async function markSelectedDineinOrdersPaid() {
+    const targets = posOrders.filter(
+      (o) => selectedDineinOrders.includes(o.id) && !['Completed', 'Payment Collected'].includes(o.status)
+    );
+    if (!targets.length) {
+      setMessage('No pending orders among selection to mark as paid.');
+      return;
+    }
+    setLoading(true);
+    setMessage('');
+    try {
+      for (const order of targets) {
+        await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            status: 'Payment Collected',
+            paymentStatus: 'Paid',
+            items: order.items || [],
+            customerName: order.customerName || '',
+            phone: order.phone || '',
+            address: order.address || '',
+            tableNumber: order.tableNumber || '',
+            deliveryAgent: order.deliveryAgent || '',
+            serviceType: order.serviceType || '',
+            deliveryFee: order.deliveryFee || 0,
+            discount: order.discount || 0,
+            taxPercent: order.taxPercent || 0,
+            serviceCharge: order.serviceCharge || 0,
+            paymentMethod: order.paymentMethod || 'Cash',
+            notes: order.notes || ''
+          })
+        });
+        const amount = Number(order.total || order.amount || 0);
+        if (amount) {
+          await fetchJson(`${apiBase}/pos/payments`, {
+            method: 'POST',
+            body: JSON.stringify({
+              orderId: order.id,
+              amount,
+              paymentMethod: order.paymentMethod || 'Cash',
+              status: 'Completed',
+              description: `Payment collected for order ${order.orderNumber || order.id}`
+            })
+          });
+        }
+        if (order.tableNumber) {
+          const table = posTables.find((item) => item.label === order.tableNumber || item.name === order.tableNumber || item.number === order.tableNumber);
+          if (table) {
+            await fetchJson(`${apiBase}/pos/tables/${table.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ status: 'available' })
+            });
+          }
+        }
+      }
+      setMessage(`${targets.length} orders marked paid successfully.`);
       setSelectedDineinOrders([]);
       await loadOrdersData();
       await loadPosData();
@@ -12438,16 +12516,46 @@ try {
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2.5">
                 <span className="text-xs font-bold text-white">🍽️ Active Dine-In Orders</span>
-                <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">{activeDineinOrdersFiltered.length}</span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">{activeDineinOrdersFiltered.length}</span>
+                  {activeDineinOrdersFiltered.length > 0 && (
+                    <button
+                      onClick={() => toggleSelectAllDineinOrders(activeDineinOrdersFiltered.map((o) => o.id))}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all active:scale-95 ${
+                        activeDineinOrdersFiltered.length > 0 && activeDineinOrdersFiltered.every((o) => selectedDineinOrders.includes(o.id))
+                          ? 'bg-slate-700 text-slate-200'
+                          : 'bg-violet-600 text-white hover:bg-violet-500'
+                      }`}
+                    >
+                      {activeDineinOrdersFiltered.every((o) => selectedDineinOrders.includes(o.id)) ? '☐ Deselect All' : '☑ Select All'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {selectedDineinOrders.length > 0 && (
+                <div className="sticky top-[64px] z-30 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-600/50 bg-slate-900 p-3 shadow-lg">
+                  <div className="text-xs font-bold text-emerald-400">{selectedDineinOrders.length} order{selectedDineinOrders.length > 1 ? 's' : ''} selected</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={markSelectedDineinOrdersPaid} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 active:scale-95 transition-all">✓ Mark Paid</button>
+                    <button onClick={deleteSelectedDineinOrders} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500 active:scale-95 transition-all">🗑 Delete</button>
+                    <button onClick={clearDineinOrderSelection} className="rounded-full border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 active:scale-95 transition-all">✕ Deselect</button>
+                  </div>
+                </div>
+              )}
               {activeDineinOrdersFiltered.length === 0 ? (
                 <div className="text-center text-sm text-slate-500 py-8">No active dine-in orders</div>
               ) : (
                 activeDineinOrdersFiltered.map((order) => {
                   const isCompleted = ['Completed', 'Payment Collected'].includes(order.status);
                   return (
-                    <div key={order.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200">
+                    <div key={order.id} className={`rounded-2xl border p-3 text-xs text-slate-200 ${selectedDineinOrders.includes(order.id) ? 'border-emerald-500/60 bg-emerald-950/20' : 'border-slate-800 bg-slate-900'}`}>
                       <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedDineinOrders.includes(order.id)}
+                          onChange={() => toggleDineinOrderSelection(order.id)}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <div className="font-semibold text-white text-sm truncate">#{order.orderNumber || order.id}</div>
@@ -12538,10 +12646,29 @@ try {
 
           {(dineinSubTab === 'paid' || dineinSubTab === 'due') && (
             <>
+              {statusFiltered.length > 0 && (
+                <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+                  <span className="text-xs font-bold text-white">{dineinSubTab === 'paid' ? '💳 Paid Orders' : '📍 Due Orders'}</span>
+                  <button
+                    onClick={() => toggleSelectAllDineinOrders(statusFiltered.map((o) => o.id))}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all active:scale-95 ${
+                      statusFiltered.length > 0 && statusFiltered.every((o) => selectedDineinOrders.includes(o.id))
+                        ? 'bg-slate-700 text-slate-200'
+                        : 'bg-violet-600 text-white hover:bg-violet-500'
+                    }`}
+                  >
+                    {statusFiltered.every((o) => selectedDineinOrders.includes(o.id)) ? '☐ Deselect All' : `☑ Select All (${statusFiltered.length})`}
+                  </button>
+                </div>
+              )}
               {selectedDineinOrders.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 gap-2">
-                  <div className="text-xs text-slate-300">{selectedDineinOrders.length} order{selectedDineinOrders.length > 1 ? 's' : ''} selected</div>
-                  <button onClick={deleteSelectedDineinOrders} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white">Delete Selected</button>
+                <div className="sticky top-[64px] z-30 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-600/50 bg-slate-900 p-3 shadow-lg">
+                  <div className="text-xs font-bold text-emerald-400">{selectedDineinOrders.length} order{selectedDineinOrders.length > 1 ? 's' : ''} selected</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={markSelectedDineinOrdersPaid} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 active:scale-95 transition-all">✓ Mark Paid</button>
+                    <button onClick={deleteSelectedDineinOrders} className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500 active:scale-95 transition-all">🗑 Delete</button>
+                    <button onClick={clearDineinOrderSelection} className="rounded-full border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 active:scale-95 transition-all">✕ Deselect</button>
+                  </div>
                 </div>
               )}
               {pagedDineinOrders.length === 0 ? (
