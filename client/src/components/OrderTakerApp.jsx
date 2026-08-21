@@ -598,16 +598,10 @@ export function OrderTakerApp() {
     );
   }, [orders, orderTaker]);
 
-  const allTypeOrders = useMemo(() => ((orders || [])
-    .filter(o => o.orderType === 'Dine-In'))
-    .slice()
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-  , [orders]);
-
   const popupOrders = useMemo(() => {
-    const base = ordersTab === 'new' ? myNewOrders : ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : allTypeOrders;
+    const base = ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : myNewOrders;
     return base.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  }, [ordersTab, myNewOrders, myServedOrders, myCancelledOrders, allTypeOrders]);
+  }, [ordersTab, myNewOrders, myServedOrders, myCancelledOrders]);
 
   async function createOrder(orderStatus = 'Pending', paymentOpts = {}) {
     if (!cart.length) { setMessage('Cart is empty'); return; }
@@ -1207,8 +1201,8 @@ export function OrderTakerApp() {
               </div>
             </div>
 
-            {/* Tabs: New | Served | Cancelled | All */}
-            <div className="grid grid-cols-4 gap-1 p-3 border-b border-slate-800">
+            {/* Tabs: New | Served | Cancelled */}
+            <div className="grid grid-cols-3 gap-1 p-3 border-b border-slate-800">
               <button onClick={() => setOrdersTab('new')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'new' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
                 🆕 New {myNewOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myNewOrders.length}</span>}
               </button>
@@ -1218,15 +1212,12 @@ export function OrderTakerApp() {
               <button onClick={() => setOrdersTab('cancelled')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'cancelled' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
                 ❌ Cancelled {myCancelledOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myCancelledOrders.length}</span>}
               </button>
-              <button onClick={() => setOrdersTab('all')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
-                📋 All {allTypeOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{allTypeOrders.length}</span>}
-              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {popupOrders.length === 0 && (
                 <p className="text-sm text-slate-500 text-center py-8">
-                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'served' ? 'No served orders yet' : ordersTab === 'cancelled' ? 'No cancelled orders yet' : 'No orders yet'}
+                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
                 </p>
               )}
               {popupOrders
