@@ -1419,13 +1419,18 @@ function App() {
       const saved = window.localStorage.getItem('posRoles');
       if (!saved) return defaultRoles;
       const parsed = JSON.parse(saved);
-      // Ensure 'restore' permission exists for admin-type roles in saved data
-      return parsed.map((r) => {
+      const merged = parsed.map((r) => {
         if (!r.permissions.restore && (r.name.toLowerCase().includes('admin') || r.permissions.settings)) {
           return { ...r, permissions: { ...r.permissions, restore: true } };
         }
         return r;
       });
+      for (const def of defaultRoles) {
+        if (!merged.some((r) => r.name === def.name)) {
+          merged.push(def);
+        }
+      }
+      return merged;
     } catch {
       return defaultRoles;
     }
