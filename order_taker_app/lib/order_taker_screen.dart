@@ -161,6 +161,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   bool get isTakeawayOnly => sOf(user['role']) == 'Takeaway Order Taker';
   bool get isTableOnly => sOf(user['role']) == 'Table Order Taker';
   bool get isBothTypes => !isTakeawayOnly && !isTableOnly;
+  bool get isTakeawayOrderTaker => isTakeawayOnly;
+  bool get isAdminOrderTaker => sOf(user['role']) == 'Admin Order Taker';
 
   List<dynamic> products = [];
   List<dynamic> categories = [];
@@ -176,6 +178,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
 
   bool showCart = false;
   bool showOrdersPopup = false;
+  bool showTakeawayOrdersPopup = false;
   bool showPaymentPopup = false;
   bool initialLoading = true;
 
@@ -195,6 +198,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   String editAddSearch = '';
 
   String ordersTab = 'new';
+  String takeawayOrdersTab = 'pay_later';
   dynamic expandedOrderId;
   bool popupRefreshing = false;
 
@@ -524,6 +528,34 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           sOf(o['orderType']) == 'Dine-In' && isMyOrder(o) && filter(o))
       .toList();
 
+  List<Map<String, dynamic>> myTakeawayOrdersBy(bool Function(Map) filter) => orders
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .where((o) =>
+          sOf(o['orderType']) == 'Takeaway' && isMyOrder(o) && filter(o))
+      .toList();
+
+  List<Map<String, dynamic>> get myTakeawayPayLaterOrders => myTakeawayOrdersBy((o) =>
+      !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o));
+
+  List<Map<String, dynamic>> get myTakeawayPaidOrders =>
+      myTakeawayOrdersBy((o) => isPaidOrDone(o));
+
+  List<Map<String, dynamic>> get myTakeawayDueOrders => myTakeawayOrdersBy((o) =>
+      !isPaidOrDone(o) && !isCancelledOrder(o));
+
+  List<Map<String, dynamic>> get takeawayPopupOrders {
+    final base = takeawayOrdersTab == 'paid'
+        ? myTakeawayPaidOrders
+        : takeawayOrdersTab == 'due'
+            ? myTakeawayDueOrders
+            : myTakeawayPayLaterOrders;
+    int ts(Map o) =>
+        DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
+    base.sort((a, b) => ts(b).compareTo(ts(a)));
+    return base;
+  }
+
   List<Map<String, dynamic>> get myNewOrders => myOrdersBy((o) =>
       !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o));
 
@@ -541,6 +573,15 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   }
 
   List<Map<String, dynamic>> get popupOrders {
+    if (isTakeawayOrderTaker) {
+      final base = takeawayOrdersTab == 'paid'
+          ? myTakeawayPaidOrders
+          : myTakeawayPayLaterOrders;
+      int ts(Map o) =>
+          DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
+      base.sort((a, b) => ts(b).compareTo(ts(a)));
+      return base;
+    }
     final base = ordersTab == 'served'
         ? myServedOrders
         : ordersTab == 'cancelled'
@@ -1386,6 +1427,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             if (showCart) _cartSheet(),
             if (showPaymentPopup) _takeawayPaymentSheet(),
             if (showOrdersPopup) _ordersPopup(),
+            if (showTakeawayOrdersPopup) _takeawayOrdersPopup(),
             if (editOrder != null) _editModal(),
             if (message.isNotEmpty) _toastOverlay(),
           ],
@@ -2433,17 +2475,36 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             fg: btConnected ? Colors.white : const Color(0xFF0369A1),
           ),
           const SizedBox(width: 6),
-          _pillButton(
-            label: '⚙️',
-            onTap: () {
-              setState(() => showPrinterSheet = true);
-              if (pairedPrintersList.isEmpty) _scanPrinters();
-            },
-            pad: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-            bg: const Color(0xFFFEF3C7),
-            fg: const Color(0xFF92400E),
-          ),
-          const SizedBox(width: 6),
+          if (isAdminOrderTaker) ...[
+            _pillButton(
+              label: '🛍️ Takeaway',
+              onTap: () {
+                setState(() => showTakeawayOrdersPopup = true);
+                _setPopupTimer();
+              },
+              bg: const Color(0xFFFEF3C7),
+              fg: const Color(0xFF92400E),
+              badge: myTakeawayPayLaterOrders.isNotEmpty
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints:
+                          const BoxConstraints(minWidth: 19, minHeight: 19),
+                      child: Text('${myTakeawayPayLaterOrders.length}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white)),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 6),
+          ],
           _pillButton(
             label: '📋 Orders',
             onTap: () {
@@ -3589,11 +3650,20 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
 
   Widget _ordersPopup() {
     final list = popupOrders;
-    final tabs = {
-      'new': ('🆕 New', myNewOrders.length, const Color(0xFFD97706)),
-      'served': ('✅ Served', myServedOrders.length, const Color(0xFF059669)),
-      'cancelled': ('❌ Cancelled', myCancelledOrders.length, const Color(0xFFE11D48)),
-    };
+    final bool isTakeawayOT = isTakeawayOrderTaker;
+    final Map<String, (String, int, Color)> tabs;
+    if (isTakeawayOT) {
+      tabs = {
+        'new': ('🛍️ Pay Later', myTakeawayPayLaterOrders.length, const Color(0xFFD97706)),
+        'served': ('✅ Paid', myTakeawayPaidOrders.length, const Color(0xFF059669)),
+      };
+    } else {
+      tabs = {
+        'new': ('🆕 New', myNewOrders.length, const Color(0xFFD97706)),
+        'served': ('✅ Served', myServedOrders.length, const Color(0xFF059669)),
+        'cancelled': ('❌ Cancelled', myCancelledOrders.length, const Color(0xFFE11D48)),
+      };
+    }
     return Positioned.fill(
       child: Material(
         color: Colors.black54,
@@ -3616,9 +3686,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                     padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                     child: Row(
                       children: [
-                        const Expanded(
-                          child: Text('📋 My Orders',
-                              style: TextStyle(
+                        Expanded(
+                          child: Text(
+                              isTakeawayOT ? '🛍️ Takeaway Orders' : '📋 My Orders',
+                              style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                   color: Colors.white)),
@@ -3661,12 +3732,22 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                         final label = e.value.$1;
                         final count = e.value.$2;
                         final color = e.value.$3;
-                        final active = ordersTab == key;
+                        final active = isTakeawayOT
+                            ? takeawayOrdersTab == (key == 'new' ? 'pay_later' : 'paid')
+                            : ordersTab == key;
                         return Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: GestureDetector(
-                              onTap: () => setState(() => ordersTab = key),
+                              onTap: () {
+                                setState(() {
+                                  if (isTakeawayOT) {
+                                    takeawayOrdersTab = key == 'new' ? 'pay_later' : 'paid';
+                                  } else {
+                                    ordersTab = key;
+                                  }
+                                });
+                              },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 9),
                                 decoration: BoxDecoration(
@@ -3721,11 +3802,166 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                         ? Center(
                             child: Text(
                               ordersTab == 'new'
-                                  ? 'No new orders yet'
+                                  ? 'No orders yet'
                                   : ordersTab == 'served'
                                       ? 'No served orders yet'
                                       : 'No cancelled orders yet',
                               style: const TextStyle(
+                                  fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                            itemCount: list.length,
+                            itemBuilder: (_, i) =>
+                                _orderCard(list[i], i, list,
+                                    printOnly: isTakeawayOT),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _takeawayOrdersPopup() {
+    final list = takeawayPopupOrders;
+    final tabs = {
+      'pay_later': ('🛍️ Pay Later', myTakeawayPayLaterOrders.length, const Color(0xFFD97706)),
+      'paid': ('✅ Paid', myTakeawayPaidOrders.length, const Color(0xFF059669)),
+      'due': ('💰 Due', myTakeawayDueOrders.length, const Color(0xFFE11D48)),
+    };
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black54,
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Container(
+              margin: const EdgeInsets.only(top: 24),
+              width: double.infinity,
+              constraints: BoxConstraints(
+                  maxWidth: 440, maxHeight: MediaQuery.of(context).size.height * 0.8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF020617),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E293B)),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text('🛍️ Takeaway Orders',
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white)),
+                        ),
+                        GestureDetector(
+                          onTap: () => _refreshOrdersOnly(showSpin: true),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1E293B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: popupRefreshing
+                                ? const SizedBox(
+                                    width: 13,
+                                    height: 13,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Color(0xFF34D399)))
+                                : const Text('🔄', style: TextStyle(fontSize: 13)),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            _popupTimer?.cancel();
+                            setState(() => showTakeawayOrdersPopup = false);
+                          },
+                          icon:
+                              const Icon(Icons.close, size: 18, color: Color(0xFFCBD5E1)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Row(
+                      children: tabs.entries.map((e) {
+                        final key = e.key;
+                        final label = e.value.$1;
+                        final count = e.value.$2;
+                        final color = e.value.$3;
+                        final active = takeawayOrdersTab == key;
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: GestureDetector(
+                              onTap: () => setState(() => takeawayOrdersTab = key),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? color
+                                      : const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Flexible(
+                                      child: Text(label,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: active
+                                                  ? Colors.white
+                                                  : const Color(0xFF94A3B8))),
+                                    ),
+                                    if (count > 0) ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: .2),
+                                          borderRadius:
+                                              BorderRadius.circular(100),
+                                        ),
+                                        child: Text('$count',
+                                            style: TextStyle(
+                                                fontSize: 8.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: active
+                                                    ? Colors.white
+                                                    : const Color(0xFF94A3B8))),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  Expanded(
+                    child: list.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No takeaway orders',
+                              style: TextStyle(
                                   fontSize: 13, color: Color(0xFF64748B)),
                             ),
                           )
@@ -3783,7 +4019,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return d?.millisecondsSinceEpoch ?? _now.value.millisecondsSinceEpoch;
   }
 
-  Widget _orderCard(Map<String, dynamic> o, int idx, List list) {
+  Widget _orderCard(Map<String, dynamic> o, int idx, List list, {bool printOnly = false}) {
     final id = o['id'];
     final expanded = expandedOrderId == id;
     final totals = orderTotals(o);
@@ -4048,15 +4284,17 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                             toast('Bluetooth print failed: $e', seconds: 6);
                           }
                         }),
-                        _actionChip('✏️ Edit Order', const Color(0xFF1E293B),
-                            const Color(0xFFE2E8F0), () => openEditOrder(o)),
-                        _actionChip(
-                            '✅ Mark Served',
-                            const Color(0xFF059669),
-                            Colors.white,
-                            () => markServed(o)),
-                        _actionChip('❌ Cancel Order', const Color(0xFFE11D48),
-                            Colors.white, () => cancelOrder(o)),
+                        if (!printOnly) ...[
+                          _actionChip('✏️ Edit Order', const Color(0xFF1E293B),
+                              const Color(0xFFE2E8F0), () => openEditOrder(o)),
+                          _actionChip(
+                              '✅ Mark Served',
+                              const Color(0xFF059669),
+                              Colors.white,
+                              () => markServed(o)),
+                          _actionChip('❌ Cancel Order', const Color(0xFFE11D48),
+                              Colors.white, () => cancelOrder(o)),
+                        ],
                       ],
                     ),
                   ],
