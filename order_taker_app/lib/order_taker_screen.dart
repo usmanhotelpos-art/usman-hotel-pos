@@ -398,7 +398,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
 
   void _setPopupTimer() {
     _popupTimer?.cancel();
-    if (showOrdersPopup) {
+    if (showOrdersPopup || showTakeawayOrdersPopup) {
       _refreshOrdersOnly();
       _popupTimer = Timer.periodic(
           const Duration(seconds: 2), (_) => _refreshOrdersOnly());
@@ -521,12 +521,17 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return st == 'completed' || st == 'payment collected' || p == 'paid';
   }
 
-  List<Map<String, dynamic>> myOrdersBy(bool Function(Map) filter) => orders
-      .whereType<Map>()
-      .map((e) => Map<String, dynamic>.from(e))
-      .where((o) =>
-          sOf(o['orderType']) == 'Dine-In' && isMyOrder(o) && filter(o))
-      .toList();
+  List<Map<String, dynamic>> myOrdersBy(bool Function(Map) filter) {
+    return orders
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((o) {
+      final type = sOf(o['orderType']);
+      if (isTakeawayOnly) return type == 'Takeaway' && isMyOrder(o) && filter(o);
+      if (isTableOnly) return type == 'Dine-In' && isMyOrder(o) && filter(o);
+      return isMyOrder(o) && filter(o);
+    }).toList();
+  }
 
   List<Map<String, dynamic>> myTakeawayOrdersBy(bool Function(Map) filter) => orders
       .whereType<Map>()
@@ -3801,11 +3806,15 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                     child: list.isEmpty
                         ? Center(
                             child: Text(
-                              ordersTab == 'new'
-                                  ? 'No orders yet'
-                                  : ordersTab == 'served'
-                                      ? 'No served orders yet'
-                                      : 'No cancelled orders yet',
+                              isTakeawayOT
+                                  ? (takeawayOrdersTab == 'paid'
+                                      ? 'No paid takeaway orders'
+                                      : 'No pending takeaway orders')
+                                  : ordersTab == 'new'
+                                      ? 'No new orders yet'
+                                      : ordersTab == 'served'
+                                          ? 'No served orders yet'
+                                          : 'No cancelled orders yet',
                               style: const TextStyle(
                                   fontSize: 13, color: Color(0xFF64748B)),
                             ),
