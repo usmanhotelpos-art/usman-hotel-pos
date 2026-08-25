@@ -742,7 +742,7 @@ export function renderReceiptToCanvas(order, settings = {}) {
   const paidBold = settings.btPaidBold !== false;
   const tokenFontSize = Number(settings.btTokenFontSize) || 44;
   const tokenLabelFontSize = Number(settings.btTokenLabelFontSize) || 14;
-  const textAlign = settings.btTextAlign || 'left';
+  const textAlign = settings.btTextAlign || 'center';
   const marginTop = settings.btMarginCustom ? (Number(settings.btMarginTop) || 10) : 10;
   const marginBottom = settings.btMarginCustom ? (Number(settings.btMarginBottom) || 10) : 10;
   const logoEnabled = settings.btLogoEnabled !== false;

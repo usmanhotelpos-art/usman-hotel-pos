@@ -160,7 +160,7 @@ function App() {
     btTokenFontSize: 44,
     tokenSlipFontSize: 44,
     tokenSlipLabelFontSize: 14,
-    btTextAlign: 'left',
+    btTextAlign: 'center',
     btMarginTop: 10,
     btMarginBottom: 10,
     btMarginCustom: false,
@@ -1408,7 +1408,10 @@ function App() {
     { name: 'Helper', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'rider-book': true, 'rider-order-requests': true, settings: false, login: true } },
     { name: 'Tandoor Staff', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
     { name: 'BS', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: false, orders: false, settings: false, login: true } },
-    { name: 'Order Taker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'order-taker-app': true, 'rider-book': false, 'rider-order-requests': false, settings: false, login: true } }
+    { name: 'Order Taker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'order-taker-app': true, 'rider-book': false, 'rider-order-requests': false, settings: false, login: true } },
+    { name: 'Admin Order Taker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'order-taker-app': true, 'rider-book': false, 'rider-order-requests': false, settings: false, login: true } },
+    { name: 'Takeaway Order Taker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'order-taker-app': true, 'rider-book': false, 'rider-order-requests': false, settings: false, login: true } },
+    { name: 'Table Order Taker', permissions: { dashboard: false, tables: false, inventory: false, staff: false, sales: false, pos: true, orders: true, 'order-taker-app': true, 'rider-book': false, 'rider-order-requests': false, settings: false, login: true } }
   ];
   const [roles, setRoles] = useState(() => {
     if (typeof window === 'undefined') return defaultRoles;
@@ -8570,7 +8573,7 @@ try {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400">Text Alignment</label>
-                <select value={settings.btTextAlign || 'left'} onChange={(e) => setSettings((prev) => ({ ...prev, btTextAlign: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
+                <select value={settings.btTextAlign || 'center'} onChange={(e) => setSettings((prev) => ({ ...prev, btTextAlign: e.target.value }))} className={`mt-2 w-full rounded-3xl border px-4 py-3 text-sm outline-none ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'}`}>
                   <option value="left">Left</option>
                   <option value="center">Center</option>
                   <option value="right">Right</option>

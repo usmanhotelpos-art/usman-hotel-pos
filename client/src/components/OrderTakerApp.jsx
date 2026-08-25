@@ -90,6 +90,8 @@ export function OrderTakerApp() {
 
   // POS state
   const [activeType, setActiveType] = useState('Dine-In');
+  const isTakeawayOnly = orderTaker?.role === 'Takeaway Order Taker';
+  const isTableOnly = orderTaker?.role === 'Table Order Taker';
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [cart, setCart] = useState([]);
@@ -223,11 +225,13 @@ export function OrderTakerApp() {
         method: 'POST',
         body: JSON.stringify(loginForm),
       });
-      if (!data.user || !['Order Taker', 'Waiter', 'Helper'].includes(data.user.role)) {
+      if (!data.user || !['Order Taker', 'Admin Order Taker', 'Takeaway Order Taker', 'Table Order Taker', 'Waiter', 'Helper'].includes(data.user.role)) {
         throw new Error('Invalid Order Taker credentials');
       }
       setToken(data.token);
       setOrderTaker(data.user);
+      if (data.user.role === 'Takeaway Order Taker') setActiveType('Take Away');
+      else if (data.user.role === 'Table Order Taker') setActiveType('Dine-In');
       localStorage.setItem('orderTakerToken', data.token);
       localStorage.setItem('orderTakerUser', JSON.stringify(data.user));
       setMessage('');
@@ -914,12 +918,16 @@ export function OrderTakerApp() {
 
       {/* Order type tabs */}
       <div className="px-3 pt-2 pb-1 flex gap-1.5">
-        <button onClick={() => setActiveType('Dine-In')} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition-all active:scale-95 ${activeType === 'Dine-In' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-          🍽️ Table
-        </button>
-        <button onClick={() => setActiveType('Take Away')} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition-all active:scale-95 ${activeType === 'Take Away' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-          🛍️ Take Away
-        </button>
+        {(!isTakeawayOnly) && (
+          <button onClick={() => setActiveType('Dine-In')} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition-all active:scale-95 ${activeType === 'Dine-In' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+            🍽️ Table
+          </button>
+        )}
+        {(!isTableOnly) && (
+          <button onClick={() => setActiveType('Take Away')} className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition-all active:scale-95 ${activeType === 'Take Away' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+            🛍️ Take Away
+          </button>
+        )}
       </div>
 
       {/* Search */}

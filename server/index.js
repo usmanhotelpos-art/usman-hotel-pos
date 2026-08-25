@@ -21,6 +21,15 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Lightweight request log so order flow can be diagnosed from server_out.txt
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl} from ${req.ip}`);
+  }
+  next();
+});
+
 app.use('/api', router);
 
 app.use('/api/*', (req, res) => {
@@ -37,7 +46,7 @@ try {
   await initDatabase();
   readDb();
 
-  // Seed default Order Taker staff member if none exists
+  // Seed default Order Taker staff members if none exists
   const staffMembers = getCollection('staff') || [];
   const orderTakerExists = staffMembers.some(
     (s) => (s.role || '').toString().trim() === 'Order Taker' && (s.username || '').toString() === 'usman'
@@ -47,11 +56,27 @@ try {
       name: 'Usman',
       username: 'usman',
       passwordHash: bcrypt.hashSync('usman123', 10),
-      role: 'Order Taker',
+      role: 'Admin Order Taker',
       loginEnabled: true,
       permissions: { 'order-taker-app': true },
     });
-    console.log('Default Order Taker staff created: usman / usman123');
+    console.log('Default Admin Order Taker staff created: usman / usman123');
+  }
+
+  // Seed Usman Waiter as Admin Order Taker
+  const waiterExists = staffMembers.some(
+    (s) => (s.username || '').toString().toLowerCase() === 'usmanwaiter'
+  );
+  if (!waiterExists) {
+    createRecord('staff', {
+      name: 'Usman Waiter',
+      username: 'usmanwaiter',
+      passwordHash: bcrypt.hashSync('usman123', 10),
+      role: 'Admin Order Taker',
+      loginEnabled: true,
+      permissions: { 'order-taker-app': true },
+    });
+    console.log('Default Admin Order Taker staff created: usmanwaiter / usman123');
   }
 } catch (startupError) {
   console.error('Failed to initialize database on startup:', startupError);
