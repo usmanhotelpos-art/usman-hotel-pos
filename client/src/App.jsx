@@ -580,6 +580,22 @@ function App() {
   const [holdViewMode, setHoldViewMode] = useState(settings.holdDefaultViewMode || 'table');
   const [holdRefreshTimer, setHoldRefreshTimer] = useState(settings.holdAutoRefreshSeconds || 24);
   const [inventorySubTab, setInventorySubTab] = useState('categories');
+  const [inventoryMenus, setInventoryMenus] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('posInventoryMenus') || 'null');
+      if (Array.isArray(saved) && saved.length) return saved;
+    } catch (e) {}
+    return ['BBQ Section'];
+  });
+  const [activeInventoryMenu, setActiveInventoryMenu] = useState('BBQ Section');
+  function addInventoryMenu() {
+    const num = inventoryMenus.length + 1;
+    const name = `Menu ${num}`;
+    const next = [...inventoryMenus, name];
+    setInventoryMenus(next);
+    try { localStorage.setItem('posInventoryMenus', JSON.stringify(next)); } catch (e) {}
+    setActiveInventoryMenu(name);
+  }
   const [showProductModal, setShowProductModal] = useState(false);
   const [productForm, setProductForm] = useState({
     name: '',
@@ -6468,6 +6484,29 @@ try {
   function renderInventory() {
     return (
       <div className="space-y-6">
+        <div className="rounded-[28px] border border-slate-800 bg-slate-900 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-slate-400">Menus</h3>
+            <button
+              onClick={addInventoryMenu}
+              className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
+            >
+              + Add new menu
+            </button>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            {inventoryMenus.map((menu) => (
+              <button
+                key={menu}
+                onClick={() => setActiveInventoryMenu(menu)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeInventoryMenu === menu ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {menu}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="text-xs text-slate-500">Active menu: <span className="text-slate-300">{activeInventoryMenu}</span> — shows all existing categories, products & {MASHALLAH_CATEGORY} items.</div>
         <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => setInventorySubTab('categories')}
