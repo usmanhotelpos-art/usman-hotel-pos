@@ -338,14 +338,11 @@ router.get('/auth/rider-me', authenticate, (req, res) => {
 });
 
 router.get('/pos/categories', (req, res) => {
-  let items = getCollection('pos_categories');
-  if (req.query.menuId) items = items.filter((c) => c.menuId === req.query.menuId);
-  res.send(items);
+  res.send(getCollection('pos_categories'));
 });
 
 router.get('/pos/products', (req, res) => {
-  let products = getCollection('pos_products');
-  if (req.query.menuId) products = products.filter((p) => p.menuId === req.query.menuId);
+  const products = getCollection('pos_products');
   if (req.query.light === '1') {
     const origin = `${req.protocol}://${req.get('host')}`;
     res.send(products.map((p) => {
@@ -662,13 +659,11 @@ router.post('/payments', (req, res) => {
 });
 
 router.get('/pos/categories', (req, res) => {
-  let items = getCollection('pos_categories');
-  if (req.query.menuId) items = items.filter((c) => c.menuId === req.query.menuId);
-  res.send(items);
+  res.send(getCollection('pos_categories'));
 });
 
 router.post('/pos/categories', (req, res) => {
-  const category = { ...req.body, menuId: req.body.menuId || req.query.menuId || 'menu_bbq' };
+  const category = req.body;
   const created = createRecord('pos_categories', category);
   res.status(201).send(created);
 });
@@ -690,13 +685,11 @@ router.delete('/pos/categories/:id', (req, res) => {
 });
 
 router.get('/pos/products', (req, res) => {
-  let products = getCollection('pos_products');
-  if (req.query.menuId) products = products.filter((p) => p.menuId === req.query.menuId);
-  res.send(products);
+  res.send(getCollection('pos_products'));
 });
 
 router.post('/pos/products', (req, res) => {
-  const product = { ...req.body, menuId: req.body.menuId || req.query.menuId || 'menu_bbq' };
+  const product = req.body;
   const created = createRecord('pos_products', product);
   res.status(201).send(created);
 });
@@ -716,37 +709,6 @@ router.delete('/pos/products/:id', (req, res) => {
   }
   res.send({ success: true });
 });
-
-router.get('/pos/menus', (req, res) => {
-  res.send(getCollection('pos_menus'));
-});
-
-router.post('/pos/menus', safe(async (req, res) => {
-  const name = (req.body && req.body.name ? req.body.name : '').toString().trim();
-  if (!name) return res.status(400).send({ error: 'Menu name is required' });
-  const created = createRecord('pos_menus', { name });
-  res.status(201).send(created);
-}));
-
-router.put('/pos/menus/:id', safe(async (req, res) => {
-  const name = (req.body && req.body.name ? req.body.name : '').toString().trim();
-  if (!name) return res.status(400).send({ error: 'Menu name is required' });
-  const updated = updateRecord('pos_menus', req.params.id, { name });
-  if (!updated) return res.status(404).send({ error: 'Menu not found' });
-  res.send(updated);
-}));
-
-router.delete('/pos/menus/:id', safe(async (req, res) => {
-  const menus = getCollection('pos_menus');
-  if (menus.length <= 1) return res.status(400).send({ error: 'Cannot delete the last remaining menu' });
-  if (req.params.id === 'menu_bbq') return res.status(400).send({ error: 'The default BBQ Section menu cannot be deleted' });
-  const remaining = menus.filter((m) => m.id !== req.params.id);
-  saveCollection('pos_menus', remaining);
-  saveCollection('pos_categories', getCollection('pos_categories').filter((c) => c.menuId !== req.params.id));
-  saveCollection('pos_products', getCollection('pos_products').filter((p) => p.menuId !== req.params.id));
-  saveCollection('pos_mashallah_slots', getCollection('pos_mashallah_slots').filter((s) => s.menuId !== req.params.id));
-  res.send({ success: true });
-}));
 
 router.get('/pos/tables', (req, res) => {
   res.send(getCollection('pos_tables'));
@@ -775,34 +737,15 @@ router.delete('/pos/tables/:id', (req, res) => {
 });
 
 router.get('/pos/mashallah-slots', (req, res) => {
-  const menuId = req.query.menuId;
-  let slots = getCollection('pos_mashallah_slots');
-  if (menuId) slots = slots.filter((s) => s.menuId === menuId);
-  else slots = slots.filter((s) => !s.menuId);
-  const padded = [];
-  for (let i = 1; i <= 20; i++) {
-    const existing = slots.find((s) => s.slot === i);
-    padded.push(existing || { slot: i, productId: null, menuId: menuId || null });
-  }
-  res.send(padded);
+  res.send(getCollection('pos_mashallah_slots'));
 });
 
 router.put('/pos/mashallah-slots', (req, res) => {
-  const body = req.body;
-  let menuId = req.query.menuId;
-  let slots;
-  if (Array.isArray(body)) {
-    slots = body;
-  } else if (body && Array.isArray(body.slots)) {
-    menuId = body.menuId || menuId;
-    slots = body.slots;
-  } else {
+  const slots = req.body;
+  if (!Array.isArray(slots)) {
     return res.status(400).send({ error: 'Expected an array of slots' });
   }
-  if (!menuId) return res.status(400).send({ error: 'menuId is required' });
-  slots = slots.map((s) => ({ slot: s.slot, productId: s.productId ?? null, menuId }));
-  const all = getCollection('pos_mashallah_slots').filter((s) => s.menuId !== menuId);
-  saveCollection('pos_mashallah_slots', [...all, ...slots]);
+  saveCollection('pos_mashallah_slots', slots);
   res.send(slots);
 });
 

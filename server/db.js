@@ -67,8 +67,7 @@ const defaultData = {
   staff: [
     { id: 's1', name: 'Ayesha', role: 'Receptionist', phone: '+923001234567', status: 'active' },
     { id: 's2', name: 'Usman', role: 'Manager', phone: '+923009876543', status: 'active' },
-    { id: 's4', name: 'Ahmed Rider', role: 'Admin Rider', phone: '+923001234567', email: 'ahmed@rider.com', status: 'active', otherName: '', username: 'ahmed@rider.com', password: 'riderpass1', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'rider1' },
-    { id: 's5', name: 'Farhan', role: 'Cashier', phone: '', email: 'farhan', otherName: '', username: 'farhan', password: '1234', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, status: 'active', permissions: { 'order-taker-app': true } }
+    { id: 's4', name: 'Ahmed Rider', role: 'Admin Rider', phone: '+923001234567', email: 'ahmed@rider.com', status: 'active', otherName: '', username: 'ahmed@rider.com', password: 'riderpass1', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'rider1' }
   ],
   sales: [
     { id: 'sale1', description: 'Room 102 payment', amount: 20800, date: '2026-05-05' }
@@ -160,9 +159,6 @@ const defaultData = {
     { id: 'p60', name: 'اچاری نان', category: 'اسپیشل نان', price: 120, availableStock: 30, image: '', description: 'مسالہ دار اچاری نان۔' }
   ],
   pos_mashallah_slots: Array.from({ length: 20 }, (_, i) => ({ slot: i + 1, productId: null })),
-  pos_menus: [
-    { id: 'menu_bbq', name: 'BBQ Section' }
-  ],
   pos_tables: [
     { id: 't1', label: 'Table 1', type: 'Table', status: 'available' },
     { id: 't2', label: 'Table 2', type: 'Table', status: 'available' },
@@ -324,21 +320,6 @@ async function saveDbToPostgres(data) {
   }
 }
 
-// Assign existing categories/products/mashallah slots to the default menu if they
-// have no menuId yet, and ensure a default menu exists.
-function migrateMenus(data) {
-  if (!Array.isArray(data.pos_menus) || data.pos_menus.length === 0) {
-    data.pos_menus = [{ id: 'menu_bbq', name: 'BBQ Section' }];
-  }
-  const defaultMenuId = data.pos_menus[0].id || 'menu_bbq';
-  for (const collection of ['pos_categories', 'pos_products', 'pos_mashallah_slots']) {
-    if (!Array.isArray(data[collection])) continue;
-    for (const item of data[collection]) {
-      if (!item.menuId) item.menuId = defaultMenuId;
-    }
-  }
-}
-
 export async function initDatabase() {
   if (pgClient) {
     try {
@@ -355,8 +336,9 @@ export async function initDatabase() {
       }
 
       const passwordsChanged = migrateLegacyPasswords(dbCache);
-      migrateMenus(dbCache);
-      await saveDbToPostgres(dbCache);
+      if (!postgresData || passwordsChanged) {
+        await saveDbToPostgres(dbCache);
+      }
 
       console.log('Connected to Postgres. Data persistence is now using Postgres.');
       return;
@@ -371,8 +353,6 @@ export async function initDatabase() {
   if (migrateLegacyPasswords(dbCache)) {
     writeDbFile(dbCache);
   }
-  migrateMenus(dbCache);
-  writeDbFile(dbCache);
 }
 
 export function readDb() {

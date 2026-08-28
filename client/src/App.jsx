@@ -348,7 +348,6 @@ function App() {
     }
   };
   const [mashallahSlots, setMashallahSlots] = useState(loadStoredMashallahSlots);
-  const lastMashallahSaveRef = useRef(JSON.stringify(mashallahSlots));
   const [activeMashallahSlot, setActiveMashallahSlot] = useState(null);
   const [showMashallahSelector, setShowMashallahSelector] = useState(false);
   const [mashallahSearch, setMashallahSearch] = useState('');
@@ -475,20 +474,18 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('mashallahSlots', JSON.stringify(mashallahSlots));
-    if (JSON.stringify(mashallahSlots) === lastMashallahSaveRef.current) return;
     if (mashallahSaveTimerRef.current) clearTimeout(mashallahSaveTimerRef.current);
     mashallahSaveTimerRef.current = setTimeout(async () => {
       try {
-        await fetchJson(`${apiBase}/pos/mashallah-slots?menuId=${activeMenuId}`, {
+        await fetchJson(`${apiBase}/pos/mashallah-slots`, {
           method: 'PUT',
-          body: JSON.stringify({ menuId: activeMenuId, slots: mashallahSlots })
+          body: JSON.stringify(mashallahSlots)
         });
-        lastMashallahSaveRef.current = JSON.stringify(mashallahSlots);
       } catch {
         // silently fail - localStorage is the fallback
       }
     }, 500);
-  }, [mashallahSlots, activeMenuId]);
+  }, [mashallahSlots]);
 
   useEffect(() => {
     const id = setInterval(() => setPopupNow(Date.now()), 1000);
@@ -583,78 +580,21 @@ function App() {
   const [holdViewMode, setHoldViewMode] = useState(settings.holdDefaultViewMode || 'table');
   const [holdRefreshTimer, setHoldRefreshTimer] = useState(settings.holdAutoRefreshSeconds || 24);
   const [inventorySubTab, setInventorySubTab] = useState('categories');
-  const DEFAULT_MENU_ID = 'menu_bbq';
-  const [posMenus, setPosMenus] = useState([]);
-  const [activeMenuId, setActiveMenuId] = useState(() => localStorage.getItem('posActiveMenuId') || DEFAULT_MENU_ID);
-
-  async function loadMenus() {
+  const [inventoryMenus, setInventoryMenus] = useState(() => {
     try {
-      const menus = await fetchJson(`${apiBase}/pos/menus`);
-      if (Array.isArray(menus) && menus.length) {
-        setPosMenus(menus);
-        const current = localStorage.getItem('posActiveMenuId') || DEFAULT_MENU_ID;
-        const resolved = menus.some((m) => m.id === current) ? current : (menus[0] && menus[0].id) || DEFAULT_MENU_ID;
-        setActiveMenuId(resolved);
-        localStorage.setItem('posActiveMenuId', resolved);
-        return resolved;
-      }
-    } catch (e) {
-      console.warn('Failed to load menus', e);
-    }
-    return DEFAULT_MENU_ID;
-  }
-
-  async function addMenu() {
-    const name = window.prompt('New menu name:', `Menu ${posMenus.length + 1}`);
-    if (!name) return;
-    try {
-      const created = await fetchJson(`${apiBase}/pos/menus`, { method: 'POST', body: JSON.stringify({ name }) });
-      const id = await loadMenus();
-      const useId = (created && created.id) || id;
-      setActiveMenuId(useId);
-      localStorage.setItem('posActiveMenuId', useId);
-      await loadPosData(useId);
-      await loadInventoryData(useId);
-    } catch (e) {
-      setMessage(e.message);
-    }
-  }
-
-  async function renameMenu(id, currentName) {
-    const name = window.prompt('Rename menu:', currentName);
-    if (!name || name === currentName) return;
-    try {
-      await fetchJson(`${apiBase}/pos/menus/${id}`, { method: 'PUT', body: JSON.stringify({ name }) });
-      await loadMenus();
-    } catch (e) {
-      setMessage(e.message);
-    }
-  }
-
-  async function deleteMenu(id) {
-    if (id === DEFAULT_MENU_ID) {
-      setMessage('The default BBQ Section menu cannot be deleted');
-      return;
-    }
-    if (!window.confirm('Delete this menu and ALL its categories, products & mashallah items?')) return;
-    try {
-      await fetchJson(`${apiBase}/pos/menus/${id}`, { method: 'DELETE' });
-      const id2 = await loadMenus();
-      const useId = activeMenuId === id ? id2 : activeMenuId;
-      setActiveMenuId(useId);
-      localStorage.setItem('posActiveMenuId', useId);
-      await loadPosData(useId);
-      await loadInventoryData(useId);
-    } catch (e) {
-      setMessage(e.message);
-    }
-  }
-
-  function selectMenu(id) {
-    setActiveMenuId(id);
-    localStorage.setItem('posActiveMenuId', id);
-    loadPosData(id);
-    loadInventoryData(id);
+      const saved = JSON.parse(localStorage.getItem('posInventoryMenus') || 'null');
+      if (Array.isArray(saved) && saved.length) return saved;
+    } catch (e) {}
+    return ['BBQ Section'];
+  });
+  const [activeInventoryMenu, setActiveInventoryMenu] = useState('BBQ Section');
+  function addInventoryMenu() {
+    const num = inventoryMenus.length + 1;
+    const name = `Menu ${num}`;
+    const next = [...inventoryMenus, name];
+    setInventoryMenus(next);
+    try { localStorage.setItem('posInventoryMenus', JSON.stringify(next)); } catch (e) {}
+    setActiveInventoryMenu(name);
   }
   const [showProductModal, setShowProductModal] = useState(false);
   const [productForm, setProductForm] = useState({
@@ -1600,13 +1540,8 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      (async () => {
-        const id = await loadMenus();
-        loadSettings();
-        if (activeTab === 'pos') await loadPosData(id);
-        else if (activeTab === 'inventory') await loadInventoryData(id);
-        else await loadTab(activeTab);
-      })();
+      loadSettings();
+      loadTab(activeTab);
     }
   }, [activeTab, user]);
 
@@ -1969,16 +1904,16 @@ try {
     }
   }
 
-  async function loadInventoryData(menuId = activeMenuId) {
+  async function loadInventoryData() {
     setLoading(true);
     setMessage('');
     try {
       const [categories, products] = await Promise.all([
-        fetchJson(`${apiBase}/pos/categories?menuId=${menuId}`),
-        fetchJson(`${apiBase}/pos/products?menuId=${menuId}`)
+        fetchJson(`${apiBase}/pos/categories`),
+        fetchJson(`${apiBase}/pos/products`)
       ]);
-      setPosCategories(categories || []);
-      setPosProducts(products || []);
+      setPosCategories(categories);
+      setPosProducts(products);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -1986,13 +1921,13 @@ try {
     }
   }
 
-  async function loadPosData(menuId = activeMenuId) {
+  async function loadPosData() {
     setLoading(true);
     setMessage('');
     try {
       const [categories, products, tables, agents, staff, orders, riders] = await Promise.all([
-        fetchJson(`${apiBase}/pos/categories?menuId=${menuId}`),
-        fetchJson(`${apiBase}/pos/products?menuId=${menuId}`),
+        fetchJson(`${apiBase}/pos/categories`),
+        fetchJson(`${apiBase}/pos/products`),
         fetchJson(`${apiBase}/pos/tables`),
         fetchJson(`${apiBase}/pos/delivery-agents`),
         fetchJson(`${apiBase}/staff`),
@@ -2000,8 +1935,8 @@ try {
         , fetchJson(`${apiBase}/riders`)
       ]);
 
-      setPosCategories(categories || []);
-      setPosProducts(products || []);
+      setPosCategories(categories);
+      setPosProducts(products);
       setPosTables(tables);
       setPosDeliveryAgents([
         ...(agents || []),
@@ -2012,7 +1947,7 @@ try {
       setRidersList(Array.isArray(riders) ? riders : []);
       setSelectedCategory((current) => current === 'All' ? MASHALLAH_CATEGORY : current);
       setPosSearch('');
-      loadMashallahSlots(menuId);
+      loadMashallahSlots();
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -2020,19 +1955,28 @@ try {
     }
   }
 
-  async function loadMashallahSlots(menuId = activeMenuId) {
-    let next;
-    try {
-      const slots = await fetchJson(`${apiBase}/pos/mashallah-slots?menuId=${menuId}`);
-      if (Array.isArray(slots)) {
-        next = slots.map((s) => ({ slot: s.slot, productId: s.productId ?? null }));
-      }
-    } catch (e) {
-      console.warn('Failed to load mashallah slots', e);
+  async function loadMashallahSlots() {
+    const local = loadStoredMashallahSlots();
+    const hasLocalData = local.some((s) => s.productId !== null);
+    if (hasLocalData) {
+      setMashallahSlots(local);
+      return;
     }
-    if (!next) next = Array.from({ length: 20 }, (_, i) => ({ slot: i + 1, productId: null }));
-    lastMashallahSaveRef.current = JSON.stringify(next);
-    setMashallahSlots(next);
+    try {
+      const slots = await fetchJson(`${apiBase}/pos/mashallah-slots`);
+      if (Array.isArray(slots) && slots.some((s) => s.productId !== null)) {
+        const normalized = slots.slice(0, 20).map((s) => ({
+          slot: s.slot,
+          productId: s.productId ?? null
+        }));
+        setMashallahSlots(normalized);
+        localStorage.setItem('mashallahSlots', JSON.stringify(normalized));
+      } else {
+        setMashallahSlots(local);
+      }
+    } catch {
+      setMashallahSlots(local);
+    }
   }
 
   async function handleManualSync() {
@@ -2361,7 +2305,7 @@ try {
     try {
       await fetchJson(`${apiBase}/pos/categories`, {
         method: 'POST',
-        body: JSON.stringify({ ...form, menuId: activeMenuId })
+        body: JSON.stringify(form)
       });
       setForm({});
       await loadInventoryData();
@@ -2380,8 +2324,7 @@ try {
       const { newFlavor, currentFlavorIndex, newVariant, newVariantPrice, ...cleanForm } = productForm;
       const payload = {
         ...cleanForm,
-        flavors: productForm.flavors,
-        menuId: activeMenuId
+        flavors: productForm.flavors
       };
       await fetchJson(`${apiBase}/pos/products`, {
         method: 'POST',
@@ -6545,44 +6488,25 @@ try {
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-slate-400">Menus</h3>
             <button
-              onClick={addMenu}
+              onClick={addInventoryMenu}
               className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
             >
               + Add new menu
             </button>
           </div>
           <div className="flex gap-3 flex-wrap">
-            {posMenus.map((menu) => {
-              const isActive = activeMenuId === menu.id;
-              const isDefault = menu.id === DEFAULT_MENU_ID;
-              return (
-                <div
-                  key={menu.id}
-                  className={`flex items-center gap-1 rounded-full pl-1 pr-1 ${isActive ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
-                >
-                  <button
-                    onClick={() => selectMenu(menu.id)}
-                    className="rounded-full px-3 py-2 text-sm font-semibold transition hover:opacity-80"
-                  >
-                    {menu.name}
-                  </button>
-                  <button
-                    onClick={() => renameMenu(menu.id, menu.name)}
-                    title="Rename menu"
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-xs transition hover:bg-black/20"
-                  >✏️</button>
-                  <button
-                    onClick={() => deleteMenu(menu.id)}
-                    disabled={isDefault}
-                    title={isDefault ? 'Default BBQ Section menu cannot be deleted' : 'Delete menu'}
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-xs transition ${isDefault ? 'cursor-not-allowed opacity-30' : 'hover:bg-black/20'}`}
-                  >🗑️</button>
-                </div>
-              );
-            })}
+            {inventoryMenus.map((menu) => (
+              <button
+                key={menu}
+                onClick={() => setActiveInventoryMenu(menu)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeInventoryMenu === menu ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {menu}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="text-xs text-slate-500">Active menu: <span className="text-slate-300">{posMenus.find((m) => m.id === activeMenuId)?.name || 'BBQ Section'}</span> — shows its own categories, products & {MASHALLAH_CATEGORY} items.</div>
+        <div className="text-xs text-slate-500">Active menu: <span className="text-slate-300">{activeInventoryMenu}</span> — shows all existing categories, products & {MASHALLAH_CATEGORY} items.</div>
         <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => setInventorySubTab('categories')}
@@ -7229,19 +7153,6 @@ try {
 
     return (
       <div className="space-y-0">
-        {/* Menu selector */}
-        <div className="flex items-center gap-2 px-1 pb-2 flex-wrap">
-          <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">Menu:</span>
-          {posMenus.map((menu) => (
-            <button
-              key={menu.id}
-              onClick={() => selectMenu(menu.id)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeMenuId === menu.id ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-            >
-              {menu.name}
-            </button>
-          ))}
-        </div>
         {/* Top Section: Search + Profile + Categories */}
         <div className={`${posTopSettings.stickyHeader ? 'sticky top-0 z-40' : ''} pt-1 pb-0`}>
           <div className="flex items-center gap-3">
