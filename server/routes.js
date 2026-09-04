@@ -757,14 +757,34 @@ router.get('/pos/customers', (req, res) => {
   res.send(getCollection('pos_customers'));
 });
 
-router.get('/pos/orders', (req, res) => {
+function sOf(v) { return v == null ? '' : v.toString(); }
+
+router.get('/pos/orders', authenticate, (req, res) => {
   let orders = getCollection('pos_orders');
-  const { status, orderType } = req.query;
+  const { status, orderType, source } = req.query;
   if (status) {
     orders = orders.filter((order) => order.status === status);
   }
   if (orderType) {
     orders = orders.filter((order) => order.orderType === orderType);
+  }
+  if (source) {
+    orders = orders.filter((order) => sOf(order.source).toLowerCase() === source.toLowerCase());
+  }
+  const userRole = (req.user.role || '').toLowerCase();
+  const isAdmin = userRole.includes('admin') || userRole === 'manager' || userRole.includes('admin');
+  if (!isAdmin && !source) {
+    const userName = (req.user.name || req.user.email || req.user.username || '').toString().trim().toLowerCase();
+    const userUsername = (req.user.username || req.user.email || '').toString().trim().toLowerCase();
+    const userEmail = (req.user.email || '').toString().trim().toLowerCase();
+    orders = orders.filter((order) => {
+      const ot = sOf(order.orderTaker).trim().toLowerCase();
+      const ow = sOf(order.waiter).trim().toLowerCase();
+      if (ot === userName || ot === userUsername || ow === userName || ow === userUsername) return true;
+      if (ot === userEmail || ow === userEmail) return true;
+      if (ot.isEmpty && ow.isEmpty) return true;
+      return false;
+    });
   }
   res.send(orders);
 });
@@ -793,7 +813,8 @@ router.post('/pos/orders', (req, res) => {
     paymentStatus = '',
     notes = '',
     orderTaker = '',
-    waiter = ''
+    waiter = '',
+    source = ''
   } = req.body;
 
   if (!items || !items.length) {
@@ -898,6 +919,7 @@ router.post('/pos/orders', (req, res) => {
     customerId,
     orderTaker,
     waiter,
+    source,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
@@ -1103,7 +1125,8 @@ router.put('/pos/orders/:id', (req, res) => {
     paymentRequestedAt = existingOrder.paymentRequestedAt,
     paymentRequestStatus = existingOrder.paymentRequestStatus,
     orderTaker = existingOrder.orderTaker,
-    waiter = existingOrder.waiter
+    waiter = existingOrder.waiter,
+    source = existingOrder.source || ''
   } = req.body;
 
   const itemsList = items || [];
@@ -1138,6 +1161,7 @@ router.put('/pos/orders/:id', (req, res) => {
     total: computedTotal,
     orderTaker,
     waiter,
+    source,
     updatedAt: new Date().toISOString()
   });
 
