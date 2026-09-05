@@ -126,8 +126,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final set = <String>{};
     for (final r in widget.riders) {
       if (r is Map) {
-        final role = sOf(r['role']).toLowerCase();
-        if (!(role.contains('rider') || role.contains('biker'))) continue;
+        if (!sOf(r['role']).toLowerCase().contains('biker')) continue;
+        if (sOf(r['status']).toLowerCase() != 'active') continue;
         final n = sOf(r['name']);
         if (n.isNotEmpty) set.add(n);
       }

@@ -1082,15 +1082,14 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   // ------------------------------------------------------------- riders list
   List<String> get ridersList {
     final names = <String, bool>{};
-    // Only staff members with a BIKER or RIDER role are synced as riders.
-    // Other staff (waiters, order takers, cashiers, managers, etc.) are never shown.
+    // Only ACTIVE staff with the BIKER role are riders.
+    // Rider/Admin Rider roles and test/inactive entries are never shown.
     for (final s in staffMembers) {
       if (s is! Map) continue;
-      final role = sOf(s['role']).toLowerCase();
-      if (role.contains('biker') || role.contains('rider')) {
-        final n = sOf(s['name']).trim();
-        if (n.isNotEmpty) names[n] = true;
-      }
+      if (!sOf(s['role']).toLowerCase().contains('biker')) continue;
+      if (sOf(s['status']).toLowerCase() != 'active') continue;
+      final n = sOf(s['name']).trim();
+      if (n.isNotEmpty) names[n] = true;
     }
     return names.keys.toList();
   }
