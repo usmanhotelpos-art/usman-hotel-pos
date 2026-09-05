@@ -33,7 +33,7 @@ const Map<String, String> categoryIcons = {
   'Dal': '\u{1F963}', 'Paratha': '\u{1FAD3}', 'Roti': '\u{1FAD3}',
   'Bread': '\u{1F35E}', 'Seafood': '\u{1F990}', 'Platter': '\u{1F37D}',
   'Family': '\u{1F468}', 'Deal': '\u{1F4A5}', 'Addon': '\u{2795}',
-  'Extra': '\u{2795}', 'Dips': '\u{1F96B}', 'Sauce': '\u{1F96B}',
+  'Extra': '\u{2795}', 'Extras': '\u{2795}', 'Dips': '\u{1F96B}', 'Sauce': '\u{1F96B}',
   'Topping': '\u{1F9C0}', 'Cheese': '\u{1F9C0}', 'Mashallah': '\u{1F31F}',
   'Naan': '\u{1FAD3}', 'Naan Roti': '\u{1FAD3}', 'Special Naan': '\u{1FAD3}',
   'Nashta': '\u{1F373}',   'Nashta Usman Hotel': '\u{1F373}',
@@ -54,6 +54,7 @@ const Map<String, String> categoryUrdu = {
   'Paratha': 'پراٹھا',
   'Bread': 'بریڈ',
   'Extra': 'اضافی',
+  'Extras': 'ایکسٹرا',
   'Mashallah': 'مشاء اللہ',
 };
 
@@ -400,6 +401,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     'نان',
     'روٹی',
   ];
+  static const List<String> _extrasAliases = [
+    'Extras',
+    'ایکسٹرا',
+  ];
 
   bool _aliasMatch(List<String> aliases, String name) =>
       aliases.any((a) => a.toLowerCase() == name.toLowerCase());
@@ -414,6 +419,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     final present = <String>[
       ..._presentNames(_nashtaAliases),
       ..._presentNames(_specialNaanAliases),
+      ..._presentNames(_extrasAliases),
     ];
     // For Delivery, Naan & Roti are shown on the POS too.
     if (activeType == 'Delivery') present.addAll(_presentNames(_breadAliases));
@@ -427,6 +433,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     if (present.isEmpty) {
       present.add(_nashtaAliases.first);
       present.add(_specialNaanAliases.first);
+      present.add(_extrasAliases.first);
       if (activeType == 'Delivery') present.add(_breadAliases.first);
     }
     // Always keep the Nashta category pinned at the top.
@@ -1463,7 +1470,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                 bottom: 24,
                 child: FloatingActionButton.extended(
                   heroTag: 'cartFab',
-                  onPressed: () => setState(() => showCart = true),
+                  onPressed: _openCart,
                   backgroundColor: const Color(0xFF059669),
                   foregroundColor: Colors.white,
                   icon: const Text('\u{1F6D2}'),
@@ -1948,6 +1955,17 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         ),
       ]),
     ));
+  }
+
+  void _openCart() {
+    // For Table / Takeaway, first let the user pick Naan/Roti, then show cart.
+    if (activeType != 'Delivery' && breadProducts.isNotEmpty) {
+      _openBreadPicker().then((_) {
+        if (mounted) setState(() => showCart = true);
+      });
+    } else {
+      setState(() => showCart = true);
+    }
   }
 
   Widget _breadChooser() => SizedBox(

@@ -90,7 +90,8 @@ const defaultData = {
     { id: 'cat9', name: 'بوٹی آئٹمز' },
     { id: 'cat10', name: 'چکن پیسز' },
     { id: 'cat11', name: 'نان اور روٹی' },
-    { id: 'cat12', name: 'اسپیشل نان' }
+    { id: 'cat12', name: 'اسپیشل نان' },
+    { id: 'cat13', name: 'Extras' }
   ],
   pos_products: [
     { id: 'p1', name: 'Chicken Karahi', category: 'Karahi', price: 1200, availableStock: 18, image: '', description: 'Spicy chicken karahi with fresh spices.' },
@@ -152,7 +153,8 @@ const defaultData = {
     { id: 'p57', name: 'چکن چیز نان', category: 'اسپیشل نان', price: 450, availableStock: 20, image: '', description: 'چکن چیز نان۔' },
     { id: 'p58', name: 'چاکلیٹ نان', category: 'اسپیشل نان', price: 400, availableStock: 18, image: '', description: 'مٹھاس دار چاکلیٹ نان۔' },
     { id: 'p59', name: 'نٹیلا نان', category: 'اسپیشل نان', price: 400, availableStock: 18, image: '', description: 'نٹیلا نان۔' },
-    { id: 'p60', name: 'اچاری نان', category: 'اسپیشل نان', price: 120, availableStock: 30, image: '', description: 'مسالہ دار اچاری نان۔' }
+    { id: 'p60', name: 'اچاری نان', category: 'اسپیشل نان', price: 120, availableStock: 30, image: '', description: 'مسالہ دار اچاری نان۔' },
+    { id: 'p61', name: 'Extra', category: 'Extras', price: 100, availableStock: 100, image: '', description: 'Extra add-on' }
   ],
   pos_mashallah_slots: Array.from({ length: 20 }, (_, i) => ({ slot: i + 1, productId: null })),
   pos_tables: [
