@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'session.dart';
 
 String sOf(dynamic v) => v == null ? '' : v.toString();
 double numOf(dynamic v) {
@@ -80,10 +81,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _status = 'all';
   String _q = '';
 
+  late String _token = widget.token;
   List<dynamic> _raw = [];
   Map<String, String> _prodCat = {};
   Map<String, String> _prodCatName = {};
   bool _loading = true;
+  bool _fetching = false;
   String _err = '';
   DateTime? _lastRefreshed;
   Timer? _timer;
@@ -102,25 +105,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (_loading && !silent) return;
-    if (!silent) setState(() { _loading = true; _err = ''; });
+    if (!silent && _fetching) return;
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _err = '';
+        _fetching = true;
+      });
+    }
     try {
-      final data = await ApiClient.send('GET', '/pos/orders', token: widget.token);
+      final data = await _fetchOrders(_token);
       if (data is! List) throw ApiException('Unexpected response');
-      final prods = await ApiClient.send('GET', '/pos/products', token: widget.token);
-      if (prods is List) _buildProductIndex(prods);
       if (!mounted) return;
       setState(() {
         _raw = data;
         _lastRefreshed = DateTime.now();
         _loading = false;
+        _fetching = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _err = e.toString();
         _loading = false;
+        _fetching = false;
       });
+    }
+  }
+
+  // Fetch orders; on an auth error, silently re-login with the built-in admin
+  // account (bad/expired token) and retry once with the fresh token.
+  Future<dynamic> _fetchOrders(String token) async {
+    try {
+      final data = await ApiClient.send('GET', '/pos/orders', token: token);
+      final prods = await ApiClient.send('GET', '/pos/products', token: token);
+      if (prods is List) _buildProductIndex(prods);
+      return data;
+    } on ApiException catch (e) {
+      if (!e.isAuthError) rethrow;
+      final r = await ApiClient.login(dashEmail, dashPassword);
+      final newTok = r['token'];
+      if (newTok is! String) rethrow;
+      await saveSession(newTok, r['user']);
+      _token = newTok;
+      final data = await ApiClient.send('GET', '/pos/orders', token: newTok);
+      await ApiClient.send('GET', '/pos/products', token: newTok);
+      return data;
     }
   }
 
