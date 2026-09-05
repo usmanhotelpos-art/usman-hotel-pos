@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'bmp_receipt.dart' as bmp;
 import 'bt_service.dart';
+import 'dashboard_screen.dart';
 import 'escpos.dart' as esc;
 import 'login_screen.dart';
 import 'session.dart';
@@ -177,10 +178,14 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   List<Map<String, dynamic>> cart = [];
 
   bool showCart = false;
-  bool showOrdersPopup = false;
-  bool showTakeawayOrdersPopup = false;
+  bool showOrdersScreen = false;
   bool showPaymentPopup = false;
   bool initialLoading = true;
+  String ordersView = 'Table';
+  String ordersSubTab = 'new';
+  String ordersDateRange = 'today';
+  DateTime? ordersFromDate;
+  DateTime? ordersToDate;
 
   Map<String, dynamic>? variantProduct;
   Map<String, dynamic>? variantFlavor;
@@ -190,15 +195,13 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   final notesCtrl = TextEditingController();
   final searchCtrl = TextEditingController();
   final cashCtrl = TextEditingController();
+  final tableCtrl = TextEditingController();
   String tableNumber = '';
   String paymentMethod = 'Cash';
 
   Map<String, dynamic>? editOrder;
   List<Map<String, dynamic>> editCart = [];
   String editAddSearch = '';
-
-  String ordersTab = 'new';
-  String takeawayOrdersTab = 'pay_later';
   dynamic expandedOrderId;
   bool popupRefreshing = false;
 
@@ -266,14 +269,18 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   @override
   void initState() {
     super.initState();
-    if (isTakeawayOnly) activeType = 'Take Away';
-    else if (isTableOnly) activeType = 'Dine-In';
+    if (isTakeawayOnly) {
+      activeType = 'Take Away';
+    } else if (isTableOnly) {
+      activeType = 'Dine-In';
+    }
     _loadData();
     _loadBtOverrides();
     _loadTimer = Timer.periodic(
         const Duration(seconds: 20), (_) => _loadData(silent: true));
-    _tickTimer = Timer.periodic(
-        const Duration(seconds: 1), (_) => _now.value = DateTime.now());
+    _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _now.value = DateTime.now();
+    });
   }
 
   @override
@@ -291,6 +298,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     notesCtrl.dispose();
     searchCtrl.dispose();
     cashCtrl.dispose();
+    tableCtrl.dispose();
     super.dispose();
   }
 
@@ -341,7 +349,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return sig(categories) == sig(r[0]) &&
         sig(products) == sig(r[1]) &&
         sig(tables) == sig(r[2]) &&
-        sig(orders) == sig(r[3]) &&
+        sig(orders) == sig(_filterForeignOrders(r[3])) &&
         sig(settings) == sig(_normSettings(r[4])) &&
         sig(mashallahSlots) == sig(r[5]);
   }
@@ -364,7 +372,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         if (results[0] is List) categories = results[0] as List<dynamic>;
         if (results[1] is List) products = results[1] as List<dynamic>;
         if (results[2] is List) tables = results[2] as List<dynamic>;
-        if (results[3] is List) orders = results[3] as List<dynamic>;
+        if (results[3] is List) orders = _filterForeignOrders(results[3] as List<dynamic>);
         if (results[4] is Map) settings = _normSettings(results[4]);
         if (results[5] is List) mashallahSlots = results[5] as List<dynamic>;
         initialLoading = false;
@@ -384,7 +392,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     if (showSpin) setState(() => popupRefreshing = true);
     try {
       final ords = await _fetch('/pos/orders');
-      if (ords is List && mounted) setState(() => orders = ords);
+      if (ords is List && mounted) setState(() => orders = _filterForeignOrders(ords));
     } catch (e) {
       if (!showSpin) toast(e.toString());
     } finally {
@@ -393,15 +401,6 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           if (mounted) setState(() => popupRefreshing = false);
         });
       }
-    }
-  }
-
-  void _setPopupTimer() {
-    _popupTimer?.cancel();
-    if (showOrdersPopup || showTakeawayOrdersPopup) {
-      _refreshOrdersOnly();
-      _popupTimer = Timer.periodic(
-          const Duration(seconds: 2), (_) => _refreshOrdersOnly());
     }
   }
 
@@ -500,6 +499,16 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           if (sOf(v).trim().isNotEmpty) sOf(v).trim().toLowerCase()
       };
 
+  List<dynamic> _filterForeignOrders(List<dynamic>? raw) {
+    if (raw == null) return const [];
+    return raw.where((o) {
+      if (o is! Map) return true;
+      final src = sOf(o['source']).trim().toLowerCase();
+      return src != 'nashta-app' && src != 'bbq-delivery-app';
+    }).toList();
+  }
+
+
   bool isMyOrder(Map o) {
     final mine = _myNames;
     for (final key in ['orderTaker', 'waiter']) {
@@ -529,7 +538,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final type = sOf(o['orderType']);
       if (isTakeawayOnly) return type == 'Takeaway' && isMyOrder(o) && filter(o);
       if (isTableOnly) return type == 'Dine-In' && isMyOrder(o) && filter(o);
-      return isMyOrder(o) && filter(o);
+      if (isAdminOrderTaker) return type == 'Dine-In' && isMyOrder(o) && filter(o);
+      return (type == 'Dine-In') && isMyOrder(o) && filter(o);
     }).toList();
   }
 
@@ -541,24 +551,22 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       .toList();
 
   List<Map<String, dynamic>> get myTakeawayPayLaterOrders => myTakeawayOrdersBy((o) =>
-      !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o));
+      _norm(sOf(o['status'])) == 'pay later' || (_norm(sOf(o['status'])) == 'pending' && !isPaidOrDone(o)));
 
   List<Map<String, dynamic>> get myTakeawayPaidOrders =>
       myTakeawayOrdersBy((o) => isPaidOrDone(o));
 
   List<Map<String, dynamic>> get myTakeawayDueOrders => myTakeawayOrdersBy((o) =>
-      !isPaidOrDone(o) && !isCancelledOrder(o));
+      _norm(sOf(o['status'])) == 'due');
 
-  List<Map<String, dynamic>> get takeawayPopupOrders {
-    final base = takeawayOrdersTab == 'paid'
-        ? myTakeawayPaidOrders
-        : takeawayOrdersTab == 'due'
-            ? myTakeawayDueOrders
-            : myTakeawayPayLaterOrders;
-    int ts(Map o) =>
-        DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
-    base.sort((a, b) => ts(b).compareTo(ts(a)));
-    return base;
+  List<Map<String, dynamic>> get myTakeawayCancelledOrders {
+    final dayAgo =
+        DateTime.now().millisecondsSinceEpoch - 24 * 60 * 60 * 1000;
+    return myTakeawayOrdersBy((o) {
+      if (!isCancelledOrder(o)) return false;
+      final c = DateTime.tryParse(sOf(o['cancelledAt']));
+      return c == null || c.millisecondsSinceEpoch > dayAgo;
+    });
   }
 
   List<Map<String, dynamic>> get myNewOrders => myOrdersBy((o) =>
@@ -566,6 +574,12 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
 
   List<Map<String, dynamic>> get myServedOrders =>
       myOrdersBy(isServedOrder);
+
+  List<Map<String, dynamic>> get myTableDueOrders => myOrdersBy((o) =>
+      _norm(sOf(o['status'])) == 'due');
+
+  List<Map<String, dynamic>> get myTablePaidOrders =>
+      myOrdersBy((o) => isPaidOrDone(o));
 
   List<Map<String, dynamic>> get myCancelledOrders {
     final dayAgo =
@@ -577,25 +591,116 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     });
   }
 
-  List<Map<String, dynamic>> get popupOrders {
-    if (isTakeawayOrderTaker) {
-      final base = takeawayOrdersTab == 'paid'
-          ? myTakeawayPaidOrders
-          : myTakeawayPayLaterOrders;
-      int ts(Map o) =>
-          DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
-      base.sort((a, b) => ts(b).compareTo(ts(a)));
-      return base;
+  List<Map<String, dynamic>> get tableOrdersForCurrentTab {
+    switch (ordersSubTab) {
+      case 'served':
+        return myServedOrders;
+      case 'due':
+        return myTableDueOrders;
+      case 'paid':
+        return myTablePaidOrders;
+      case 'cancelled':
+        return myCancelledOrders;
+      default:
+        return myNewOrders;
     }
-    final base = ordersTab == 'served'
-        ? myServedOrders
-        : ordersTab == 'cancelled'
-            ? myCancelledOrders
-            : myNewOrders;
+  }
+
+  List<Map<String, dynamic>> get takeawayOrdersForCurrentTab {
+    switch (ordersSubTab) {
+      case 'due':
+        return myTakeawayDueOrders;
+      case 'paid':
+        return myTakeawayPaidOrders;
+      case 'cancelled':
+        return myTakeawayCancelledOrders;
+      default:
+        return myTakeawayPayLaterOrders;
+    }
+  }
+
+  List<Map<String, dynamic>> get visibleOrders {
+    final base =
+        ordersView == 'Takeaway' ? takeawayOrdersForCurrentTab : tableOrdersForCurrentTab;
     int ts(Map o) =>
         DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
-    base.sort((a, b) => ts(b).compareTo(ts(a)));
-    return base;
+    final out = List<Map<String, dynamic>>.from(base);
+    out.sort((a, b) => ts(b).compareTo(ts(a)));
+    return out;
+  }
+
+  // ------------------------------------------------ orders date filter
+  (DateTime, DateTime) _ordersDateWindow() {
+    final now = DateTime.now();
+    final sod = DateTime(now.year, now.month, now.day);
+    switch (ordersDateRange) {
+      case 'yesterday':
+        return (sod.subtract(const Duration(days: 1)), sod);
+      case 'last7':
+        return (sod.subtract(const Duration(days: 6)),
+            sod.add(const Duration(days: 1)));
+      case 'last30':
+        return (sod.subtract(const Duration(days: 29)),
+            sod.add(const Duration(days: 1)));
+      case 'month':
+        return (
+          DateTime(now.year, now.month, 1),
+          sod.add(const Duration(days: 1))
+        );
+      case 'all':
+        return (DateTime(2000), DateTime(2100));
+      case 'custom':
+        final f = ordersFromDate ?? sod;
+        final t = ordersToDate != null
+            ? DateTime(
+                    ordersToDate!.year, ordersToDate!.month, ordersToDate!.day)
+                .add(const Duration(days: 1))
+            : sod.add(const Duration(days: 1));
+        return (f, t);
+      default:
+        return (sod, sod.add(const Duration(days: 1)));
+    }
+  }
+
+  bool _inOrdersDateRange(Map<String, dynamic> o) {
+    if (ordersDateRange == 'all') return true;
+    final (from, to) = _ordersDateWindow();
+    final d = DateTime.tryParse(sOf(o['createdAt']));
+    if (d == null) return false;
+    return !d.isBefore(from) && d.isBefore(to);
+  }
+
+  List<Map<String, dynamic>> get filteredVisibleOrders {
+    final out = visibleOrders.where(_inOrdersDateRange).toList();
+    int ts(Map o) =>
+        DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
+    out.sort((a, b) => ts(b).compareTo(ts(a)));
+    return out;
+  }
+
+  void _openOrders() {
+    setState(() {
+      showOrdersScreen = true;
+      if (isTakeawayOnly) {
+        ordersView = 'Takeaway';
+        ordersSubTab = 'payLater';
+      } else if (isTableOnly) {
+        ordersView = 'Table';
+        ordersSubTab = 'new';
+      } else {
+        ordersView = 'Takeaway';
+        ordersSubTab = 'payLater';
+      }
+    });
+    _popupTimer?.cancel();
+    _popupTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (showOrdersScreen && mounted) _refreshOrdersOnly();
+    });
+  }
+
+  void _closeOrders() {
+    setState(() => showOrdersScreen = false);
+    _popupTimer?.cancel();
   }
 
   int get cartTotal => cart.fold<int>(
@@ -793,6 +898,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         'notes': notesCtrl.text.trim(),
         'orderTaker': me,
         'waiter': me,
+        'source': 'order-taker-app',
         'status': orderStatus,
         'paymentStatus': paid ? 'Paid' : 'Pending',
         'serviceType': '',
@@ -821,6 +927,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         notesCtrl.clear();
         cashCtrl.clear();
         tableNumber = '';
+        tableCtrl.clear();
         showCart = false;
         showPaymentPopup = false;
       });
@@ -948,6 +1055,53 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       if (!mounted) return;
       setState(() => expandedOrderId = null);
       toast('Order #${order['orderNumber'] ?? order['id']} marked served ✅');
+      await _loadData(silent: true);
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> markDue(Map order) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final me = sOf(user['name']).isNotEmpty
+          ? sOf(user['name'])
+          : sOf(user['username']);
+      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+        'status': 'Due',
+        'dueAt': DateTime.now().toUtc().toIso8601String(),
+        'orderTaker': me,
+      });
+      if (!mounted) return;
+      setState(() => expandedOrderId = null);
+      toast('Order #${order['orderNumber'] ?? order['id']} marked Due 💰');
+      await _loadData(silent: true);
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> markPaid(Map order) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final me = sOf(user['name']).isNotEmpty
+          ? sOf(user['name'])
+          : sOf(user['username']);
+      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+        'paymentStatus': 'paid',
+        'status': 'Payment Collected',
+        'paidAt': DateTime.now().toUtc().toIso8601String(),
+        'orderTaker': me,
+      });
+      if (!mounted) return;
+      setState(() => expandedOrderId = null);
+      toast('Order #${order['orderNumber'] ?? order['id']} marked Paid ✅');
       await _loadData(silent: true);
     } catch (e) {
       toast(e.toString(), seconds: 6);
@@ -1342,8 +1496,9 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     };
     Future<void> sendTest() async {
       if (!(await BtService.isConnected())) {
-        final ok = await _connectPrinter(target!);
-        if (!ok) throw Exception('Could not connect to ${target.name}');
+        final target0 = target!;
+        final ok = await _connectPrinter(target0);
+        if (!ok) throw Exception('Could not connect to ${target0.name}');
       }
       if (_btUseImageMode()) {
         await BtService.write(
@@ -1431,8 +1586,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             if (showPrinterSheet) _printerSheet(),
             if (showCart) _cartSheet(),
             if (showPaymentPopup) _takeawayPaymentSheet(),
-            if (showOrdersPopup) _ordersPopup(),
-            if (showTakeawayOrdersPopup) _takeawayOrdersPopup(),
+            if (showOrdersScreen) _ordersScreen(),
             if (editOrder != null) _editModal(),
             if (message.isNotEmpty) _toastOverlay(),
           ],
@@ -2408,57 +2562,40 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     );
   }
 
-  Widget _pillButton({
-    required String label,
-    required VoidCallback onTap,
-    Color? bg,
-    Color? fg,
-    Widget? badge,
-    EdgeInsets pad = const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-  }) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: pad,
-            decoration: BoxDecoration(
-              color: bg ?? const Color(0xFF0369A1),
-              borderRadius: BorderRadius.circular(100),
-            ),
-            child: Text(label,
-                style: TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700, color: fg ?? Colors.white)),
-          ),
-        ),
-        if (badge != null) Positioned(top: -7, right: -7, child: badge),
-      ],
-    );
-  }
-
   Widget _header() {
     final name = sOf(user['name']).isNotEmpty
         ? sOf(user['name'])
         : (sOf(user['username']).isNotEmpty ? sOf(user['username']) : 'User');
     final role = sOf(user['role']).isEmpty ? 'Order Taker' : sOf(user['role']);
-    final printerLabel = btConnecting
-        ? '⏳'
-        : btConnected
-            ? '🖨️ ${(btInfo?.name ?? 'Printer').substring(0, btInfo!.name.length > 10 ? 10 : btInfo!.name.length)}'
-            : '🖨️';
+    final photo = sOf(user['facePhoto']);
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       child: Row(
         children: [
-          const Padding(
-            padding: EdgeInsets.only(right: 6),
-            child: Text('📋', style: TextStyle(fontSize: 17)),
-          ),
+          if (photo.isNotEmpty)
+            ClipOval(
+              child: SmartImage(src: photo, size: 30),
+            )
+          else
+            Container(
+              width: 30,
+              height: 30,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [Color(0xFF059669), Color(0xFF10B981)]),
+              ),
+              child: Center(
+                child: Text(initial,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white)),
+              ),
+            ),
+          const SizedBox(width: 6),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2467,83 +2604,109 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+                        fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
                 Text(role,
-                    style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
               ],
             ),
           ),
-          _pillButton(
-            label: printerLabel,
+          _iconBtn(
+            icon: '🖨️',
             onTap: _openPrinterSheet,
             bg: btConnected ? const Color(0xFF059669) : const Color(0xFFE0F2FE),
-            fg: btConnected ? Colors.white : const Color(0xFF0369A1),
           ),
           const SizedBox(width: 6),
-          if (isAdminOrderTaker) ...[
-            _pillButton(
-              label: '🛍️ Takeaway',
-              onTap: () {
-                setState(() => showTakeawayOrdersPopup = true);
-                _setPopupTimer();
-              },
-              bg: const Color(0xFFFEF3C7),
-              fg: const Color(0xFF92400E),
-              badge: myTakeawayPayLaterOrders.isNotEmpty
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B),
-                        borderRadius: BorderRadius.circular(100),
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      constraints:
-                          const BoxConstraints(minWidth: 19, minHeight: 19),
-                      child: Text('${myTakeawayPayLaterOrders.length}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white)),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 6),
-          ],
-          _pillButton(
-            label: '📋 Orders',
-            onTap: () {
-              setState(() => showOrdersPopup = true);
-              _setPopupTimer();
-            },
-            bg: const Color(0xFFD1FAE5),
-            fg: const Color(0xFF065F46),
-            badge: myNewOrders.isNotEmpty
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _hdrBtn('\u{1F4CB}', 'Orders', const Color(0xFFD1FAE5),
+                  const Color(0xFF059669), _openOrders),
+              if (myPendingOrdersCount > 0)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF059669),
+                      color: const Color(0xFFDC2626),
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
                     constraints:
-                        const BoxConstraints(minWidth: 19, minHeight: 19),
-                    child: Text('${myNewOrders.length}',
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text('$myPendingOrdersCount',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                            fontSize: 9,
+                            fontSize: 8,
                             fontWeight: FontWeight.w900,
                             color: Colors.white)),
-                  )
-                : null,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 6),
-          _pillButton(
-            label: 'Logout',
+          _hdrBtn('\u{1F4CA}', 'Dash', const Color(0xFFECFDF5),
+              const Color(0xFF7C3AED), () {
+            Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) =>
+                    DashboardScreen(token: token, user: user)));
+          }),
+          const SizedBox(width: 6),
+          _iconBtn(
+            icon: '🚪',
             onTap: handleLogout,
             bg: const Color(0xFFE11D48),
           ),
         ],
+      ),
+    );
+  }
+
+  int get myPendingOrdersCount {
+    if (isTakeawayOnly) return myTakeawayPayLaterOrders.length;
+    if (isTableOnly) return myNewOrders.length;
+    return myNewOrders.length + myTakeawayPayLaterOrders.length;
+  }
+
+  Widget _hdrBtn(String icon, String label, Color bg, Color fg,
+      VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(icon, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w800, color: fg)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _iconBtn({
+    required String icon,
+    required VoidCallback onTap,
+    Color? bg,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: bg ?? const Color(0xFF0369A1),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(icon, style: const TextStyle(fontSize: 14)),
+        ),
       ),
     );
   }
@@ -3067,54 +3230,70 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     );
   }
 
-  Widget _cartSheet() {
-    final floor = freeTablesBySection['floor'] ?? [];
-    final outside = freeTablesBySection['outside'] ?? [];
-    final noFreeTables = floor.isEmpty && outside.isEmpty;
+Widget _cartSheet() {
     final isTakeaway = activeType == 'Take Away';
     return Positioned.fill(
-      child: Material(
-        color: Colors.white,
-        child: Column(
-          children: [
+      child: Column(children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => showCart = false),
+            child: Container(color: Colors.black54),
+          ),
+        ),
+        Container(
+          constraints:
+              BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+          decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: Column(children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+              padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('🛒 Place Order ($cartCount items)',
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A))),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(() => showCart = false),
-                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
+                  border:
+                      Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+              child: Row(children: [
+                Text('🛒 $activeType Order ($cartCount items)',
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF059669))),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => setState(() => showCart = false),
+                  icon: const Icon(Icons.close),
+                ),
+              ]),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (cart.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                      child: Text('ITEMS',
-                          style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                              color: Colors.grey.shade600)),
-                    ),
+                      padding: const EdgeInsets.only(top: 40, bottom: 20),
+                      child: Column(children: [
+                        const Text('🛒', style: TextStyle(fontSize: 34)),
+                        const Text('Cart is empty',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF94A3B8))),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: () => setState(() => showCart = false),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 8)),
+                          child: const Text('Back to Menu',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w800)),
+                        ),
+                      ]),
+                    )
+                  else
                     ...cart.map((item) => Container(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
+                          margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -3142,7 +3321,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                                               color: Color(0xFF64748B))),
                                     Text('${numOf(item['price'])} PKR each',
                                         style: const TextStyle(
-                                            fontSize: 11, color: Color(0xFF94A3B8))),
+                                            fontSize: 11,
+                                            color: Color(0xFF94A3B8))),
                                   ],
                                 ),
                               ),
@@ -3153,7 +3333,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                                 child: Text('${numOf(item['quantity']).round()}',
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                        fontSize: 13, fontWeight: FontWeight.w800)),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800)),
                               ),
                               _qtyBtn('+', const Color(0xFF059669), Colors.white,
                                   () => updateCartQty(sOf(item['itemId']), 1)),
@@ -3163,243 +3344,121 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                             ],
                           ),
                         )),
-                    if (cart.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 48),
-                          child: Column(
-                            children: [
-                              const Text('🛒', style: TextStyle(fontSize: 34)),
-                              const Text('Cart is empty',
-                                  style: TextStyle(
-                                      fontSize: 13, color: Color(0xFF94A3B8))),
-                              const SizedBox(height: 10),
-                              ElevatedButton(
-                                onPressed: () => setState(() => showCart = false),
-                                style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF059669),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 18, vertical: 8)),
-                                child: const Text('Back to Menu',
-                                    style: TextStyle(
-                                        fontSize: 11, fontWeight: FontWeight.w800)),
-                              ),
-                            ],
-                          ),
-                        ),
+                  if (cart.isNotEmpty) const Divider(),
+                  if (cart.isNotEmpty) ...[
+                    if (!isTakeaway) ...[
+                      const Text.rich(TextSpan(children: [
+                        TextSpan(text: 'Table / Room ',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569))),
+                        TextSpan(text: '*',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFF43F5E))),
+                      ])),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: tableCtrl,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: _lightInput('e.g. T-1, Room 4, Table 3'),
                       ),
-                    Container(
-                      margin: const EdgeInsets.only(top: 14),
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                      width: double.infinity,
-                      color: const Color(0xFFF8FAFC),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(isTakeaway ? '🛍️ TAKE AWAY DETAILS' : 'ORDER DETAILS',
-                              style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.2,
-                                  color: Colors.grey.shade600)),
-                          if (!isTakeaway) ...[
-                            const SizedBox(height: 10),
-                            const Text.rich(TextSpan(children: [
-                              TextSpan(text: 'Table / Room ',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF475569))),
-                              TextSpan(text: '*',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFF43F5E))),
-                            ])),
-                            const SizedBox(height: 8),
-                            if (noFreeTables)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFFBEB),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFFDE68A)),
-                                ),
-                                child: const Text(
-                                    'No free tables available right now',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFFB45309))),
-                              )
-                            else ...[
-                              if (floor.isNotEmpty) ...[
-                                Text(
-                                    '⬆️ Floor Tables (${floor.length} free)',
-                                    style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                        color: Color(0xFF059669))),
-                                const SizedBox(height: 6),
-                                _tableGrid(floor, const Color(0xFF059669),
-                                    const Color(0xFFECFDF5), const Color(0xFF065F46)),
-                                const SizedBox(height: 10),
-                              ],
-                              if (outside.isNotEmpty) ...[
-                                Text(
-                                    '⬇️ Outside Tables (${outside.length} free)',
-                                    style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                        color: Color(0xFF0284C7))),
-                                const SizedBox(height: 6),
-                                _tableGrid(outside, const Color(0xFF0284C7),
-                                    const Color(0xFFF0F9FF), const Color(0xFF075985)),
-                              ],
-                            ],
-                            if (tableNumber.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 8),
-                                child: Text(
-                                    'Please select a table to place the order',
-                                    style: TextStyle(
-                                        fontSize: 11, color: Color(0xFFD97706))),
-                              ),
-                          ],
-                          const SizedBox(height: 10),
-                          Text(
-                              isTakeaway
-                                  ? 'Customer Name (optional)'
-                                  : 'Customer Name',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF475569))),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: customerNameCtrl,
-                            style: const TextStyle(fontSize: 13),
-                            decoration: _lightInput('Customer name'),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text('Notes (optional)',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF475569))),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: notesCtrl,
-                            maxLines: 2,
-                            style: const TextStyle(fontSize: 13),
-                            decoration: _lightInput('Order notes'),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    Text('Customer Name',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF475569))),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: customerNameCtrl,
+                      style: const TextStyle(fontSize: 13),
+                      decoration:
+                          _lightInput('Customer name (optional)'),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('Notes (optional)',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF475569))),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesCtrl,
+                      maxLines: 2,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: _lightInput('Order notes'),
                     ),
                   ],
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                      Text('$cartTotal PKR',
-                          style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF059669))),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: (_busy ||
-                              cart.isEmpty ||
-                              (!isTakeaway && tableNumber.isEmpty))
-                          ? null
-                          : () {
-                              if (isTakeaway) {
-                                setState(() => showPaymentPopup = true);
-                              } else {
-                                createOrder('Pending');
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isTakeaway
-                            ? const Color(0xFFF59E0B)
-                            : const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: (isTakeaway
-                                ? const Color(0xFFF59E0B)
-                                : const Color(0xFF059669))
-                            .withValues(alpha: .45),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(
-                        _busy
-                            ? 'Creating...'
-                            : isTakeaway
-                                ? 'Place 🛍️ Take Away Order'
-                                : 'Place 🍽️ Dine-In Order',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _tableGrid(List<Map<String, dynamic>> list, Color activeColor,
-      Color idleBg, Color idleFg) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: list.map((t) {
-        final label = tableLabel(t);
-        final sel = tableNumber == label;
-        return GestureDetector(
-          onTap: () => setState(() => tableNumber = sel ? '' : label),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: sel ? activeColor : idleBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: sel ? activeColor : activeColor.withValues(alpha: .35)),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0xFFE2E8F0)))),
+              child: Column(children: [
+                Row(children: [
+                  const Text('Total',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                  const Spacer(),
+                  Text('$cartTotal PKR',
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF059669))),
+                ]),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: (_busy || cart.isEmpty)
+                        ? null
+                        : () {
+                            if (isTakeaway) {
+                              setState(() => showPaymentPopup = true);
+                            } else {
+                              tableNumber = tableCtrl.text.trim();
+                              if (tableNumber.isEmpty) {
+                                toast('Please enter a table or room');
+                                return;
+                              }
+                              createOrder('Pending');
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isTakeaway
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: (isTakeaway
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF059669))
+                          .withValues(alpha: .45),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(
+                      _busy
+                          ? 'Creating...'
+                          : isTakeaway
+                              ? 'Place 🛍️ Take Away Order'
+                              : 'Place 🍽️ Dine-In Order',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ]),
             ),
-            constraints: const BoxConstraints(minWidth: 64),
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: sel ? Colors.white : idleFg)),
-          ),
-        );
-      }).toList(),
+          ]),
+        ),
+      ]),
     );
   }
 
@@ -3653,339 +3712,272 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     );
   }
 
-  Widget _ordersPopup() {
-    final list = popupOrders;
-    final bool isTakeawayOT = isTakeawayOrderTaker;
-    final Map<String, (String, int, Color)> tabs;
-    if (isTakeawayOT) {
-      tabs = {
-        'new': ('🛍️ Pay Later', myTakeawayPayLaterOrders.length, const Color(0xFFD97706)),
-        'served': ('✅ Paid', myTakeawayPaidOrders.length, const Color(0xFF059669)),
-      };
-    } else {
-      tabs = {
-        'new': ('🆕 New', myNewOrders.length, const Color(0xFFD97706)),
-        'served': ('✅ Served', myServedOrders.length, const Color(0xFF059669)),
-        'cancelled': ('❌ Cancelled', myCancelledOrders.length, const Color(0xFFE11D48)),
-      };
+  // -------------------------------------------------- full-screen orders screen
+  Color _viewColor(String v) {
+    switch (v) {
+      case 'Takeaway':
+        return const Color(0xFFF59E0B);
+      case 'Table':
+        return const Color(0xFF7C3AED);
+      default:
+        return const Color(0xFF2563EB);
     }
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black54,
-        child: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              margin: const EdgeInsets.only(top: 24),
-              width: double.infinity,
-              constraints: BoxConstraints(
-                  maxWidth: 440, maxHeight: MediaQuery.of(context).size.height * 0.8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF020617),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF1E293B)),
+  }
+
+  Color _tabGlowColor(String k) {
+    switch (k) {
+      case 'new':
+      case 'active':
+      case 'pay_later':
+        return const Color(0xFF2563EB);
+      case 'served':
+        return const Color(0xFF0D9488);
+      case 'paid':
+        return const Color(0xFF059669);
+      case 'due':
+        return const Color(0xFFF59E0B);
+      case 'cancelled':
+        return const Color(0xFFDC2626);
+      default:
+        return const Color(0xFF2563EB);
+    }
+  }
+
+  List<String> get ordersViews {
+    if (isTakeawayOnly) return const ['Takeaway'];
+    if (isTableOnly) return const ['Table'];
+    return const ['Takeaway', 'Table'];
+  }
+
+  List<List<String>> ordersSubTabsOf(String view) {
+    if (view == 'Takeaway') {
+      return const [
+        ['pay_later', 'Pay Later'],
+        ['due', 'Due'],
+        ['paid', 'Paid'],
+        ['cancelled', 'Cancelled'],
+      ];
+    }
+    return const [
+      ['new', 'New'],
+      ['served', 'Served'],
+      ['due', 'Due'],
+      ['paid', 'Paid'],
+      ['cancelled', 'Cancelled'],
+    ];
+  }
+
+  String _fmtDatePicker(DateTime? d) => d == null
+      ? 'Any'
+      : '${two(d.day)}/${two(d.month)}/${d.year}';
+
+  Widget _datePickBtn(String label, VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFBFDBFE)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.calendar_today, size: 14, color: Color(0xFF2563EB)),
+            const SizedBox(width: 6),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E40AF)))),
+          ]),
+        ),
+      );
+
+  List<Widget> _ordersRangeChips() {
+    const ranges = [
+      ('today', 'Today'),
+      ('yesterday', 'Yesterday'),
+      ('last7', '7 Days'),
+      ('last30', '30 Days'),
+      ('month', 'Month'),
+      ('all', 'All'),
+      ('custom', 'Custom'),
+    ];
+    return ranges.map((r) {
+      final active = ordersDateRange == r.$1;
+      final c = active ? const Color(0xFF0EA5E9) : const Color(0xFF64748B);
+      return Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          label: Text(r.$2),
+          selected: active,
+          onSelected: (_) => setState(() => ordersDateRange = r.$1),
+          selectedColor: const Color(0xFF0EA5E9),
+          backgroundColor: const Color(0xFFF1F5F9),
+          labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? Colors.white : c),
+          side: BorderSide(color: active ? const Color(0xFF0EA5E9) : const Color(0xFFE2E8F0)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _ordersDateFilterBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 2),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(right: 6),
+                child: Text('Date:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF64748B))),
               ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                              isTakeawayOT ? '🛍️ Takeaway Orders' : '📋 My Orders',
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white)),
-                        ),
-                        GestureDetector(
-                          onTap: () => _refreshOrdersOnly(showSpin: true),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF1E293B),
-                              shape: BoxShape.circle,
-                            ),
-                            child: popupRefreshing
-                                ? const SizedBox(
-                                    width: 13,
-                                    height: 13,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Color(0xFF34D399)))
-                                : const Text('🔄', style: TextStyle(fontSize: 13)),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            _popupTimer?.cancel();
-                            setState(() => showOrdersPopup = false);
-                          },
-                          icon:
-                              const Icon(Icons.close, size: 18, color: Color(0xFFCBD5E1)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: Row(
-                      children: tabs.entries.map((e) {
-                        final key = e.key;
-                        final label = e.value.$1;
-                        final count = e.value.$2;
-                        final color = e.value.$3;
-                        final active = isTakeawayOT
-                            ? takeawayOrdersTab == (key == 'new' ? 'pay_later' : 'paid')
-                            : ordersTab == key;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  if (isTakeawayOT) {
-                                    takeawayOrdersTab = key == 'new' ? 'pay_later' : 'paid';
-                                  } else {
-                                    ordersTab = key;
-                                  }
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
-                                decoration: BoxDecoration(
-                                  color: active
-                                      ? color
-                                      : const Color(0xFF0F172A),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Flexible(
-                                      child: Text(label,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w900,
-                                              color: active
-                                                  ? Colors.white
-                                                  : const Color(0xFF94A3B8))),
-                                    ),
-                                    if (count > 0) ...[
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: .2),
-                                          borderRadius:
-                                              BorderRadius.circular(100),
-                                        ),
-                                        child: Text('$count',
-                                            style: TextStyle(
-                                                fontSize: 8.5,
-                                                fontWeight: FontWeight.w900,
-                                                color: active
-                                                    ? Colors.white
-                                                    : const Color(0xFF94A3B8))),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  Expanded(
-                    child: list.isEmpty
-                        ? Center(
-                            child: Text(
-                              isTakeawayOT
-                                  ? (takeawayOrdersTab == 'paid'
-                                      ? 'No paid takeaway orders'
-                                      : 'No pending takeaway orders')
-                                  : ordersTab == 'new'
-                                      ? 'No new orders yet'
-                                      : ordersTab == 'served'
-                                          ? 'No served orders yet'
-                                          : 'No cancelled orders yet',
-                              style: const TextStyle(
-                                  fontSize: 13, color: Color(0xFF64748B)),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                            itemCount: list.length,
-                            itemBuilder: (_, i) =>
-                                _orderCard(list[i], i, list,
-                                    printOnly: isTakeawayOT),
-                          ),
-                  ),
-                ],
-              ),
-            ),
+              ..._ordersRangeChips(),
+            ],
           ),
         ),
-      ),
+        if (ordersDateRange == 'custom')
+          Row(children: [
+            Expanded(
+              child: _datePickBtn('From: ${_fmtDatePicker(ordersFromDate)}', () async {
+                final p = await showDatePicker(
+                  context: context,
+                  initialDate: ordersFromDate ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (p != null) setState(() => ordersFromDate = p);
+              }),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _datePickBtn('To: ${_fmtDatePicker(ordersToDate)}', () async {
+                final p = await showDatePicker(
+                  context: context,
+                  initialDate: ordersToDate ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (p != null) setState(() => ordersToDate = p);
+              }),
+            ),
+            if (ordersFromDate != null || ordersToDate != null)
+              IconButton(
+                onPressed: () => setState(() { ordersFromDate = null; ordersToDate = null; }),
+                icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF64748B)),
+                tooltip: 'Reset custom dates',
+              ),
+          ]),
+      ]),
     );
   }
 
-  Widget _takeawayOrdersPopup() {
-    final list = takeawayPopupOrders;
-    final tabs = {
-      'pay_later': ('🛍️ Pay Later', myTakeawayPayLaterOrders.length, const Color(0xFFD97706)),
-      'paid': ('✅ Paid', myTakeawayPaidOrders.length, const Color(0xFF059669)),
-      'due': ('💰 Due', myTakeawayDueOrders.length, const Color(0xFFE11D48)),
-    };
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black54,
-        child: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              margin: const EdgeInsets.only(top: 24),
-              width: double.infinity,
-              constraints: BoxConstraints(
-                  maxWidth: 440, maxHeight: MediaQuery.of(context).size.height * 0.8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF020617),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF1E293B)),
+  Widget _ordersScreen() {
+    final subTabs = ordersSubTabsOf(ordersView);
+    final list = filteredVisibleOrders;
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+            child: Row(children: [
+              const Text('📋 Orders',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _refreshOrdersOnly(showSpin: true),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: popupRefreshing
+                      ? const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Color(0xFF059669)))
+                      : const Text('🔄', style: TextStyle(fontSize: 13)),
+                ),
               ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text('🛍️ Takeaway Orders',
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white)),
-                        ),
-                        GestureDetector(
-                          onTap: () => _refreshOrdersOnly(showSpin: true),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF1E293B),
-                              shape: BoxShape.circle,
-                            ),
-                            child: popupRefreshing
-                                ? const SizedBox(
-                                    width: 13,
-                                    height: 13,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Color(0xFF34D399)))
-                                : const Text('🔄', style: TextStyle(fontSize: 13)),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            _popupTimer?.cancel();
-                            setState(() => showTakeawayOrdersPopup = false);
-                          },
-                          icon:
-                              const Icon(Icons.close, size: 18, color: Color(0xFFCBD5E1)),
-                        ),
+              IconButton(
+                onPressed: _closeOrders,
+                icon: const Icon(Icons.close, color: Color(0xFFDC2626)),
+              ),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(children: ordersViews.map((v) {
+              final sel = ordersView == v;
+              final color = _viewColor(v);
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    ordersView = v;
+                    ordersSubTab = ordersSubTabsOf(v).first[0];
+                    if (ordersSubTab == 'new' && v == 'Takeaway') {
+                      ordersSubTab = 'pay_later';
+                    }
+                  }),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                        color: sel ? color : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text(v,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: sel ? Colors.white : const Color(0xFF475569))),
+                  ),
+                ),
+              );
+            }).toList()),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: subTabs.map((t) {
+                final sel = ordersSubTab == t[0];
+                final tc = _tabGlowColor(t[0]);
+                return GestureDetector(
+                  onTap: () => setState(() => ordersSubTab = t[0]),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: sel ? tc : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: sel ? tc : const Color(0xFFE2E8F0), width: sel ? 1.4 : 1),
+                      boxShadow: [
+                        BoxShadow(color: tc.withValues(alpha: sel ? 0.45 : 0.18), blurRadius: sel ? 12 : 7, spreadRadius: sel ? 1 : 0.2, offset: const Offset(0, 1)),
                       ],
                     ),
+                    child: Text(t[1], textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: sel ? Colors.white : tc)),
                   ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: Row(
-                      children: tabs.entries.map((e) {
-                        final key = e.key;
-                        final label = e.value.$1;
-                        final count = e.value.$2;
-                        final color = e.value.$3;
-                        final active = takeawayOrdersTab == key;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: GestureDetector(
-                              onTap: () => setState(() => takeawayOrdersTab = key),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
-                                decoration: BoxDecoration(
-                                  color: active
-                                      ? color
-                                      : const Color(0xFF0F172A),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Flexible(
-                                      child: Text(label,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w900,
-                                              color: active
-                                                  ? Colors.white
-                                                  : const Color(0xFF94A3B8))),
-                                    ),
-                                    if (count > 0) ...[
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: .2),
-                                          borderRadius:
-                                              BorderRadius.circular(100),
-                                        ),
-                                        child: Text('$count',
-                                            style: TextStyle(
-                                                fontSize: 8.5,
-                                                fontWeight: FontWeight.w900,
-                                                color: active
-                                                    ? Colors.white
-                                                    : const Color(0xFF94A3B8))),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  Expanded(
-                    child: list.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No takeaway orders',
-                              style: TextStyle(
-                                  fontSize: 13, color: Color(0xFF64748B)),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                            itemCount: list.length,
-                            itemBuilder: (_, i) =>
-                                _orderCard(list[i], i, list),
-                          ),
-                  ),
-                ],
-              ),
+                );
+              }).toList()),
             ),
           ),
-        ),
+          _ordersDateFilterBar(),
+          Expanded(
+            child: list.isEmpty
+                ? const Center(child: Text('No orders', style: TextStyle(color: Color(0xFF94A3B8))))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _orderCard(list[i], i, list,
+                        takeawayTab: ordersView == 'Takeaway' ? ordersSubTab : null),
+                  ),
+          ),
+        ]),
       ),
     );
   }
@@ -4028,7 +4020,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return d?.millisecondsSinceEpoch ?? _now.value.millisecondsSinceEpoch;
   }
 
-  Widget _orderCard(Map<String, dynamic> o, int idx, List list, {bool printOnly = false}) {
+  Widget _orderCard(Map<String, dynamic> o, int idx, List list, {bool printOnly = false, String? takeawayTab}) {
     final id = o['id'];
     final expanded = expandedOrderId == id;
     final totals = orderTotals(o);
@@ -4086,30 +4078,31 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF818CF8))),
                       const Spacer(),
-                      if (createdMs != null && st == 'new')
+                      if (createdMs != null && (st == 'new' || takeawayTab != null))
                         Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: Text(time12(sOf(o['createdAt'])),
                               style: const TextStyle(
                                   fontSize: 9.5, color: Color(0xFF94A3B8))),
                         ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: stateColor.withValues(alpha: .15),
-                          borderRadius: BorderRadius.circular(100),
+                      if (takeawayTab == null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: stateColor.withValues(alpha: .15),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: ValueListenableBuilder<DateTime>(
+                            valueListenable: _now,
+                            builder: (_, nowVal, __) => Text(
+                                '⏱ ${formatDuration(nowVal.millisecondsSinceEpoch - baseMs)}',
+                                style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: stateColor)),
+                          ),
                         ),
-                        child: ValueListenableBuilder<DateTime>(
-                          valueListenable: _now,
-                          builder: (_, nowVal, __) => Text(
-                              '⏱ ${formatDuration(nowVal.millisecondsSinceEpoch - baseMs)}',
-                              style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: stateColor)),
-                        ),
-                      ),
                       Padding(
                         padding: const EdgeInsets.only(left: 6),
                         child: AnimatedRotation(
@@ -4278,6 +4271,57 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                       ],
                     ),
                   ),
+                  // ---------- Takeaway popup action buttons (admin OT) ----------
+                  if (takeawayTab != null) ...[
+                    const SizedBox(height: 10),
+                    if (st == 'new' || st == 'served') ...[
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _actionChip('🖨️ Print', const Color(0xFF1E293B),
+                              const Color(0xFFE2E8F0), () async {
+                            try {
+                              await printOrderBT(o);
+                              toast('Order sent to printer 🖨️');
+                            } catch (e) {
+                              toast('Bluetooth print failed: $e', seconds: 6);
+                            }
+                          }),
+                          _actionChip('✏️ Edit Order', const Color(0xFF1E293B),
+                              const Color(0xFFE2E8F0), () => openEditOrder(o)),
+                          if (takeawayTab == 'pay_later') ...[
+                            _actionChip(
+                                '💰 Mark Due',
+                                const Color(0xFFF59E0B),
+                                Colors.white,
+                                () => markDue(o)),
+                            _actionChip(
+                                '✅ Mark Paid',
+                                const Color(0xFF059669),
+                                Colors.white,
+                                () => markPaid(o)),
+                          ],
+                          if (takeawayTab == 'paid')
+                            _actionChip(
+                                '💰 Mark Due',
+                                const Color(0xFFF59E0B),
+                                Colors.white,
+                                () => markDue(o)),
+                          if (takeawayTab == 'due')
+                            _actionChip(
+                                '✅ Mark Paid',
+                                const Color(0xFF059669),
+                                Colors.white,
+                                () => markPaid(o)),
+                          _actionChip('❌ Delete', const Color(0xFFE11D48),
+                              Colors.white, () => cancelOrder(o)),
+                        ],
+                      ),
+                    ],
+                  ],
+                  // ---------- Normal order card action buttons ----------
+                  if (takeawayTab == null) ...[
                   if (st == 'new') ...[
                     const SizedBox(height: 10),
                     Wrap(
@@ -4532,6 +4576,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                       ),
                     ),
                   ],
+                  ],
                 ],
               ),
             ),
@@ -4765,7 +4810,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                     child: Column(
                       children: [
                         DropdownButtonFormField<String>(
-                          value:
+                          initialValue:
                               sOf(eo['tableNumber']).isEmpty ? '' : sOf(eo['tableNumber']),
                           dropdownColor: const Color(0xFF0F172A),
                           style: const TextStyle(

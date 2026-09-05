@@ -782,7 +782,7 @@ router.get('/pos/orders', authenticate, (req, res) => {
       const ow = sOf(order.waiter).trim().toLowerCase();
       if (ot === userName || ot === userUsername || ow === userName || ow === userUsername) return true;
       if (ot === userEmail || ow === userEmail) return true;
-      if (ot.isEmpty && ow.isEmpty) return true;
+      if (ot.length === 0 && ow.length === 0) return true;
       return false;
     });
   }

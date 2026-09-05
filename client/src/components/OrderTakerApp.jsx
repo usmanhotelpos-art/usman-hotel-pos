@@ -586,26 +586,41 @@ export function OrderTakerApp() {
     return s === 'completed' || s === 'payment collected' || p === 'paid';
   };
 
+  const isDueOrder = (order) => {
+    const s = (order.status || '').toLowerCase();
+    const p = (order.paymentStatus || '').toLowerCase();
+    return s === 'due' || p === 'due';
+  };
+
+  const isForeignSource = (order) => {
+    const src = (order.source || '').trim().toLowerCase();
+    return src === 'nashta-app' || src === 'bbq-delivery-app';
+  };
+
   const myNewOrders = useMemo(() => (orders || []).filter(o =>
-    o.orderType === 'Dine-In' && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o)
+    !isForeignSource(o) && o.orderType === 'Dine-In' && isMyOrder(o) && !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o) && !isDueOrder(o)
+  ), [orders, orderTaker]);
+
+  const myDueOrders = useMemo(() => (orders || []).filter(o =>
+    !isForeignSource(o) && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway') && isMyOrder(o) && isDueOrder(o) && !isCancelledOrder(o)
   ), [orders, orderTaker]);
 
   const myServedOrders = useMemo(() => (orders || []).filter(o =>
-    o.orderType === 'Dine-In' && isMyOrder(o) && isServedOrder(o)
+    !isForeignSource(o) && o.orderType === 'Dine-In' && isMyOrder(o) && isServedOrder(o)
   ), [orders, orderTaker]);
 
   const myCancelledOrders = useMemo(() => {
     const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
     return (orders || []).filter(o =>
-      o.orderType === 'Dine-In' && isMyOrder(o) && isCancelledOrder(o) &&
+      !isForeignSource(o) && o.orderType === 'Dine-In' && isMyOrder(o) && isCancelledOrder(o) &&
       (!o.cancelledAt || new Date(o.cancelledAt).getTime() > dayAgo)
     );
   }, [orders, orderTaker]);
 
   const popupOrders = useMemo(() => {
-    const base = ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : myNewOrders;
+    const base = ordersTab === 'served' ? myServedOrders : ordersTab === 'cancelled' ? myCancelledOrders : ordersTab === 'due' ? myDueOrders : myNewOrders;
     return base.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  }, [ordersTab, myNewOrders, myServedOrders, myCancelledOrders]);
+  }, [ordersTab, myNewOrders, myServedOrders, myCancelledOrders, myDueOrders]);
 
   async function createOrder(orderStatus = 'Pending', paymentOpts = {}) {
     if (!cart.length) { setMessage('Cart is empty'); return; }
@@ -622,6 +637,7 @@ export function OrderTakerApp() {
         notes,
         orderTaker: orderTaker?.name || orderTaker?.username || '',
         waiter: orderTaker?.name || orderTaker?.username || '',
+        source: 'web-order-taker',
         status: orderStatus,
         paymentStatus: paymentOpts.paid ? 'Paid' : 'Pending',
         serviceType: '',
@@ -830,6 +846,24 @@ export function OrderTakerApp() {
       });
       setExpandedOrderId(null);
       setMessage(`Order #${order.orderNumber || order.id} cancelled ❌`);
+      await loadData();
+    } catch (e) { setMessage(e.message); } finally { setLoading(false); }
+  }
+
+  async function markDue(order) {
+    setLoading(true);
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          status: 'Due',
+          paymentStatus: 'Due',
+          orderTaker: orderTaker?.name || orderTaker?.username || '',
+        }),
+        token
+      });
+      setExpandedOrderId(null);
+      setMessage(`Order #${order.orderNumber || order.id} marked due 🟠`);
       await loadData();
     } catch (e) { setMessage(e.message); } finally { setLoading(false); }
   }
@@ -1209,10 +1243,13 @@ export function OrderTakerApp() {
               </div>
             </div>
 
-            {/* Tabs: New | Served | Cancelled */}
-            <div className="grid grid-cols-3 gap-1 p-3 border-b border-slate-800">
+            {/* Tabs: New | Due | Served | Cancelled */}
+            <div className="grid grid-cols-4 gap-1 p-3 border-b border-slate-800">
               <button onClick={() => setOrdersTab('new')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'new' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
                 🆕 New {myNewOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myNewOrders.length}</span>}
+              </button>
+              <button onClick={() => setOrdersTab('due')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'due' ? 'bg-orange-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
+                🟠 Due {myDueOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myDueOrders.length}</span>}
               </button>
               <button onClick={() => setOrdersTab('served')} className={`rounded-xl px-1 py-2 text-[10px] font-bold transition-all ${ordersTab === 'served' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}>
                 ✅ Served {myServedOrders.length > 0 && <span className="ml-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px]">{myServedOrders.length}</span>}
@@ -1225,7 +1262,7 @@ export function OrderTakerApp() {
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {popupOrders.length === 0 && (
                 <p className="text-sm text-slate-500 text-center py-8">
-                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
+                  {ordersTab === 'new' ? 'No new orders yet' : ordersTab === 'due' ? 'No due orders yet' : ordersTab === 'served' ? 'No served orders yet' : 'No cancelled orders yet'}
                 </p>
               )}
               {popupOrders
@@ -1237,29 +1274,29 @@ export function OrderTakerApp() {
                 const servedAtMs = order.servedAt ? new Date(order.servedAt).getTime() : null;
                 const createdMs = order.createdAt ? new Date(order.createdAt).getTime() : null;
                 const cancelledMs = order.cancelledAt ? new Date(order.cancelledAt).getTime() : null;
-                const st = isCancelledOrder(order) ? 'cancelled' : isServedOrder(order) ? 'served' : 'new';
+                const st = isCancelledOrder(order) ? 'cancelled' : isDueOrder(order) ? 'due' : isServedOrder(order) ? 'served' : 'new';
                 return (
-                  <div key={order.id} className={`rounded-xl border overflow-hidden ${st === 'cancelled' ? 'border-rose-900/60 bg-rose-950/20' : 'border-slate-800 bg-slate-900'}`}>
+                  <div key={order.id} className={`rounded-xl border overflow-hidden ${st === 'cancelled' ? 'border-rose-900/60 bg-rose-950/20' : st === 'due' ? 'border-orange-700/60 bg-orange-950/20' : 'border-slate-800 bg-slate-900'}`}>
                     {/* Header - tap to expand */}
                     <button onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} className="w-full p-3 text-left active:bg-slate-800/50 transition-colors">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-indigo-400">#{order.orderNumber || order.id}</span>
                         <span className="flex items-center gap-1.5">
                           {createdMs && <span className="text-[10px] text-slate-400">{new Date(createdMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>}
-                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${st === 'new' ? 'bg-amber-500/15 text-amber-400' : st === 'served' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
-                            ⏱ {formatDuration(now - (st === 'new' ? createdMs : st === 'served' ? servedAtMs : cancelledMs) || now)}
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${st === 'new' ? 'bg-amber-500/15 text-amber-400' : st === 'served' ? 'bg-emerald-500/15 text-emerald-400' : st === 'due' ? 'bg-orange-500/15 text-orange-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                            ⏱ {formatDuration(now - (st === 'new' ? (createdMs || now) : st === 'served' ? (servedAtMs || now) : st === 'due' ? (createdMs || now) : (cancelledMs || now)))}
                           </span>
                           <span className={`text-[10px] ${isExpanded ? 'rotate-180' : ''} transition-transform text-slate-500`}>▼</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
-                        <span className={`font-semibold ${st === 'new' ? 'text-amber-400' : st === 'served' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {st === 'new' ? order.orderType : st === 'served' ? 'Served' : 'Cancelled'}
+                        <span className={`font-semibold ${st === 'new' ? 'text-amber-400' : st === 'served' ? 'text-emerald-400' : st === 'due' ? 'text-orange-400' : 'text-rose-400'}`}>
+                          {st === 'due' ? 'Due' : st === 'new' ? order.orderType : st === 'served' ? 'Served' : 'Cancelled'}
                         </span>
                         <span>•</span>
                         <span>{order.customerName || order.tableNumber || '-'}</span>
                         <span>•</span>
-                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : st === 'cancelled' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
+                        <span className={`font-semibold rounded-full px-1.5 py-0.5 ${isPaid ? 'bg-emerald-500/15 text-emerald-400' : st === 'cancelled' ? 'bg-rose-500/15 text-rose-400' : st === 'due' ? 'bg-orange-500/15 text-orange-400' : 'bg-amber-500/15 text-amber-400'}`}>{order.status || order.paymentStatus || 'New'}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-emerald-400">{total} PKR</span>
@@ -1290,8 +1327,17 @@ export function OrderTakerApp() {
                         {st === 'new' && (
                           <div className="flex flex-wrap gap-1.5">
                             <button onClick={() => printOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">🖨️ Print</button>
+                            <button onClick={() => markDue(order)} disabled={loading} className="flex-1 min-w-[45%] rounded-full bg-orange-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-orange-500 active:scale-[0.97] disabled:opacity-50">🟠 Mark Due</button>
                             <button onClick={() => openEditOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">✏️ Edit Order</button>
                             <button onClick={() => markServed(order)} disabled={loading} className="flex-1 min-w-[45%] rounded-full bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-500 active:scale-[0.97] disabled:opacity-50">✅ Mark Served</button>
+                            <button onClick={() => cancelOrder(order)} disabled={loading} className="flex-1 min-w-[45%] rounded-full bg-rose-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-rose-500 active:scale-[0.97] disabled:opacity-50">❌ Cancel Order</button>
+                          </div>
+                        )}
+
+                        {st === 'due' && (
+                          <div className="flex flex-wrap gap-1.5">
+                            <button onClick={() => printOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">🖨️ Print</button>
+                            <button onClick={() => openEditOrder(order)} className="flex-1 min-w-[45%] rounded-full bg-slate-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-700 active:scale-[0.97]">✏️ Edit Order</button>
                             <button onClick={() => cancelOrder(order)} disabled={loading} className="flex-1 min-w-[45%] rounded-full bg-rose-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-rose-500 active:scale-[0.97] disabled:opacity-50">❌ Cancel Order</button>
                           </div>
                         )}

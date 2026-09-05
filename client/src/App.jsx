@@ -3074,7 +3074,8 @@ try {
         paymentMethod: orderType === 'Takeaway' ? paymentMethod : '',
         paymentStatus: orderType === 'Delivery' ? (overrides.paymentStatus ?? orderDetails.paymentStatus) : '',
         notes: orderDetails.notes,
-        status: orderStatus
+        status: orderStatus,
+        source: 'pos-web'
       };
       const order = editingOrder && editingOrder.id
       ? await fetchJson(`${apiBase}/pos/orders/${editingOrder.id}`, {
@@ -4863,7 +4864,7 @@ try {
         );
       }
       if (riderBookSubTab === 'all') {
-        return true;
+        return paymentStatus !== 'paid' && orderStatus !== 'completed';
       }
     }
     if (riderBookMainTab === 'sales') {
