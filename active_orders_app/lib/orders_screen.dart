@@ -14,6 +14,7 @@ import 'bt_service.dart';
 import 'escpos.dart' as esc;
 import 'login_screen.dart';
 import 'notify.dart';
+import 'printer_settings_screen.dart';
 import 'siren.dart';
 
 const List<String> _excludedStatuses = [
@@ -56,6 +57,19 @@ bool _isDineInActive(Map o) =>
     _s(o['orderType']) == 'Dine-In' &&
     !_excludedStatuses.contains(_norm(o['status']));
 
+String _orderTypeLabel(String t) {
+  switch (_norm(t)) {
+    case 'delivery':
+      return 'DELIVERY';
+    case 'takeaway':
+      return 'TAKEAWAY';
+    case 'dine-in':
+      return 'DINE-IN';
+    default:
+      return t.isEmpty ? 'ORDER' : t.toUpperCase();
+  }
+}
+
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -70,7 +84,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   List<dynamic> tables = [];
   Map<String, dynamic> settings = {};
   DateTime? lastUpdated;
-  String activeTab = 'active'; // default tab - Active
+  String activeTab = 'nashtaAll'; // default tab - Nashta All
+  String _userFilter = ''; // cashier / orderTaker name filter for nashta orders
   String message = '';
   String connError = '';
   bool alertsEnabled = true;
@@ -214,8 +229,68 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return list.cast<Map<String, dynamic>>();
   }
 
-  List<Map<String, dynamic>> get _displayOrders =>
-      activeTab == 'served' ? _servedOrders : _activeOrders;
+  List<Map<String, dynamic>> get _cancelledOrders {
+    final list =
+        orders
+            .whereType<Map>()
+            .where((o) => _s(o['orderType']) == 'Dine-In' && _norm(o['status']) == 'cancelled')
+            .toList();
+    int key(Map o) {
+      final d = DateTime.tryParse(
+        _s(o['cancelledAt']).isEmpty ? _s(o['createdAt']) : _s(o['cancelledAt']),
+      );
+      return d?.millisecondsSinceEpoch ?? 0;
+    }
+
+    list.sort((a, b) => key(b).compareTo(key(a)));
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  List<Map<String, dynamic>> get _displayOrders {
+    if (activeTab == 'nashtaAll') return _nashtaOrders;
+    if (activeTab == 'served') return _servedOrders;
+    if (activeTab == 'cancelled') return _cancelledOrders;
+    return _activeOrders;
+  }
+
+  // --- Nashta-all view -----------------------------------------------------
+  bool _isNashta(Map o) {
+    final src = _norm(o['source']);
+    if (src == 'nashta-app') return true;
+    // Fallback: orders not tagged by the (not-yet-deployed) server source
+    // change are treated as nashta so the tab isn't empty.
+    return src.isEmpty;
+  }
+
+  bool _matchesUser(Map o) {
+    if (_userFilter.isEmpty) return true;
+    final ot = _norm(o['orderTaker']);
+    final w = _norm(o['waiter']);
+    final f = _norm(_userFilter);
+    return ot == f || w == f;
+  }
+
+  List<Map<String, dynamic>> get _nashtaOrders {
+    final list =
+        orders
+            .whereType<Map>()
+            .where((o) => _isNashta(o) && _matchesUser(o))
+            .toList();
+    list.sort((a, b) => _dateOf(b).compareTo(_dateOf(a)));
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  List<String> get _nashtaUsers {
+    final names = <String>{};
+    for (final o in orders.whereType<Map>()) {
+      if (!_isNashta(o)) continue;
+      final ot = _s(o['orderTaker']).trim();
+      final w = _s(o['waiter']).trim();
+      if (ot.isNotEmpty) names.add(ot);
+      if (w.isNotEmpty) names.add(w);
+    }
+    return names.toList()..sort();
+  }
 
   DateTime _dateOf(Map o) =>
       DateTime.tryParse(
@@ -579,6 +654,181 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  Future<void> _cancelOrder(Map<String, dynamic> order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        title: Text(
+          'Cancel order #${_s(order['orderNumber']).isEmpty ? _s(order['id']) : _s(order['orderNumber'])}?',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        content: const Text('This order will move to the Cancelled tab.',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFE11D48)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final id = _s(order['id']);
+    setState(() => busyId = id);
+    try {
+      await ApiClient.send(
+        'PUT',
+        '/pos/orders/$id',
+        token: token,
+        body: {
+          'status': 'Cancelled',
+          'cancelledAt': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+      _showMsg(
+        'Order #${_s(order['orderNumber']).isEmpty ? _s(order['id']) : _s(order['orderNumber'])} cancelled 🗑️',
+      );
+      await _reloadAfterLocalAction();
+    } catch (e) {
+      _showMsg(e.toString(), seconds: 4);
+    } finally {
+      if (mounted) setState(() => busyId = null);
+    }
+  }
+
+  Future<void> _restoreOrder(Map<String, dynamic> order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        title: Text(
+          'Restore order #${_s(order['orderNumber']).isEmpty ? _s(order['id']) : _s(order['orderNumber'])}?',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        content: const Text('This order will move back to the Active tab.',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF059669)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Restore'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final id = _s(order['id']);
+    setState(() => busyId = id);
+    try {
+      await ApiClient.send(
+        'PUT',
+        '/pos/orders/$id',
+        token: token,
+        body: {
+          'status': 'New',
+        },
+      );
+      _showMsg(
+        'Order #${_s(order['orderNumber']).isEmpty ? _s(order['id']) : _s(order['orderNumber'])} restored to Active ✅',
+      );
+      await _reloadAfterLocalAction();
+    } catch (e) {
+      _showMsg(e.toString(), seconds: 4);
+    } finally {
+      if (mounted) setState(() => busyId = null);
+    }
+  }
+
+  void _openEditOrder(Map<String, dynamic> order) {
+    final notesCtrl = TextEditingController(text: _s(order['notes']));
+    final nameCtrl = TextEditingController(text: _s(order['customerName']));
+    final phoneCtrl = TextEditingController(text: _s(order['phone']));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+        child: StatefulBuilder(
+          builder: (ctx, setSheet) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Edit Order #${_s(order['orderNumber']).isEmpty ? _s(order['id']) : _s(order['orderNumber'])}',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              _buildLabel('Customer Name'),
+              _buildTextField(nameCtrl),
+              const SizedBox(height: 12),
+              _buildLabel('Phone'),
+              _buildTextField(phoneCtrl),
+              const SizedBox(height: 12),
+              _buildLabel('Notes'),
+              _buildTextField(notesCtrl, maxLines: 3),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    final id = _s(order['id']);
+                    setState(() => busyId = id);
+                    try {
+                      await ApiClient.send(
+                        'PUT',
+                        '/pos/orders/$id',
+                        token: token,
+                        body: {
+                          'notes': notesCtrl.text.trim(),
+                          'customerName': nameCtrl.text.trim(),
+                          'phone': phoneCtrl.text.trim(),
+                          'items': order['items'] ?? [],
+                          'tableNumber': _s(order['tableNumber']),
+                        },
+                      );
+                      Navigator.pop(ctx);
+                      _showMsg('Order updated ✅');
+                      await _reloadAfterLocalAction();
+                    } catch (e) {
+                      _showMsg(e.toString(), seconds: 4);
+                    } finally {
+                      if (mounted) setState(() => busyId = null);
+                    }
+                  },
+                  child: const Text('Save Changes',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // --- bluetooth printing ---------------------------------------------------
 
   Future<bool> _connectPrinter(PrinterInfo p) async {
@@ -674,28 +924,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
         final ok = await _connectPrinter(target);
         if (!ok) throw Exception('Could not connect to ${target.name}');
       }
-      final isBmp = _s(settings['btEncoding']) == 'bmp';
-      if (isBmp) {
-        await BtService.write(
-          await bmp.buildBmpReceipt(
-            Map<String, dynamic>.from(order),
-            Map<String, dynamic>.from(settings),
-            host: ApiClient.host,
-          ),
-        );
-      } else {
-        try {
-          await BtService.write(esc.buildEscposReceipt(order, settings));
-        } catch (_) {
-          await BtService.write(
-            await bmp.buildBmpReceipt(
-              Map<String, dynamic>.from(order),
-              Map<String, dynamic>.from(settings),
-              host: ApiClient.host,
-            ),
-          );
-        }
-      }
+      // Always use BMP/raster path for reliable printing (no blank slips)
+      await BtService.write(
+        await bmp.buildBmpReceipt(
+          Map<String, dynamic>.from(order),
+          Map<String, dynamic>.from(settings),
+          host: ApiClient.host,
+        ),
+      );
 
       // Token slip (same conditions as web)
       final type = _s(order['orderType']);
@@ -710,31 +946,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (shouldToken) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         final tokOrder = <String, dynamic>{...order, 'items': []};
-        if (isBmp) {
-          await BtService.write(
-            await bmp.buildBmpReceipt(
-              tokOrder,
-              Map<String, dynamic>.from(settings),
-              tokenOnly: true,
-              host: ApiClient.host,
-            ),
-          );
-        } else {
-          try {
-            await BtService.write(
-              esc.buildEscposReceipt(tokOrder, settings, tokenOnly: true),
-            );
-          } catch (_) {
-            await BtService.write(
-              await bmp.buildBmpReceipt(
-                tokOrder,
-                Map<String, dynamic>.from(settings),
-                tokenOnly: true,
-                host: ApiClient.host,
-              ),
-            );
-          }
-        }
+        await BtService.write(
+          await bmp.buildBmpReceipt(
+            tokOrder,
+            Map<String, dynamic>.from(settings),
+            tokenOnly: true,
+            host: ApiClient.host,
+          ),
+        );
       }
     }
 
@@ -824,7 +1043,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildHeader() {
-    final count = _activeOrders.length;
+    final count = _displayOrders.length;
+    final title = activeTab == 'nashtaAll'
+        ? 'Nashta • All Orders'
+        : activeTab == 'served'
+            ? 'Served Orders'
+            : activeTab == 'cancelled'
+                ? 'Cancelled Orders'
+                : 'Active Dine-In Orders';
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xF5020617),
@@ -835,14 +1061,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
         children: [
           Row(
             children: [
-              const Text('🆕', style: TextStyle(fontSize: 20)),
+              Text(activeTab == 'nashtaAll' ? '📦' : '🆕',
+                  style: const TextStyle(fontSize: 20)),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Active Dine-In Orders',
+                    Text(
+                      title,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
@@ -902,6 +1129,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
               const SizedBox(width: 6),
               _roundIconBtn(
+                const Text('⚙️', style: TextStyle(fontSize: 15)),
+                _openPrinterSettings,
+              ),
+              const SizedBox(width: 6),
+              _roundIconBtn(
                 const Text('🚪', style: TextStyle(fontSize: 15)),
                 _logout,
               ),
@@ -946,7 +1178,60 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ],
           ),
+          if (activeTab == 'nashtaAll') _buildUserFilter(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUserFilter() {
+    final users = _nashtaUsers;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: panel,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          children: [
+            const Text('👤', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 8),
+            const Text(
+              'Cashier:',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: txtDim),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _userFilter.isEmpty ? null : _userFilter,
+                  hint: const Text('All Cashiers',
+                      style: TextStyle(fontSize: 12, color: txtDim)),
+                  dropdownColor: panel,
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                  items: users
+                      .map(
+                        (u) => DropdownMenuItem(value: u, child: Text(u)),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    setState(() => _userFilter = v ?? '');
+                  },
+                ),
+              ),
+            ),
+            if (_userFilter.isNotEmpty)
+              GestureDetector(
+                onTap: () => setState(() => _userFilter = ''),
+                child: const Text('✖️', style: TextStyle(fontSize: 13)),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -986,6 +1271,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
     } else if (saved != null) {
       _showMsg('Saved printer: ${saved.name}');
     }
+  }
+
+  void _openPrinterSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+    );
   }
 
   Widget _buildMessageBar() {
@@ -1048,8 +1339,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
         child: Row(
           children: [
+            _tabButton('📦 NASHTA (${_nashtaOrders.length})', 'nashtaAll'),
             _tabButton('🔥 ACTIVE (${_activeOrders.length})', 'active'),
             _tabButton('🍽️ SERVED (${_servedOrders.length})', 'served'),
+            _tabButton('🚫 CANCELLED (${_cancelledOrders.length})', 'cancelled'),
           ],
         ),
       ),
@@ -1067,16 +1360,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
           decoration: BoxDecoration(
             color:
                 selected
-                    ? (tab == 'active'
-                        ? const Color(0xFF059669)
-                        : const Color(0xFFD97706))
+                    ? (tab == 'nashtaAll'
+                        ? const Color(0xFF0EA5E9)
+                        : tab == 'active'
+                            ? const Color(0xFF059669)
+                            : tab == 'served'
+                                ? const Color(0xFFD97706)
+                                : const Color(0xFFE11D48))
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 10,
               fontWeight: FontWeight.w900,
               color: selected ? Colors.white : txtDim,
             ),
@@ -1099,14 +1398,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    activeTab == 'served' ? '🍽️' : '🎉',
+                    activeTab == 'nashtaAll'
+                        ? (_userFilter.isNotEmpty ? '📦' : '📦')
+                        : activeTab == 'served'
+                            ? '🍽️'
+                            : '🎉',
                     style: const TextStyle(fontSize: 44),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    activeTab == 'served'
-                        ? 'No served orders yet'
-                        : 'No active dine-in orders',
+                    activeTab == 'nashtaAll'
+                        ? (_userFilter.isEmpty
+                            ? 'No nashta orders yet'
+                            : 'No nashta orders for this cashier')
+                        : activeTab == 'served'
+                            ? 'No served orders yet'
+                            : activeTab == 'cancelled'
+                                ? 'No cancelled orders'
+                                : 'No active dine-in orders',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -1114,9 +1423,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                   ),
                   Text(
-                    activeTab == 'served'
-                        ? 'Marked-served orders move here'
-                        : 'New orders will appear here with a loud alert',
+                    activeTab == 'nashtaAll'
+                        ? 'Nashta orders (Delivery / Takeaway / Dine-in) from all cashiers'
+                        : activeTab == 'served'
+                            ? 'Marked-served orders move here'
+                            : activeTab == 'cancelled'
+                                ? 'Cancelled orders from all users appear here'
+                                : 'New orders will appear here with a loud alert',
                     style: const TextStyle(
                       fontSize: 12,
                       color: Color(0xFF475569),
@@ -1207,10 +1520,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final isNew =
         DateTime.now().difference(created) < const Duration(minutes: 5);
     final served = _norm(order['status']) == 'served';
+    final cancelled = _norm(order['status']) == 'cancelled';
     final busy = busyId == id;
 
     final borderColor =
-        isNew && !served
+        cancelled
+            ? const Color(0xFFE11D48)
+            : isNew && !served
             ? const Color(0xFFD946EF)
             : served
             ? const Color(0xFFB45309)
@@ -1249,21 +1565,26 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'TABLE',
-                      style: TextStyle(
+                    Text(
+                      _orderTypeLabel(_s(order['orderType'])),
+                      style: const TextStyle(
                         fontSize: 7,
                         fontWeight: FontWeight.w700,
                         color: Colors.white70,
                       ),
                     ),
                     Text(
-                      _s(order['tableNumber'])
-                          .replaceAll(
-                            RegExp(r'table', caseSensitive: false),
-                            '',
-                          )
-                          .trim(),
+                      _s(order['orderType']) == 'Dine-In'
+                          ? _s(order['tableNumber'])
+                              .replaceAll(
+                                RegExp(r'table', caseSensitive: false),
+                                '',
+                              )
+                              .trim()
+                          : _n(order['items'] != null
+                                  ? (order['items'] as List).length
+                                  : 0)
+                              .toString(),
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -1334,12 +1655,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
                       color:
-                          served
+                          cancelled
+                              ? const Color(0xFFE11D48)
+                              : served
                               ? const Color(0xFFF59E0B)
                               : const Color(0xFF7C3AED),
                     ),
                     child: Text(
-                      isNew && !served ? '🔥 NEW' : _s(order['status']),
+                      cancelled
+                          ? '🚫 CANCELLED'
+                          : isNew && !served
+                              ? '🔥 NEW'
+                              : _s(order['status']),
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
@@ -1442,37 +1769,70 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              _actionBtn('✅', 'PAID', const [
-                Color(0xFF10B981),
-                Color(0xFF047857),
-              ], busy ? null : () => _markPaid(order)),
-              _actionBtn(
-                '🍽️',
-                served ? 'SERVED' : 'SERVE',
-                const [Color(0xFFFBBF24), Color(0xFFD97706)],
-                busy || served ? null : () => _markServed(order),
-              ),
-              _actionBtn('🖨️', 'PRINT', const [
-                Color(0xFF0EA5E9),
-                Color(0xFF0369A1),
-              ], () => _printOrderBT(order)),
-              _actionBtn(
-                '👁️',
-                'VIEW',
-                const [Color(0xFF6366F1), Color(0xFF4338CA)],
-                () {
-                  setState(() => viewOrder = order);
-                  _openViewSheet();
-                },
-              ),
-              _actionBtn('🗑️', 'DEL', const [
-                Color(0xFFF43F5E),
-                Color(0xFFBE123C),
-              ], busy ? null : () => _deleteOrder(order)),
-            ],
-          ),
+          if (activeTab == 'cancelled')
+            Row(
+              children: [
+                _actionBtn('🖨️', 'PRINT', const [
+                  Color(0xFF0EA5E9),
+                  Color(0xFF0369A1),
+                ], () => _printOrderBT(order)),
+                _actionBtn(
+                  '👁️',
+                  'VIEW',
+                  const [Color(0xFF6366F1), Color(0xFF4338CA)],
+                  () {
+                    setState(() => viewOrder = order);
+                    _openViewSheet();
+                  },
+                ),
+                _actionBtn('✏️', 'EDIT', const [
+                  Color(0xFF8B5CF6),
+                  Color(0xFF6D28D9),
+                ], () => _openEditOrder(order)),
+                _actionBtn('♻️', 'RESTORE', const [
+                  Color(0xFF059669),
+                  Color(0xFF047857),
+                ], busy ? null : () => _restoreOrder(order)),
+                _actionBtn('🗑️', 'DEL', const [
+                  Color(0xFFF43F5E),
+                  Color(0xFFBE123C),
+                ], busy ? null : () => _deleteOrder(order)),
+              ],
+            )
+          else
+            Row(
+              children: [
+                _actionBtn('✅', 'PAID', const [
+                  Color(0xFF10B981),
+                  Color(0xFF047857),
+                ], busy ? null : () => _markPaid(order)),
+                if (activeTab != 'nashtaAll' ||
+                    _s(order['orderType']) == 'Dine-In')
+                  _actionBtn(
+                    '🍽️',
+                    served ? 'SERVED' : 'SERVE',
+                    const [Color(0xFFFBBF24), Color(0xFFD97706)],
+                    busy || served ? null : () => _markServed(order),
+                  ),
+                _actionBtn('🖨️', 'PRINT', const [
+                  Color(0xFF0EA5E9),
+                  Color(0xFF0369A1),
+                ], () => _printOrderBT(order)),
+                _actionBtn(
+                  '👁️',
+                  'VIEW',
+                  const [Color(0xFF6366F1), Color(0xFF4338CA)],
+                  () {
+                    setState(() => viewOrder = order);
+                    _openViewSheet();
+                  },
+                ),
+                _actionBtn('🗑️', 'DEL', const [
+                  Color(0xFFF43F5E),
+                  Color(0xFFBE123C),
+                ], busy ? null : () => _deleteOrder(order)),
+              ],
+            ),
         ],
       ),
     );
@@ -1520,6 +1880,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
     );
   }
+
+  Widget _buildLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF94A3B8))),
+      );
+
+  Widget _buildTextField(TextEditingController ctrl, {int maxLines = 1}) =>
+      TextField(
+        controller: ctrl,
+        maxLines: maxLines,
+        style: const TextStyle(color: Colors.white, fontSize: 13),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: panel,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF059669), width: 1.5),
+          ),
+        ),
+      );
 
   void _openViewSheet() {
     final order = viewOrder;

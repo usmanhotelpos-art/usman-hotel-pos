@@ -4,7 +4,7 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'order_taker_screen.dart';
+import 'dashboard_screen.dart';
 import 'session.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen>
       await saveSession(token, user);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => OrderTakerScreen(token: token, user: user),
+        builder: (_) => DashboardScreen(token: token, user: user),
       ));
     } on ApiException catch (e) {
       setState(() => message = e.message);
@@ -82,8 +82,7 @@ class _LoginScreenState extends State<LoginScreen>
           fit: StackFit.expand,
           children: [
             _bbqBackground(),
-            const _DarkOverlay(),
-            CustomPaint(painter: _EmbersPainter(_ctrl.value)),
+            const _MorningGlow(),
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -97,14 +96,16 @@ class _LoginScreenState extends State<LoginScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const SizedBox(height: 12),
+                          _sunshine(),
+                          const SizedBox(height: 4),
                           _logoPulse(),
                           const SizedBox(height: 6),
                           ShaderMask(
                             shaderCallback: (r) => const LinearGradient(
                               colors: [
-                                Color(0xFFFDE68A),
-                                Color(0xFFF5C542),
-                                Color(0xFFD97706),
+                                Color(0xFFFEF3C7),
+                                Color(0xFFF59E0B),
+                                Color(0xFFEA580C),
                               ],
                             ).createShader(r),
                             child: const Text(
@@ -117,29 +118,38 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             ),
                           ),
-                          const Text(
-                            'BBQ  •  RESTAURANT',
+                          Text(
+                            '\u{1F525} BBQ \u00B7 RESTAURANT \u{1F525}',
                             style: TextStyle(
                               fontSize: 11,
-                              letterSpacing: 6,
-                              color: Color(0xFFF5C542),
-                              fontWeight: FontWeight.w700,
+                              letterSpacing: 3,
+                              color: const Color(0xFFB45309),
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
-                            '📋 Order Taker App',
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: Color(0xFFCBD5E1),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _orderTakerArt(),
-                          const SizedBox(height: 10),
+                          Text('\u{1F31E} Aag Aur Zaiqa Ki Shaan, BBQ Usman Hotel \u{1F31E}',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF7C2D12),
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 2),
+                          const Text('\u{1F4CB} Order Taker App \u{1F64F}',
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  color: Color(0xFF92400E),
+                                  fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 18),
                           _loginCard(),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
+                          const Text(
+                              '\u{1F64F} Dua Ke Saath Sab Unhe Khana Mile Jo Bhukhe Hain \u{1F64F}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF7C2D12),
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
                         ],
                       ),
                     ),
@@ -164,6 +174,32 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  Widget _sunshine() {
+    final t = (sin(_ctrl.value * 2 * pi * 3) + 1) / 2;
+    final glow = 0.55 + 0.35 * t;
+    return Container(
+      width: 150,
+      height: 86,
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          colors: [
+            Color.lerp(const Color(0xFFFFF7D6), const Color(0xFFFDE68A), t)!,
+            const Color(0xFFFDE68A).withValues(alpha: 0.2),
+          ],
+          radius: 1,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(75)),
+        border: Border.all(color: const Color(0xFFFBBF24).withValues(alpha: 0.9), width: 2),
+        boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: glow), blurRadius: 46, spreadRadius: 8)],
+      ),
+      child: SizedBox(
+        width: 120,
+        height: 60,
+        child: CustomPaint(painter: _SunRaysPainter(_ctrl.value)),
+      ),
+    );
+  }
+
   Widget _logoPulse() {
     final t = (sin(_ctrl.value * 2 * pi * 3) + 1) / 2;
     final scale = 1.0 + 0.04 * t;
@@ -173,11 +209,8 @@ class _LoginScreenState extends State<LoginScreen>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFF5C542).withValues(alpha: 0.25 + 0.25 * t),
-              blurRadius: 40,
-              spreadRadius: 4,
-            ),
+            BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.3 + 0.3 * t), blurRadius: 40, spreadRadius: 4),
+            const BoxShadow(color: Color(0xFFFDE68A), blurRadius: 60, spreadRadius: -12),
           ],
         ),
         child: ClipOval(
@@ -187,74 +220,34 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _orderTakerArt() {
-    final t = _ctrl.value * 2 * pi;
-    final dy = sin(t) * 7;
-    final rot = sin(t + 0.9) * 0.035;
-    return Transform.translate(
-      offset: Offset(0, dy),
-      child: Transform.rotate(
-        angle: rot,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _flameEmoji(t),
-            const SizedBox(width: 8),
-            Image.asset(
-              'assets/img/order_taker.png',
-              height: 150,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 8),
-            _clipboardGlow(t),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _flameEmoji(double t) {
-    final s = 1.0 + 0.18 * sin(t * 4.1);
-    return Transform.scale(
-      scale: s,
-      child: const Text('🔥', style: TextStyle(fontSize: 34)),
-    );
-  }
-
-  Widget _clipboardGlow(double t) {
-    final o = 0.55 + 0.45 * sin(t * 2.6);
-    return Opacity(
-      opacity: o.clamp(0.15, 1),
-      child: const Text('🧾', style: TextStyle(fontSize: 34)),
-    );
-  }
-
   Widget _loginCard() {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxWidth: 400),
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+        color: const Color(0xFFFFFBEB).withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF5C542).withValues(alpha: .35)),
+        border: Border.all(color: const Color(0xFFFBBF24), width: 2.4),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .5),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
+          BoxShadow(color: const Color(0xFFB45309).withValues(alpha: .22), blurRadius: 30, offset: const Offset(0, 14)),
+          BoxShadow(color: const Color(0xFFFDE68A).withValues(alpha: .5), blurRadius: 40, spreadRadius: -8),
         ],
       ),
       child: Column(
         children: [
+          const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text('\u{1F525}', style: TextStyle(fontSize: 16)),
+            Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('BARBEQUE KHIDMAT', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF92400E), letterSpacing: 2))),
+            Text('\u{1F64F}', style: TextStyle(fontSize: 16)),
+          ]),
+          const SizedBox(height: 14),
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
             enableSuggestions: false,
-            style: const TextStyle(color: Color(0xFFF1F5F9), fontSize: 14),
+            style: const TextStyle(color: Color(0xFF1F2937), fontSize: 14),
             decoration: _inputDeco('Username'),
           ),
           const SizedBox(height: 12),
@@ -263,12 +256,12 @@ class _LoginScreenState extends State<LoginScreen>
             obscureText: obscure,
             autofillHints: const [AutofillHints.password],
             onSubmitted: (_) => _login(),
-            style: const TextStyle(color: Color(0xFFF1F5F9), fontSize: 14),
+            style: const TextStyle(color: Color(0xFF1F2937), fontSize: 14),
             decoration: _inputDeco('Password').copyWith(
               suffixIcon: IconButton(
                 icon: Icon(
                   obscure ? Icons.visibility_off : Icons.visibility,
-                  color: const Color(0xFF94A3B8),
+                  color: const Color(0xFF92400E),
                   size: 18,
                 ),
                 onPressed: () => setState(() => obscure = !obscure),
@@ -281,12 +274,13 @@ class _LoginScreenState extends State<LoginScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF4C0519).withValues(alpha: .6),
+                color: const Color(0xFFFEF2F2).withValues(alpha: .85),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
               ),
               child: Text(
                 message,
-                style: const TextStyle(fontSize: 12, color: Color(0xFFFDA4AF)),
+                style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C)),
               ),
             ),
           ],
@@ -299,12 +293,15 @@ class _LoginScreenState extends State<LoginScreen>
                       ? null
                       : _login,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
+                backgroundColor: const Color(0xFFD97706),
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFF065F46).withValues(alpha: .5),
+                disabledBackgroundColor: const Color(0xFFB45309).withValues(alpha: .5),
                 padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 4,
+                shadowColor: const Color(0xFFF59E0B),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFFDE68A), width: 1.4),
                 ),
               ),
               child: Text(
@@ -321,25 +318,52 @@ class _LoginScreenState extends State<LoginScreen>
   InputDecoration _inputDeco(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+      labelStyle: const TextStyle(color: Color(0xFFB45309), fontSize: 12),
       filled: true,
-      fillColor: const Color(0xFF020617),
+      fillColor: const Color(0xFFFEF9C3).withValues(alpha: .6),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF334155)),
+        borderSide: const BorderSide(color: Color(0xFFFCD34D), width: 1.6),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF059669), width: 1.4),
+        borderSide: const BorderSide(color: Color(0xFFD97706), width: 2),
       ),
     );
   }
 }
 
-class _DarkOverlay extends StatelessWidget {
-  const _DarkOverlay();
+class _SunRaysPainter extends CustomPainter {
+  final double t;
+  _SunRaysPainter(this.t);
 
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height * 0.62);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.85);
+    for (int i = 0; i < 8; i++) {
+      final baseAngle = (i / 8) * pi * 2 + t * pi * 2;
+      canvas.drawLine(
+        center,
+        center + Offset(cos(baseAngle), sin(baseAngle)) * size.width * 0.42,
+        paint,
+      );
+    }
+    final corePaint = Paint()..color = const Color(0xFFFFF3C4);
+    canvas.drawCircle(center, size.width * 0.16, corePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SunRaysPainter old) => old.t != t;
+}
+
+class _MorningGlow extends StatelessWidget {
+  const _MorningGlow();
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -348,65 +372,13 @@ class _DarkOverlay extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF020617).withValues(alpha: .72),
-            const Color(0xFF020617).withValues(alpha: .38),
-            const Color(0xFF020617).withValues(alpha: .85),
+            const Color(0xFFFFF3C4).withValues(alpha: .20),
+            const Color(0xFFFFF7D6).withValues(alpha: .12),
+            const Color(0xFFFEF3C7).withValues(alpha: .30),
           ],
-          stops: const [0, 0.42, 1],
+          stops: const [0, 0.45, 1],
         ),
       ),
     );
   }
-}
-
-class _EmbersPainter extends CustomPainter {
-  final double t;
-  _EmbersPainter(this.t);
-
-  static final List<_Ember> _embers = List.generate(26, (i) {
-    final rng = Random(i * 97 + 13);
-    return _Ember(
-      seedX: rng.nextDouble(),
-      speed: 0.05 + rng.nextDouble() * 0.09,
-      size: 1.5 + rng.nextDouble() * 3.2,
-      phase: rng.nextDouble(),
-      hueShift: rng.nextDouble(),
-    );
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    for (final e in _embers) {
-      final prog = ((t * e.speed * 10 + e.phase) % 1);
-      final y = size.height * (1.05 - prog * 1.15);
-      final sway = sin(prog * 6 * pi + e.phase * 10) * 26;
-      final x = size.width * e.seedX + sway;
-      final alpha = (sin(prog * pi) * 200).clamp(0, 255).toDouble();
-      final warm = e.hueShift > 0.5;
-      paint.color = warm
-          ? Color.fromRGBO(255, 170, 60, alpha / 255)
-          : Color.fromRGBO(245, 197, 66, alpha / 255);
-      canvas.drawCircle(Offset(x, y), e.size, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _EmbersPainter oldDelegate) =>
-      oldDelegate.t != t;
-}
-
-class _Ember {
-  final double seedX;
-  final double speed;
-  final double size;
-  final double phase;
-  final double hueShift;
-  const _Ember({
-    required this.seedX,
-    required this.speed,
-    required this.size,
-    required this.phase,
-    required this.hueShift,
-  });
 }

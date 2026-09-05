@@ -1,7 +1,7 @@
 name: order_taker_app
 description: "Usman Hotel Order Taker App - Flutter port of the web order taker"
 publish_to: 'none'
-version: 1.0.7+8
+version: 1.2.0+10
 
 environment:
   sdk: ^3.7.0

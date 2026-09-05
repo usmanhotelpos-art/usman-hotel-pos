@@ -298,10 +298,24 @@ export function ActiveOrdersApp() {
     }
   }
 
+  const isDue = (o) => {
+    const s = norm(o.status);
+    const p = norm(o.paymentStatus);
+    return s === 'due' || p === 'due';
+  };
+
   const activeOrders = useMemo(
     () =>
       orders
-        .filter((o) => o.orderType === 'Dine-In' && !ACTIVE_STATUSES_EXCLUDED.includes(norm(o.status)) && norm(o.status) !== 'served')
+        .filter((o) => o.orderType === 'Dine-In' && !ACTIVE_STATUSES_EXCLUDED.includes(norm(o.status)) && norm(o.status) !== 'served' && !isDue(o))
+        .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)),
+    [orders]
+  );
+
+  const dueOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => o.orderType === 'Dine-In' && isDue(o) && norm(o.status) !== 'cancelled')
         .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)),
     [orders]
   );
@@ -314,7 +328,7 @@ export function ActiveOrdersApp() {
     [orders]
   );
 
-  const displayOrders = activeTab === 'served' ? servedOrders : activeOrders;
+  const displayOrders = activeTab === 'served' ? servedOrders : activeTab === 'due' ? dueOrders : activeOrders;
 
   const tableStatusFor = (label) => {
     const t = tables.find((x) => String(x.label || x.name || x.number || '') === String(label || ''));
@@ -398,6 +412,23 @@ export function ActiveOrdersApp() {
         body: JSON.stringify({ status: 'Served', servedAt: new Date().toISOString() })
       });
       setMessage(`Order #${order.orderNumber || order.id} marked served 🍽️`);
+      await loadData(true);
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function markDue(order) {
+    setBusyId(order.id);
+    try {
+      await fetchJson(`${API}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        token: tokenRef.current,
+        body: JSON.stringify({ status: 'Due', paymentStatus: 'Due' })
+      });
+      setMessage(`Order #${order.orderNumber || order.id} marked due 🟠`);
       await loadData(true);
     } catch (e) {
       setMessage(e.message);
@@ -645,11 +676,14 @@ export function ActiveOrdersApp() {
         )}
       </div>
 
-      {/* Tabs: Active (default) / Served */}
+      {/* Tabs: Active (default) / Due / Served */}
       <div className="mx-auto max-w-3xl px-3 pt-2">
         <div className="flex gap-1.5 rounded-2xl border border-slate-800 bg-slate-900 p-1">
           <button onClick={() => setActiveTab('active')} className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-black transition-all active:scale-[0.97] ${activeTab === 'active' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
             🔥 ACTIVE ({activeOrders.length})
+          </button>
+          <button onClick={() => setActiveTab('due')} className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-black transition-all active:scale-[0.97] ${activeTab === 'due' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
+            🟠 DUE ({dueOrders.length})
           </button>
           <button onClick={() => setActiveTab('served')} className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2.5 text-xs font-black transition-all active:scale-[0.97] ${activeTab === 'served' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
             🍽️ SERVED ({servedOrders.length})
@@ -673,18 +707,19 @@ export function ActiveOrdersApp() {
       <div className="mx-auto max-w-3xl space-y-3 px-3 pt-3">
         {displayOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-slate-500">
-            <div className="text-5xl">{activeTab === 'served' ? '🍽️' : '🎉'}</div>
-            <p className="mt-2 text-sm font-semibold">{activeTab === 'served' ? 'No served orders yet' : 'No active dine-in orders'}</p>
-            <p className="text-xs">{activeTab === 'served' ? 'Marked-served orders move here' : 'New orders will appear here with a loud alert'}</p>
+            <div className="text-5xl">{activeTab === 'served' ? '🍽️' : activeTab === 'due' ? '🟠' : '🎉'}</div>
+            <p className="mt-2 text-sm font-semibold">{activeTab === 'served' ? 'No served orders yet' : activeTab === 'due' ? 'No due orders yet' : 'No active dine-in orders'}</p>
+            <p className="text-xs">{activeTab === 'served' ? 'Marked-served orders move here' : activeTab === 'due' ? 'Due dine-in orders appear here' : 'New orders will appear here with a loud alert'}</p>
           </div>
         ) : (
           displayOrders.map((order) => {
             const isNew = Date.now() - new Date(order.createdAt || 0).getTime() < 5 * 60 * 1000;
             const served = norm(order.status) === 'served';
+            const due = isDue(order);
             return (
               <div
                 key={order.id}
-                className={`rounded-3xl border p-3 shadow-lg ${isNew && !served ? 'border-fuchsia-500/60 bg-gradient-to-br from-fuchsia-950/40 to-slate-900' : served ? 'border-amber-600/50 bg-slate-900' : 'border-emerald-700/50 bg-slate-900'}`}
+                className={`rounded-3xl border p-3 shadow-lg ${isNew && !served && !due ? 'border-fuchsia-500/60 bg-gradient-to-br from-fuchsia-950/40 to-slate-900' : served ? 'border-amber-600/50 bg-slate-900' : due ? 'border-orange-600/60 bg-orange-950/20' : 'border-emerald-700/50 bg-slate-900'}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -699,8 +734,8 @@ export function ActiveOrdersApp() {
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-black text-emerald-400">{Number(order.total || order.amount || 0)}<span className="ml-0.5 text-[10px]">Rs</span></div>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${served ? 'bg-amber-500 text-slate-950' : 'bg-violet-600 text-white'}`}>
-                      {isNew && !served ? '🔥 NEW' : order.status}
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${served ? 'bg-amber-500 text-slate-950' : due ? 'bg-orange-500 text-white' : 'bg-violet-600 text-white'}`}>
+                      {isNew && !served && !due ? '🔥 NEW' : due ? 'DUE' : order.status}
                     </span>
                   </div>
                 </div>
@@ -731,7 +766,7 @@ export function ActiveOrdersApp() {
                   </button>
                 )}
 
-                <div className="mt-2.5 grid grid-cols-5 gap-1.5">
+                <div className="mt-2.5 grid grid-cols-6 gap-1.5">
                   <button onClick={() => markPaid(order)} disabled={busyId === order.id} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 py-2.5 text-white shadow transition-all active:scale-90 disabled:opacity-50">
                     <span className="text-lg leading-none">✅</span>
                     <span className="text-[9px] font-black">PAID</span>
@@ -739,6 +774,10 @@ export function ActiveOrdersApp() {
                   <button onClick={() => markServed(order)} disabled={busyId === order.id || served} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 py-2.5 text-slate-950 shadow transition-all active:scale-90 disabled:opacity-50">
                     <span className="text-lg leading-none">🍽️</span>
                     <span className="text-[9px] font-black">{served ? 'SERVED' : 'SERVE'}</span>
+                  </button>
+                  <button onClick={() => markDue(order)} disabled={busyId === order.id || served || due} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-orange-500 to-orange-700 py-2.5 text-white shadow transition-all active:scale-90 disabled:opacity-50" title="Mark Due">
+                    <span className="text-lg leading-none">🟠</span>
+                    <span className="text-[9px] font-black">{due ? 'DUE' : 'MARK'}</span>
                   </button>
                   <button onClick={() => printOrderBT(order)} className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-gradient-to-b from-sky-500 to-sky-700 py-2.5 text-white shadow transition-all active:scale-90">
                     <span className="text-lg leading-none">🖨️</span>
