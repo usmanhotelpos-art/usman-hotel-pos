@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'session.dart';
+import 'staff_screen.dart';
 
 String sOf(dynamic v) => v == null ? '' : v.toString();
 double numOf(dynamic v) {
@@ -90,6 +91,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _err = '';
   DateTime? _lastRefreshed;
   Timer? _timer;
+
+  String _tab = 'dashboard';
+  bool _sidebarCollapsed = false;
 
   @override
   void initState() {
@@ -366,42 +370,222 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ---- UI ------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Column(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _header(),
+            _sidebar(dark),
+            Container(
+              width: 1,
+              color: dark ? const Color(0xFF1E2A44) : const Color(0xFFE5EAF2),
+            ),
             Expanded(
-              child: RefreshIndicator(
-                color: accent,
-                onRefresh: () => _load(),
-                child: _loading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: accent))
-                    : _err.isNotEmpty
-                        ? _errorView()
-                        : CustomScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            slivers: [
-                              SliverPadding(
-                                padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                                sliver: SliverToBoxAdapter(
-                                    child: _filters()),
-                              ),
-                              SliverToBoxAdapter(child: _overview()),
-                              SliverToBoxAdapter(child: _charts()),
-                              SliverToBoxAdapter(child: _extrasBlock()),
-                              SliverToBoxAdapter(child: _byAppPanel()),
-                              SliverToBoxAdapter(child: _byStaffPanel()),
-                              const SliverPadding(
-                                padding: EdgeInsets.only(bottom: 28),
-                              ),
-                            ],
-                          ),
+              child: IndexedStack(
+                index: _tab == 'dashboard' ? 0 : 1,
+                children: [
+                  _dashboardView(context),
+                  StaffScreen(token: _token, user: widget.user),
+                ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dashboardView(BuildContext context) {
+    return Column(
+      children: [
+        _header(),
+        Expanded(
+          child: RefreshIndicator(
+            color: accent,
+            onRefresh: () => _load(),
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: accent))
+                : _err.isNotEmpty
+                    ? _errorView()
+                    : CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                            sliver: SliverToBoxAdapter(
+                                child: _filters()),
+                          ),
+                          SliverToBoxAdapter(child: _overview()),
+                          SliverToBoxAdapter(child: _charts()),
+                          SliverToBoxAdapter(child: _extrasBlock()),
+                          SliverToBoxAdapter(child: _byAppPanel()),
+                          SliverToBoxAdapter(child: _byStaffPanel()),
+                          const SliverPadding(
+                            padding: EdgeInsets.only(bottom: 28),
+                          ),
+                        ],
+                      ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sidebar(bool dark) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+      width: _sidebarCollapsed ? 58 : 196,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(
+          right: BorderSide(
+              color: dark ? const Color(0xFF1E2A44) : const Color(0xFFE5EAF2)),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisAlignment:
+                  _sidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              children: [
+                ClipOval(
+                  child: Image.asset('assets/img/logo.png',
+                      width: 36,
+                      height: 36,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.store, color: accent, size: 30)),
+                ),
+                if (!_sidebarCollapsed) ...[
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Usman Hotel',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w900)),
+                        Text('DASHBOARD',
+                            style: TextStyle(
+                                fontSize: 8.5,
+                                letterSpacing: 2.4,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF059669))),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _navTile('dashboard', Icons.dashboard_outlined,
+              Icons.dashboard, 'Dashboard'),
+          _navTile('staff', Icons.group_outlined, Icons.group, 'Staff',
+              badgeCount: _staffBadge),
+          const Spacer(),
+          const Divider(height: 1, indent: 12, endIndent: 12),
+          IconButton(
+            tooltip: _sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar',
+            icon: Icon(
+              _sidebarCollapsed ? Icons.visibility : Icons.visibility_off,
+              size: 20,
+              color: _sidebarCollapsed ? accent : const Color(0xFF64748B),
+            ),
+            onPressed: () =>
+                setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+          ),
+          if (!_sidebarCollapsed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                '👁 eye: ${_sidebarCollapsed ? 'show' : 'hide'} sidebar',
+                style: const TextStyle(
+                    fontSize: 9.5, color: Color(0xFF94A3B8)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  int get _staffBadge => 0;
+
+  Widget _navTile(String key, IconData icon, IconData selIcon, String label,
+      {int badgeCount = 0}) {
+    final active = _tab == key;
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: () => setState(() => _tab = key),
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: active
+                ? accent.withValues(alpha: .14)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                active ? selIcon : icon,
+                size: 20,
+                color: active
+                    ? accent
+                    : Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF9FB0C9)
+                        : const Color(0xFF64748B),
+              ),
+              if (!_sidebarCollapsed) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(label,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight:
+                                    active ? FontWeight.w900 : FontWeight.w700,
+                                color: active
+                                    ? accent
+                                    : Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFFCBD5E1)
+                                        : const Color(0xFF475569))),
+                      ),
+                      if (badgeCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0EA5E9),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text('$badgeCount',
+                              style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

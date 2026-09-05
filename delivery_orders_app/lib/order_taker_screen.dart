@@ -219,6 +219,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   bool showOrdersScreen = false;
   String ordersView = 'Delivery';
   String ordersSubTab = 'active';
+  String ordersRiderFilter = '';      // biker-role rider filter for orders screen
 
   final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(DateTime.now());
 
@@ -1362,8 +1363,13 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return !d.isBefore(from) && d.isBefore(to);
   }
 
-  List<Map<String, dynamic>> get filteredVisibleOrders =>
-      visibleOrders.where(_inOrdersDateRange).toList();
+  List<Map<String, dynamic>> get filteredVisibleOrders => visibleOrders
+      .where(_inOrdersDateRange)
+      .where((o) {
+        if (ordersRiderFilter.isEmpty) return true;
+        return sOf(o['deliveryAgent']).trim() == ordersRiderFilter;
+      })
+      .toList();
 
   void _openOrders() {
     setState(() => showOrdersScreen = true);
@@ -2285,6 +2291,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             ),
           ),
           _ordersDateFilterBar(),
+          _ordersRiderFilterBar(),
           if (selectMode && _isManager())
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -2301,6 +2308,46 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                     itemBuilder: (_, i) => _orderCard(list[i]),
                   ),
           ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _ordersRiderFilterBar() {
+    final riders = ridersList;
+    if (riders.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: const Text('All Riders', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+              selected: ordersRiderFilter.isEmpty,
+              onSelected: (_) => setState(() => ordersRiderFilter = ''),
+              selectedColor: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFFF1F5F9),
+              labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: ordersRiderFilter.isEmpty ? Colors.white : const Color(0xFF475569)),
+              side: BorderSide(color: const Color(0xFFE2E8F0)),
+            ),
+          ),
+          ...riders.map((r) {
+            final sel = ordersRiderFilter == r;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                label: Text(r, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                selected: sel,
+                onSelected: (_) => setState(() => ordersRiderFilter = sel ? '' : r),
+                selectedColor: const Color(0xFF059669),
+                backgroundColor: const Color(0xFFF1F5F9),
+                labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sel ? Colors.white : const Color(0xFF475569)),
+                side: BorderSide(color: const Color(0xFFE2E8F0)),
+              ),
+            );
+          }).toList(),
         ]),
       ),
     );

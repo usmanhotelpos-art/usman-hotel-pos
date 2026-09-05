@@ -64,11 +64,7 @@ const defaultData = {
     { id: 'i1', name: 'Laundry Detergent', category: 'Housekeeping', quantity: 24, cost: 220 },
     { id: 'i2', name: 'Breakfast Bundle', category: 'Food', quantity: 12, cost: 560 }
   ],
-  staff: [
-    { id: 's1', name: 'Ayesha', role: 'Receptionist', phone: '+923001234567', status: 'active' },
-    { id: 's2', name: 'Usman', role: 'Manager', phone: '+923009876543', status: 'active' },
-    { id: 's4', name: 'Ahmed Rider', role: 'Admin Rider', phone: '+923001234567', email: 'ahmed@rider.com', status: 'active', otherName: '', username: 'ahmed@rider.com', password: 'riderpass1', facePhoto: '', idCardNumber: '', idCardFront: '', idCardBack: '', description: '', address: '', loginEnabled: true, riderId: 'rider1' }
-  ],
+  staff: [],
   sales: [
     { id: 'sale1', description: 'Room 102 payment', amount: 20800, date: '2026-05-05' }
   ],
@@ -166,10 +162,7 @@ const defaultData = {
     { id: 'r101', label: 'Room 101', type: 'Room', status: 'available' },
     { id: 'r102', label: 'Room 102', type: 'Room', status: 'available' }
   ],
-  delivery_agents: [
-    { id: 'd1', name: 'Taha Delivery', phone: '+923001234567', status: 'online' },
-    { id: 'd2', name: 'Rashid Courier', phone: '+923011234567', status: 'online' }
-  ],
+  delivery_agents: [],
   delivery_service_types: [
     { id: 'standard', name: 'Standard Delivery', charge: 50, location: 'City', active: true },
     { id: 'express', name: 'Express Delivery', charge: 120, location: '', active: true }
@@ -181,10 +174,7 @@ const defaultData = {
   pos_orders: [],
   pos_customers: [],
   pos_payments: [],
-  riders: [
-    { id: 'rider1', name: 'Ahmed Rider', phone: '+923001234567', email: 'ahmed@rider.com', username: 'ahmed@rider.com', role: 'Admin Rider', status: 'active', passwordHash: bcrypt.hashSync('riderpass1', 10), rawPassword: 'riderpass1' },
-    { id: 'rider2', name: 'Hassan Biker', phone: '+923009876543', email: 'hassan@rider.com', role: 'Rider', status: 'active', passwordHash: null }
-  ],
+  riders: [],
   rider_orders: [],
   rider_order_requests: []
 };
@@ -288,6 +278,47 @@ function migrateLegacyPasswords(data) {
   return changed;
 }
 
+// Removes old test/placeholder records so only real live users remain. Safe to
+// run on every startup because it only targets the known junk signatures.
+const TEST_STAFF_PHONES = ['030000000', '0366666666', '0000'];
+const TEST_RIDER_IDS = ['rider1', 'rider2'];
+const TEST_RIDER_USERNAMES = ['ahmed@rider.com', 'hassan@rider.com'];
+const TEST_AGENT_IDS = ['d1', 'd2'];
+
+function cleanupTestData(data) {
+  let changed = false;
+
+  const staff = data.staff || [];
+  const filteredStaff = staff.filter(
+    (s) => !(s && TEST_STAFF_PHONES.includes(String(s.phone || ''))));
+  if (filteredStaff.length !== staff.length) {
+    data.staff = filteredStaff;
+    changed = true;
+  }
+
+  const riders = data.riders || [];
+  const filteredRiders = riders.filter((r) => {
+    if (!r) return false;
+    const id = String(r.id || '');
+    const username = String(r.username || '').toLowerCase();
+    return !(TEST_RIDER_IDS.includes(id) || TEST_RIDER_USERNAMES.includes(username));
+  });
+  if (filteredRiders.length !== riders.length) {
+    data.riders = filteredRiders;
+    changed = true;
+  }
+
+  const agents = data.delivery_agents || [];
+  const filteredAgents = agents.filter(
+    (a) => !(a && TEST_AGENT_IDS.includes(String(a.id || ''))));
+  if (filteredAgents.length !== agents.length) {
+    data.delivery_agents = filteredAgents;
+    changed = true;
+  }
+
+  return changed;
+}
+
 async function ensurePostgresSchema() {  if (!pgClient) return;
   await pgClient.query(`
     CREATE TABLE IF NOT EXISTS pos_data (
@@ -336,7 +367,8 @@ export async function initDatabase() {
       }
 
       const passwordsChanged = migrateLegacyPasswords(dbCache);
-      if (!postgresData || passwordsChanged) {
+      const testDataRemoved = cleanupTestData(dbCache);
+      if (!postgresData || passwordsChanged || testDataRemoved) {
         await saveDbToPostgres(dbCache);
       }
 
@@ -350,7 +382,9 @@ export async function initDatabase() {
   }
 
   dbCache = loadDbFile();
-  if (migrateLegacyPasswords(dbCache)) {
+  const passwordsChanged = migrateLegacyPasswords(dbCache);
+  const testDataRemoved = cleanupTestData(dbCache);
+  if (passwordsChanged || testDataRemoved) {
     writeDbFile(dbCache);
   }
 }

@@ -186,6 +186,9 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   String ordersDateRange = 'today';
   DateTime? ordersFromDate;
   DateTime? ordersToDate;
+  String ordersUserFilter = '';
+  bool selectMode = false;
+  final Set<String> _selectedOrderIds = {};
 
   Map<String, dynamic>? variantProduct;
   Map<String, dynamic>? variantFlavor;
@@ -536,10 +539,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         .map((e) => Map<String, dynamic>.from(e))
         .where((o) {
       final type = sOf(o['orderType']);
-      if (isTakeawayOnly) return type == 'Takeaway' && isMyOrder(o) && filter(o);
-      if (isTableOnly) return type == 'Dine-In' && isMyOrder(o) && filter(o);
-      if (isAdminOrderTaker) return type == 'Dine-In' && isMyOrder(o) && filter(o);
-      return (type == 'Dine-In') && isMyOrder(o) && filter(o);
+      if (isTakeawayOnly) return type == 'Takeaway' && filter(o);
+      if (isTableOnly) return type == 'Dine-In' && filter(o);
+      if (isAdminOrderTaker) return type == 'Dine-In' && filter(o);
+      return (type == 'Dine-In') && filter(o);
     }).toList();
   }
 
@@ -547,7 +550,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       .whereType<Map>()
       .map((e) => Map<String, dynamic>.from(e))
       .where((o) =>
-          sOf(o['orderType']) == 'Takeaway' && isMyOrder(o) && filter(o))
+          sOf(o['orderType']) == 'Takeaway' && filter(o))
       .toList();
 
   List<Map<String, dynamic>> get myTakeawayPayLaterOrders => myTakeawayOrdersBy((o) =>
@@ -671,11 +674,28 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   }
 
   List<Map<String, dynamic>> get filteredVisibleOrders {
-    final out = visibleOrders.where(_inOrdersDateRange).toList();
+    final out = visibleOrders.where(_inOrdersDateRange).where((o) {
+      if (ordersUserFilter.isEmpty) return true;
+      final t = sOf(o['orderTaker']).isNotEmpty
+          ? sOf(o['orderTaker'])
+          : sOf(o['waiter']);
+      return t.trim() == ordersUserFilter;
+    }).toList();
     int ts(Map o) =>
         DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch ?? 0;
     out.sort((a, b) => ts(b).compareTo(ts(a)));
     return out;
+  }
+
+  List<String> get orderUsersForCurrentTab {
+    final names = <String, bool>{};
+    for (final o in visibleOrders) {
+      final t = sOf(o['orderTaker']).isNotEmpty
+          ? sOf(o['orderTaker'])
+          : sOf(o['waiter']);
+      if (t.trim().isNotEmpty) names[t.trim()] = true;
+    }
+    return names.keys.toList();
   }
 
   void _openOrders() {
@@ -1126,6 +1146,181 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       if (!mounted) return;
       setState(() => expandedOrderId = null);
       toast('Order #${order['orderNumber'] ?? order['id']} cancelled ❌');
+      await _loadData(silent: true);
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> deleteOrder(Map order) async {
+    final id = sOf(order['id']);
+    if (id.isEmpty || _busy) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF020617),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: const Color(0xFF334155).withValues(alpha: .6))),
+        title: const Text('Delete Order',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+        content: Text(
+            'Delete order #${order['orderNumber'] ?? id} permanently? This cannot be undone.',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFFB7185), fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await _fetch('/pos/orders/$id', method: 'DELETE');
+      if (!mounted) return;
+      setState(() {
+        expandedOrderId = null;
+        _selectedOrderIds.remove(id);
+      });
+      toast('Order #${order['orderNumber'] ?? id} deleted 🗑️');
+      await _loadData(silent: true);
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _selectedOrdersList => filteredVisibleOrders
+      .where((o) => _selectedOrderIds.contains(sOf(o['id'])))
+      .toList();
+
+  void _toggleSelectAll() {
+    setState(() {
+      final ids = filteredVisibleOrders.map((o) => sOf(o['id'])).toList();
+      final allSelected = ids.isNotEmpty && ids.every(_selectedOrderIds.contains);
+      if (allSelected) {
+        _selectedOrderIds.clear();
+      } else {
+        _selectedOrderIds.addAll(ids);
+      }
+    });
+  }
+
+  Future<void> _bulkDelete() async {
+    final selected = _selectedOrdersList;
+    if (selected.isEmpty || _busy) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF020617),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: const Color(0xFF334155).withValues(alpha: .6))),
+        title: const Text('Delete Orders',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+        content: Text('Delete ${selected.length} selected order(s) permanently?',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFFB7185), fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      for (final o in selected) {
+        final id = sOf(o['id']);
+        if (id.isEmpty) continue;
+        await _fetch('/pos/orders/$id', method: 'DELETE');
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedOrderIds.clear();
+        selectMode = false;
+        expandedOrderId = null;
+      });
+      toast('${selected.length} order(s) deleted 🗑️');
+      await _loadData(silent: true);
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _bulkMarkPaid() async {
+    final selected = _selectedOrdersList;
+    if (selected.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final me = sOf(user['name']).isNotEmpty
+          ? sOf(user['name'])
+          : sOf(user['username']);
+      for (final o in selected) {
+        final id = sOf(o['id']);
+        if (id.isEmpty) continue;
+        await _fetch('/pos/orders/$id', method: 'PUT', body: {
+          'paymentStatus': 'paid',
+          'status': 'Payment Collected',
+          'paidAt': DateTime.now().toUtc().toIso8601String(),
+          'orderTaker': me,
+        });
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedOrderIds.clear();
+        selectMode = false;
+        expandedOrderId = null;
+      });
+      toast('${selected.length} order(s) marked paid ✅');
+      await _loadData(silent: true);
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _bulkMarkDue() async {
+    final selected = _selectedOrdersList;
+    if (selected.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final me = sOf(user['name']).isNotEmpty
+          ? sOf(user['name'])
+          : sOf(user['username']);
+      for (final o in selected) {
+        final id = sOf(o['id']);
+        if (id.isEmpty) continue;
+        await _fetch('/pos/orders/$id', method: 'PUT', body: {
+          'status': 'Due',
+          'dueAt': DateTime.now().toUtc().toIso8601String(),
+          'orderTaker': me,
+        });
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedOrderIds.clear();
+        selectMode = false;
+        expandedOrderId = null;
+      });
+      toast('${selected.length} order(s) marked Due 💰');
       await _loadData(silent: true);
     } catch (e) {
       toast(e.toString(), seconds: 6);
@@ -3905,11 +4100,24 @@ Widget _cartSheet() {
                 ),
               ),
               IconButton(
+                onPressed: () => setState(() {
+                  selectMode = !selectMode;
+                  _selectedOrderIds.clear();
+                  expandedOrderId = null;
+                }),
+                icon: Icon(
+                  selectMode ? Icons.close : Icons.checklist_rtl,
+                  color: selectMode ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                ),
+                tooltip: selectMode ? 'Exit Select' : 'Select Multi Orders',
+              ),
+              IconButton(
                 onPressed: _closeOrders,
                 icon: const Icon(Icons.close, color: Color(0xFFDC2626)),
               ),
             ]),
           ),
+          if (selectMode) _bulkBar(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(children: ordersViews.map((v) {
@@ -3966,6 +4174,13 @@ Widget _cartSheet() {
             ),
           ),
           _ordersDateFilterBar(),
+          _ordersUserFilterBar(),
+          if (selectMode)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+              child: Text('Tap orders to select. Then use the bar above for bulk actions.',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+            ),
           Expanded(
             child: list.isEmpty
                 ? const Center(child: Text('No orders', style: TextStyle(color: Color(0xFF94A3B8))))
@@ -3977,6 +4192,96 @@ Widget _cartSheet() {
                         takeawayTab: ordersView == 'Takeaway' ? ordersSubTab : null),
                   ),
           ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _bulkBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFEEF2FF),
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: Text('${_selectedOrderIds.length} / ${filteredVisibleOrders.length} selected',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+          ),
+          TextButton(
+            onPressed: () => setState(() { selectMode = false; _selectedOrderIds.clear(); }),
+            child: Text('Done', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF2563EB))),
+          ),
+        ]),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _bulkBtn('Select All', const Color(0xFF0EA5E9),
+              filteredVisibleOrders.isEmpty ? null : _toggleSelectAll),
+          _bulkBtn('Delete', const Color(0xFFDC2626),
+              _selectedOrderIds.isEmpty ? null : _bulkDelete),
+          _bulkBtn('Mark Paid', const Color(0xFF059669),
+              _selectedOrderIds.isEmpty ? null : _bulkMarkPaid),
+          _bulkBtn('Mark Due', const Color(0xFFF59E0B),
+              _selectedOrderIds.isEmpty ? null : _bulkMarkDue),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _bulkBtn(String label, Color c, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: onTap == null ? const Color(0xFFE2E8F0) : c.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(
+              color: onTap == null ? const Color(0xFFE2E8F0) : c.withValues(alpha: .4)),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 11.5, fontWeight: FontWeight.w800, color: onTap == null ? const Color(0xFF94A3B8) : c)),
+      ),
+    );
+  }
+
+  Widget _ordersUserFilterBar() {
+    final users = orderUsersForCurrentTab;
+    if (users.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: const Text('All Users', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+              selected: ordersUserFilter.isEmpty,
+              onSelected: (_) => setState(() => ordersUserFilter = ''),
+              selectedColor: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFFF1F5F9),
+              labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: ordersUserFilter.isEmpty ? Colors.white : const Color(0xFF475569)),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+          ),
+          ...users.map((u) {
+            final sel = ordersUserFilter == u;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                label: Text(u, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                selected: sel,
+                onSelected: (_) => setState(() => ordersUserFilter = sel ? '' : u),
+                selectedColor: const Color(0xFF059669),
+                backgroundColor: const Color(0xFFF1F5F9),
+                labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sel ? Colors.white : const Color(0xFF475569)),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+            );
+          }),
         ]),
       ),
     );
@@ -4035,6 +4340,9 @@ Widget _cartSheet() {
         DateTime.tryParse(sOf(o['createdAt']))?.millisecondsSinceEpoch;
     final cancelledMs =
         DateTime.tryParse(sOf(o['cancelledAt']))?.millisecondsSinceEpoch;
+    final takerName = sOf(o['orderTaker']).isNotEmpty
+        ? sOf(o['orderTaker'])
+        : sOf(o['waiter']);
 
     Color stateColor;
     if (st == 'new') {
@@ -4064,14 +4372,38 @@ Widget _cartSheet() {
       child: Column(
         children: [
           InkWell(
-            onTap: () =>
-                setState(() => expandedOrderId = expanded ? null : id),
+            onTap: () {
+              if (selectMode) {
+                setState(() {
+                  final selId = sOf(id);
+                  if (_selectedOrderIds.contains(selId)) {
+                    _selectedOrderIds.remove(selId);
+                  } else {
+                    _selectedOrderIds.add(selId);
+                  }
+                });
+              } else {
+                setState(() => expandedOrderId = expanded ? null : id);
+              }
+            },
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
                   Row(
                     children: [
+                      if (selectMode) ...[
+                        Icon(
+                          _selectedOrderIds.contains(sOf(id))
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          size: 16,
+                          color: _selectedOrderIds.contains(sOf(id))
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Text('#${sOf(o['orderNumber']).isEmpty ? sOf(o['id']) : sOf(o['orderNumber'])}',
                           style: const TextStyle(
                               fontSize: 11,
@@ -4171,6 +4503,19 @@ Widget _cartSheet() {
                       ),
                     ],
                   ),
+                  if (takerName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(children: [
+                        const Icon(Icons.person_outline, size: 11, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(takerName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                        ),
+                      ]),
+                    ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -4274,11 +4619,11 @@ Widget _cartSheet() {
                   // ---------- Takeaway popup action buttons (admin OT) ----------
                   if (takeawayTab != null) ...[
                     const SizedBox(height: 10),
-                    if (st == 'new' || st == 'served') ...[
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (st == 'new' || st == 'served') ...[
                           _actionChip('🖨️ Print', const Color(0xFF1E293B),
                               const Color(0xFFE2E8F0), () async {
                             try {
@@ -4290,35 +4635,41 @@ Widget _cartSheet() {
                           }),
                           _actionChip('✏️ Edit Order', const Color(0xFF1E293B),
                               const Color(0xFFE2E8F0), () => openEditOrder(o)),
-                          if (takeawayTab == 'pay_later') ...[
-                            _actionChip(
-                                '💰 Mark Due',
-                                const Color(0xFFF59E0B),
-                                Colors.white,
-                                () => markDue(o)),
-                            _actionChip(
-                                '✅ Mark Paid',
-                                const Color(0xFF059669),
-                                Colors.white,
-                                () => markPaid(o)),
-                          ],
-                          if (takeawayTab == 'paid')
-                            _actionChip(
-                                '💰 Mark Due',
-                                const Color(0xFFF59E0B),
-                                Colors.white,
-                                () => markDue(o)),
-                          if (takeawayTab == 'due')
-                            _actionChip(
-                                '✅ Mark Paid',
-                                const Color(0xFF059669),
-                                Colors.white,
-                                () => markPaid(o)),
-                          _actionChip('❌ Delete', const Color(0xFFE11D48),
+                        ],
+                        if (takeawayTab == 'pay_later') ...[
+                          _actionChip(
+                              '💰 Mark Due',
+                              const Color(0xFFF59E0B),
+                              Colors.white,
+                              () => markDue(o)),
+                          _actionChip(
+                              '✅ Mark Paid',
+                              const Color(0xFF059669),
+                              Colors.white,
+                              () => markPaid(o)),
+                          _actionChip('❌ Cancel', const Color(0xFFE11D48),
                               Colors.white, () => cancelOrder(o)),
                         ],
-                      ),
-                    ],
+                        if (takeawayTab == 'paid') ...[
+                          _actionChip(
+                              '💰 Mark Due',
+                              const Color(0xFFF59E0B),
+                              Colors.white,
+                              () => markDue(o)),
+                          _actionChip('🗑️ Delete', const Color(0xFFE11D48),
+                              Colors.white, () => deleteOrder(o)),
+                        ],
+                        if (takeawayTab == 'due')
+                          _actionChip(
+                              '✅ Mark Paid',
+                              const Color(0xFF059669),
+                              Colors.white,
+                              () => markPaid(o)),
+                        if (takeawayTab == 'cancelled')
+                          _actionChip('🗑️ Delete Order', const Color(0xFFE11D48),
+                              Colors.white, () => deleteOrder(o)),
+                      ],
+                    ),
                   ],
                   // ---------- Normal order card action buttons ----------
                   if (takeawayTab == null) ...[
@@ -4442,6 +4793,28 @@ Widget _cartSheet() {
                                 ),
                               ),
                       ),
+                    if (!isPaid) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _busy ? null : () => markPaid(o),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor:
+                                const Color(0xFF059669).withValues(alpha: .4),
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Text('✅', style: TextStyle(fontSize: 12)),
+                          label: const Text('Mark Paid',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     if (isPaid)
                       Container(
@@ -4573,6 +4946,26 @@ Widget _cartSheet() {
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFFFB7185)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _busy ? null : () => deleteOrder(o),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE11D48),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor:
+                              const Color(0xFFE11D48).withValues(alpha: .4),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Text('🗑️', style: TextStyle(fontSize: 12)),
+                        label: const Text('Delete Order',
+                            style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w800)),
                       ),
                     ),
                   ],

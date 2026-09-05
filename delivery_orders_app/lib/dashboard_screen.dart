@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'order_taker_screen.dart' show sOf, numOf;
+import 'order_taker_screen.dart' show sOf, numOf, dateTime12;
 
 const Color _accent = Color(0xFF2563EB);
 const Color _border = Color(0xFFE2E8F0);
@@ -30,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime? _from;
   DateTime? _to;
   bool _busy = false;
+  final Set<String> _expandedDue = {};
   late List<dynamic> _orders = widget.orders;
 
   static const List<Map<String, String>> _ranges = [
@@ -209,18 +210,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final inRange = _inRange;
+    final activeRange = inRange.where((o) => !_isCancelled(o)).toList();
     final name = sOf(widget.user['name']).isNotEmpty
         ? sOf(widget.user['name'])
         : (sOf(widget.user['username']).isNotEmpty ? sOf(widget.user['username']) : 'Staff');
 
-    int totalRev() => inRange.fold<int>(0, (s, o) => s + numOf(o['total'] ?? o['amount']).round());
-    int byType(String t) => inRange.where((o) => sOf(o['orderType']) == t).length;
-    int deliveryActive() => inRange.where((o) => _isActiveDelivery(o) && sOf(o['deliveryAgent']).trim().isEmpty).length;
-    int deliveryAssigned() => inRange.where((o) => _isActiveDelivery(o) && sOf(o['deliveryAgent']).trim().isNotEmpty).length;
-    int takeawayPaid() => inRange.where((o) => sOf(o['orderType']) == 'Takeaway' && _isPaidOrDone(o)).length;
-    int takeawayLater() => inRange.where((o) => sOf(o['orderType']) == 'Takeaway' && !_isPaidOrDone(o)).length;
-    int tablePaid() => inRange.where((o) => sOf(o['orderType']) == 'Dine-In' && _isPaidOrDone(o)).length;
-    int tableActive() => inRange.where((o) => sOf(o['orderType']) == 'Dine-In' && !_isPaidOrDone(o) && !_isCancelled(o)).length;
+    int totalRev() => activeRange.fold<int>(0, (s, o) => s + numOf(o['total'] ?? o['amount']).round());
+    int deliveryActive() => activeRange.where((o) => _isActiveDelivery(o) && sOf(o['deliveryAgent']).trim().isEmpty).length;
+    int deliveryAssigned() => activeRange.where((o) => _isActiveDelivery(o) && sOf(o['deliveryAgent']).trim().isNotEmpty).length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -245,36 +242,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _card('Revenue', '${totalRev()} PKR', const Color(0xFF059669)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _mini('Total Orders', '${inRange.length}', const Color(0xFF2563EB))),
+          Expanded(child: _mini('Total Delivery Orders', '${activeRange.length}', const Color(0xFF2563EB))),
           const SizedBox(width: 10),
-          Expanded(child: _mini('Delivery', '${byType('Delivery')}', const Color(0xFF0EA5E9))),
+          Expanded(child: _mini('Pending', '${deliveryActive()}', const Color(0xFFDC2626))),
         ]),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _mini('Takeaway', '${byType('Takeaway')}', const Color(0xFFF59E0B))),
+          Expanded(child: _mini('Rider Assigned', '${deliveryAssigned()}', const Color(0xFF0EA5E9))),
           const SizedBox(width: 10),
-          Expanded(child: _mini('Table (Dine-In)', '${byType('Dine-In')}', const Color(0xFF7C3AED))),
-        ]),
-        const SizedBox(height: 14),
-        const Text('Delivery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0EA5E9))),
-        Row(children: [
-          Expanded(child: _mini('Pending', '${deliveryActive()}', const Color(0xFFDC2626))),
-          const SizedBox(width: 10),
-          Expanded(child: _mini('Rider Assigned', '${deliveryAssigned()}', const Color(0xFF059669))),
-        ]),
-        const SizedBox(height: 14),
-        const Text('Takeaway', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFF59E0B))),
-        Row(children: [
-          Expanded(child: _mini('Paid', '${takeawayPaid()}', const Color(0xFF059669))),
-          const SizedBox(width: 10),
-          Expanded(child: _mini('Pay Later', '${takeawayLater()}', const Color(0xFFDC2626))),
-        ]),
-        const SizedBox(height: 14),
-        const Text('Table', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF7C3AED))),
-        Row(children: [
-          Expanded(child: _mini('Paid', '${tablePaid()}', const Color(0xFF059669))),
-          const SizedBox(width: 10),
-          Expanded(child: _mini('Active', '${tableActive()}', const Color(0xFFDC2626))),
+          Expanded(child: _mini('Delivered', '${activeRange.where((o) => _isPaidOrDone(o)).length}', const Color(0xFF059669))),
         ]),
         const SizedBox(height: 18),
         _buildDuePanel(),
@@ -485,51 +461,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ]),
         ),
-        ...orders.map((o) => _dueOrderRow(o)),
+        ...orders.map((o) => _dueOrderRow(rider, o)),
       ],
     );
   }
 
-  Widget _dueOrderRow(Map<String, dynamic> o) {
+  Widget _dueOrderRow(String rider, Map<String, dynamic> o) {
     final id = sOf(o['id']);
     final addr = sOf(o['address']);
     final loc = sOf(o['serviceType']);
     final total = numOf(o['total'] ?? o['amount']);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFFDE68A))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-            child: Text('#${sOf(o['orderNumber']).isNotEmpty ? o['orderNumber'] : id}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _txtDark)),
-          ),
-          _miniBtn('Mark Paid', () => _markDuePaid(o)),
-        ]),
-        if (loc.isNotEmpty)
+    final dt = dateTime12(sOf(o['createdAt']));
+    final expanded = _expandedDue.contains(id);
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (expanded) {
+          _expandedDue.remove(id);
+        } else {
+          _expandedDue.add(id);
+        }
+      }),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFFDE68A))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
+              child: Text('#${sOf(o['orderNumber']).isNotEmpty ? o['orderNumber'] : id}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _txtDark)),
+            ),
+            _miniBtn('Mark Paid', () => _markDuePaid(o)),
+          ]),
+          if (dt.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Row(children: [
+                const Icon(Icons.schedule, size: 13, color: Color(0xFFB45309)),
+                const SizedBox(width: 4),
+                Text(dt, style: const TextStyle(fontSize: 11, color: Color(0xFF78350F))),
+              ]),
+            ),
+          if (loc.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.location_on_outlined, size: 13, color: Color(0xFFB45309)),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(loc, style: const TextStyle(fontSize: 12, color: Color(0xFF78350F))),
+                ),
+              ]),
+            ),
+          if (addr.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(addr, maxLines: expanded ? null : 2, overflow: expanded ? null : TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF78350F))),
+            ),
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.location_on_outlined, size: 13, color: Color(0xFFB45309)),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(loc, style: const TextStyle(fontSize: 12, color: Color(0xFF78350F))),
-              ),
-            ]),
+            child: Text('Total: ${_fmtNum(total)} PKR',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFB45309))),
           ),
-        if (addr.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(addr, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF78350F))),
-          ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text('Total: ${_fmtNum(total)} PKR',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFB45309))),
-        ),
-      ]),
+          if (expanded) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(children: [
+                const Icon(Icons.person_outline, size: 13, color: Color(0xFFB45309)),
+                const SizedBox(width: 4),
+                Text('Rider: $rider', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF78350F))),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text('Order ID: $id', style: const TextStyle(fontSize: 11, color: Color(0xFFB45309))),
+            ),
+          ],
+        ]),
+      ),
     );
   }
 
@@ -672,6 +682,47 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
     }
   }
 
+  Future<void> _bulkMarkPaid() async {
+    final ids = _selected.toList();
+    if (ids.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final paidAt = DateTime.now().toUtc().toIso8601String();
+      await Future.wait(ids.map((id) => ApiClient.send('PUT', '/pos/orders/$id',
+          token: widget.token,
+          body: {'paymentStatus': 'paid', 'status': 'Delivered', 'paidAt': paidAt}).catchError((_) => null)));
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${ids.length} order(s) marked paid')));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _bulkMarkDue() async {
+    final ids = _selected.toList();
+    if (ids.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await Future.wait(ids.map((id) => ApiClient.send('PUT', '/pos/orders/$id',
+          token: widget.token,
+          body: {'paymentStatus': 'Due', 'status': 'Due'}).catchError((_) => null)));
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${ids.length} order(s) marked due')));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUn = widget.riderName == 'Unassigned';
@@ -793,7 +844,10 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
         Container(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
           decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: _border))),
-          child: Row(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               TextButton(
                 onPressed: () {
@@ -814,7 +868,29 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
                   style: const TextStyle(color: _accent, fontWeight: FontWeight.w700),
                 ),
               ),
-              const Spacer(),
+              if (_selected.isNotEmpty)
+                Text('${_selected.length} selected',
+                    style: const TextStyle(fontSize: 12, color: _txtDim)),
+              OutlinedButton.icon(
+                onPressed: _busy || _selected.isEmpty ? null : _bulkMarkPaid,
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Mark Paid'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _accent,
+                  side: const BorderSide(color: _accent),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy || _selected.isEmpty ? null : _bulkMarkDue,
+                icon: const Icon(Icons.schedule, size: 16),
+                label: const Text('Mark Due'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
               ElevatedButton.icon(
                 onPressed: _busy || _selected.isEmpty ? null : _changeRider,
                 icon: _busy
