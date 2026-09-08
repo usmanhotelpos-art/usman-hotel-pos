@@ -623,40 +623,6 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   void removeFromCart(String itemId) =>
       setState(() => carts[activeType]!.removeWhere((i) => i['itemId'] == itemId));
 
-  Future<void> _editCartPrice(Map<String, dynamic> item) async {
-    final ctrl = TextEditingController(text: numOf(item['price']).toStringAsFixed(0));
-    final newPrice = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Price'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Price (PKR)', isDense: true),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final v = double.tryParse(ctrl.text.trim().replaceAll(',', ''));
-              Navigator.pop(ctx, v);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    ctrl.dispose();
-    if (newPrice == null || newPrice < 0 || !mounted) return;
-    setState(() {
-      final list = carts[activeType]!;
-      final idx = list.indexWhere((x) => x['itemId'] == item['itemId']);
-      if (idx >= 0) list[idx]['price'] = newPrice;
-    });
-    toast('Price updated', seconds: 2);
-  }
-
   void _onPressStart(Map<String, dynamic> product) {
     _pressFired = false;
     _pressTimer?.cancel();
@@ -1293,11 +1259,6 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return role.contains('manager') || role.contains('admin');
   }
 
-  bool _isCashier() {
-    final role = sOf(user['role']).toLowerCase();
-    return role.contains('cashier');
-  }
-
   // ----------------------------------------------------------- orders screen
   bool _isMineOrder(Map<String, dynamic> o) {
     if (_isManager()) return true;
@@ -1553,7 +1514,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           const SizedBox(width: 6),
           _hdrBtn('\u{1F4CA}', 'Dash', const Color(0xFFECFDF5), const Color(0xFF7C3AED), () {
             Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => DashboardScreen(orders: orders, user: user, riders: staffMembers, token: token)));
+                MaterialPageRoute(builder: (_) => DashboardScreen(orders: orders, user: user, riders: ridersRecords, token: token)));
           }),
           const SizedBox(width: 6),
           _hdrBtn('\u{1F9F1}', 'Printer', const Color(0xFFEFF6FF), const Color(0xFF2563EB), () {
@@ -2078,14 +2039,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
               : Container(width: 44, height: 44, color: const Color(0xFFF1F5F9), child: const Icon(Icons.fastfood, color: Color(0xFF94A3B8))),
         ),
         title: Text('${i['name']} ${sOf(i['flavor']).isNotEmpty ? '(${i['flavor']})' : ''}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        subtitle: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text('${_fmtNum(numOf(i['price']))} PKR', style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () => _editCartPrice(i),
-            child: const Icon(Icons.edit, size: 13, color: Color(0xFF94A3B8)),
-          ),
-        ]),
+        subtitle: Text('${_fmtNum(numOf(i['price']))} PKR', style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton(onPressed: () => updateCartQty(sOf(i['itemId']), -1), icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFDC2626))),
           Text('${i['quantity']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
@@ -2650,8 +2604,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           if (_isManager() && type == 'Delivery' && !_isDeliveryPaid(o) && !_isDeliveryDue(o) && !_isDeliveredOrDone(o)) ...[
             _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
             _actBtn('Due', const Color(0xFFF59E0B), () => markDue(o)),
-          ] else if (_isCashier() && type == 'Delivery' && !_isDeliveryPaid(o) && !_isDeliveryDue(o) && !_isDeliveredOrDone(o))
-            _actBtn('Due', const Color(0xFFF59E0B), () => markDue(o)),
+          ],
           if (_isManager() && type == 'Delivery' && _isDeliveryDue(o))
             _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
           if (type != 'Delivery' && !_isPaidOrDone(o)) ...[
@@ -2664,7 +2617,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           _actBtn('Print', const Color(0xFF0EA5E9), () async {
             try { await printOrderBT(o); toast('Printed'); } catch (e) { toast('$e', seconds: 6); }
           }),
-          _editIconBtn(() => _editOrder(o)),
+          _actBtn('Edit', const Color(0xFF7C3AED), () => _editOrder(o)),
           _actBtn('Cancel', const Color(0xFFDC2626), () => cancelOrder(o)),
           if (_isManager())
             _actBtn('Delete', const Color(0xFFB91C1C), () => _deleteOrder(o)),
@@ -2684,22 +2637,6 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             elevation: glow ? 4 : 2,
             shadowColor: onTap == null ? Colors.transparent : c.withValues(alpha: 0.8)),
         child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-      );
-
-  Widget _editIconBtn(VoidCallback onTap) => Tooltip(
-        message: 'Edit Order',
-        child: Material(
-          color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.edit, color: Color(0xFF7C3AED), size: 18),
-            ),
-          ),
-        ),
       );
 
   // expand state
