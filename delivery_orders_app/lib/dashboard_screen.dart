@@ -135,10 +135,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (n.isNotEmpty) set.add(n);
       }
     }
-    for (final o in _all) {
-      final a = sOf(o['deliveryAgent']).trim();
-      if (a.isNotEmpty) set.add(a);
-    }
     return set.toList();
   }
 

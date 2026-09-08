@@ -132,10 +132,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (n.isNotEmpty) set.add(n);
       }
     }
-    for (final o in _all) {
-      final a = sOf(o['deliveryAgent']).trim();
-      if (a.isNotEmpty) set.add(a);
-    }
     return set.toList();
   }
 
@@ -670,6 +666,47 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
     }
   }
 
+  Future<void> _bulkMarkPaid() async {
+    final ids = _selected.toList();
+    if (ids.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final paidAt = DateTime.now().toUtc().toIso8601String();
+      await Future.wait(ids.map((id) => ApiClient.send('PUT', '/pos/orders/$id',
+          token: widget.token,
+          body: {'paymentStatus': 'paid', 'status': 'Delivered', 'paidAt': paidAt}).catchError((_) => null)));
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${ids.length} order(s) marked paid')));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _bulkMarkDue() async {
+    final ids = _selected.toList();
+    if (ids.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await Future.wait(ids.map((id) => ApiClient.send('PUT', '/pos/orders/$id',
+          token: widget.token,
+          body: {'paymentStatus': 'Due', 'status': 'Due'}).catchError((_) => null)));
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${ids.length} order(s) marked due')));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUn = widget.riderName == 'Unassigned';
@@ -813,6 +850,28 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
                 ),
               ),
               const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _busy || _selected.isEmpty ? null : _bulkMarkPaid,
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Mark Paid'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _accent,
+                  side: const BorderSide(color: _accent),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _busy || _selected.isEmpty ? null : _bulkMarkDue,
+                icon: const Icon(Icons.schedule, size: 16),
+                label: const Text('Mark Due'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+              const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: _busy || _selected.isEmpty ? null : _changeRider,
                 icon: _busy
