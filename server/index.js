@@ -63,21 +63,23 @@ try {
     console.log('Default Admin Order Taker staff created: usman / usman123');
   }
 
-  // Seed Usman Waiter as Admin Order Taker
-  const waiterExists = staffMembers.some(
-    (s) => (s.username || '').toString().toLowerCase() === 'usmanwaiter'
+  // Seed Manager account for Stock App (Manager / Cashier can login)
+  const managerExists = staffMembers.some(
+    (s) => (s.username || '').toString().trim().toLowerCase() === 'farhanadmin'
   );
-  if (!waiterExists) {
+  if (!managerExists) {
     createRecord('staff', {
-      name: 'Usman Waiter',
-      username: 'usmanwaiter',
-      passwordHash: bcrypt.hashSync('usman123', 10),
-      role: 'Admin Order Taker',
+      name: 'Farhan',
+      username: 'farhanadmin',
+      passwordHash: bcrypt.hashSync('Farhan123', 10),
+      role: 'Manager',
       loginEnabled: true,
-      permissions: { 'order-taker-app': true },
+      permissions: {},
     });
-    console.log('Default Admin Order Taker staff created: usmanwaiter / usman123');
+    console.log('Stock App Manager staff created: farhanadmin / Farhan123');
   }
+
+  
 } catch (startupError) {
   console.error('Failed to initialize database on startup:', startupError);
   process.exit(1);

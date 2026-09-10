@@ -33,9 +33,9 @@ const defaultData = {
     hotelName: 'Usman Hotel',
     currency: 'PKR',
     location: 'Karachi',
-    taxRate: 0.18
-    ,
-     riderShift: {
+    taxRate: 0.18,
+    stockOrderCounter: { date: '', count: 0 },
+    riderShift: {
        active: false,
        riderId: null,
        riderName: null,
@@ -178,7 +178,8 @@ const defaultData = {
   pos_payments: [],
   riders: [],
   rider_orders: [],
-  rider_order_requests: []
+  rider_order_requests: [],
+  stock_orders: []
 };
 
 function ensureLocalDataDir() {

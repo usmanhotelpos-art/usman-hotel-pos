@@ -1,0 +1,33 @@
+name: stock_app
+description: "Usman Hotel Stock Management App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.2.0
+  shared_preferences: ^2.3.0
+  permission_handler: ^11.3.0
+  intl: ^0.19.0
+  provider: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/stock_icon.png"
+  adaptive_icon_background: "#38BDF8"
+  adaptive_icon_foreground: "assets/icon/stock_icon.png"
+
+flutter:
+  uses-material-design: true

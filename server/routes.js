@@ -373,6 +373,227 @@ router.get('/settings', (req, res) => {
   res.send(db.settings || {});
 });
 
+// ─── Stock Management API (for Stock mobile app) ────────────────────────────
+
+function getNextStockOrderNumber() {
+  const db = readDb();
+  const settings = db.settings || {};
+  const counter = settings.stockOrderCounter || {};
+  const today = getPkDateString();
+  if (counter.date !== today) {
+    counter.date = today;
+    counter.count = 0;
+  }
+  counter.count = (Number(counter.count) || 0) + 1;
+  db.settings = { ...settings, stockOrderCounter: counter };
+  writeDb(db);
+  return counter.count;
+}
+
+// Staff login for stock app (staff or manager role)
+router.post('/stock/login', safe(async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).send({ error: 'Username and password required' });
+  }
+
+  const staffMembers = getCollection('staff') || [];
+  const loginValue = username.trim().toLowerCase();
+  const staff = staffMembers.find((s) => {
+    const uname = (s.username || '').toString().trim().toLowerCase();
+    const loginEnabled = s.loginEnabled !== false;
+    if (!loginEnabled) return false;
+    return uname === loginValue;
+  });
+
+  if (!staff) {
+    return res.status(401).send({ error: 'Invalid credentials' });
+  }
+
+  let valid = false;
+  if (staff.passwordHash) {
+    valid = await bcrypt.compare(password, staff.passwordHash);
+  } else if (typeof staff.password === 'string' && staff.password.length > 0) {
+    valid = await bcrypt.compare(password, staff.password);
+  }
+
+  if (!valid) {
+    return res.status(401).send({ error: 'Invalid credentials' });
+  }
+
+  const roleString = (staff.role || '').toString().trim();
+  const isManager = /manager|admin/i.test(roleString);
+  const isCashier = /cashier/i.test(roleString);
+  if (!isManager && !isCashier) {
+    return res.status(403).send({ error: 'Only Manager and Cashier can login to the Stock App' });
+  }
+
+  const role = isManager ? 'manager' : 'cashier';
+  const token = jwt.sign(
+    { id: staff.id, name: staff.name, role, username: staff.username },
+    JWT_SECRET,
+    { expiresIn: '12h' }
+  );
+
+  res.send({
+    token,
+    user: { id: staff.id, name: staff.name, role, username: staff.username }
+  });
+}));
+
+// Get settings (for stock app)
+router.get('/stock/settings', authenticate, (req, res) => {
+  const db = readDb();
+  res.send(db.settings || {});
+});
+
+// Update settings (manager only)
+router.put('/stock/settings', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const db = readDb();
+  db.settings = { ...db.settings, ...req.body };
+  writeDb(db);
+  res.send(db.settings);
+});
+
+// Get products list (for item selection)
+router.get('/stock/products', authenticate, (req, res) => {
+  const products = getCollection('pos_products') || [];
+  res.send(products.map(p => ({ id: p.id, name: p.name, category: p.category, stock: p.availableStock ?? p.stock ?? 0 })));
+});
+
+// List stock orders with optional date filters
+router.get('/stock/orders', authenticate, (req, res) => {
+  const orders = getCollection('stock_orders') || [];
+  let filtered = [...orders];
+  const { startDate, endDate, status } = req.query;
+
+  if (startDate) {
+    filtered = filtered.filter(o => o.date >= startDate);
+  }
+  if (endDate) {
+    filtered = filtered.filter(o => o.date <= endDate);
+  }
+  if (status) {
+    filtered = filtered.filter(o => o.status === status);
+  }
+
+  filtered.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  res.send(filtered);
+});
+
+// Create new stock order
+router.post('/stock/orders', authenticate, (req, res) => {
+  const { items, notes, addedBy, approvedBy } = req.body;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).send({ error: 'At least one item required' });
+  }
+
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+  const dateStr = pkTime.toISOString().slice(0, 10);
+  const timeStr = pkTime.toTimeString().slice(0, 8);
+  const orderNum = getNextStockOrderNumber();
+
+  const order = {
+    orderNumber: `SO-${dateStr.replace(/-/g, '')}-${String(orderNum).padStart(4, '0')}`,
+    items: items.map(item => ({
+      productName: item.productName || item.name || '',
+      productId: item.productId || '',
+      quantity: Number(item.quantity) || 0,
+      unit: item.unit || 'pcs',
+    })),
+    notes: notes || '',
+    addedBy: addedBy || req.user.name || '',
+    approvedBy: approvedBy || '',
+    status: 'pending',
+    date: dateStr,
+    time: timeStr,
+    dateTime: pkTime.toISOString(),
+    createdBy: req.user.id,
+  };
+
+  const created = createRecord('stock_orders', order);
+  res.status(201).send(created);
+});
+
+// Approve stock order (manager only)
+router.put('/stock/orders/:id/approve', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const orders = getCollection('stock_orders') || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).send({ error: 'Order not found' });
+
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+  orders[idx] = {
+    ...orders[idx],
+    status: 'approved',
+    approvedBy: req.user.name,
+    approvedAt: pkTime.toISOString(),
+    updatedAt: pkTime.toISOString(),
+  };
+
+  // Update product stock quantities
+  const products = getCollection('pos_products') || [];
+  for (const item of orders[idx].items) {
+    const pIdx = products.findIndex(p => p.id === item.productId);
+    if (pIdx !== -1) {
+      const current = Number(products[pIdx].availableStock ?? products[pIdx].stock ?? 0);
+      products[pIdx].availableStock = current + Number(item.quantity);
+      products[pIdx].stock = current + Number(item.quantity);
+    }
+  }
+
+  const db = readDb();
+  db.stock_orders = orders;
+  db.pos_products = products;
+  writeDb(db);
+
+  res.send(orders[idx]);
+});
+
+// Reject stock order (manager only)
+router.put('/stock/orders/:id/reject', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const orders = getCollection('stock_orders') || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).send({ error: 'Order not found' });
+
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+  orders[idx] = {
+    ...orders[idx],
+    status: 'rejected',
+    approvedBy: req.user.name,
+    rejectedAt: pkTime.toISOString(),
+    updatedAt: pkTime.toISOString(),
+  };
+
+  const db = readDb();
+  db.stock_orders = orders;
+  writeDb(db);
+
+  res.send(orders[idx]);
+});
+
+// Delete stock order (manager only)
+router.delete('/stock/orders/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const removed = removeRecord('stock_orders', req.params.id);
+  if (!removed) return res.status(404).send({ error: 'Order not found' });
+  res.send({ ok: true });
+});
 router.use(authenticate);
 
 const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests'];
@@ -1126,7 +1347,13 @@ router.put('/pos/orders/:id', (req, res) => {
     paymentRequestStatus = existingOrder.paymentRequestStatus,
     orderTaker = existingOrder.orderTaker,
     waiter = existingOrder.waiter,
-    source = existingOrder.source || ''
+    source = existingOrder.source || '',
+    reserved = existingOrder.reserved,
+    reservedAt = existingOrder.reservedAt,
+    mergeGroupId = existingOrder.mergeGroupId,
+    mergedOrderIds = existingOrder.mergedOrderIds,
+    mergedTotal = existingOrder.mergedTotal,
+    mergedAt = existingOrder.mergedAt
   } = req.body;
 
   const itemsList = items || [];
@@ -1162,6 +1389,12 @@ router.put('/pos/orders/:id', (req, res) => {
     orderTaker,
     waiter,
     source,
+    reserved: reserved === undefined ? existingOrder.reserved : !!reserved,
+    reservedAt: reservedAt === undefined ? existingOrder.reservedAt : reservedAt,
+    mergeGroupId: mergeGroupId === undefined ? existingOrder.mergeGroupId : mergeGroupId,
+    mergedOrderIds: mergedOrderIds === undefined ? existingOrder.mergedOrderIds : mergedOrderIds,
+    mergedTotal: mergedTotal === undefined ? existingOrder.mergedTotal : mergedTotal,
+    mergedAt: mergedAt === undefined ? existingOrder.mergedAt : mergedAt,
     updatedAt: new Date().toISOString()
   });
 
@@ -1581,3 +1814,4 @@ router.get('/riders/raw/:id', authenticate, (req, res) => {
   if (!rider) return res.status(404).send({ error: 'Rider not found' });
   res.send({ id: rider.id, email: rider.email, rawPassword: rider.rawPassword || null });
 });
+

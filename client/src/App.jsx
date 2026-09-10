@@ -330,6 +330,7 @@ function App() {
   const pollingRef = useRef(null);
 
   const normalizeText = (value) => String(value || '').trim().toLowerCase();
+  const isReserved = (o) => o?.reserved === true || String(o?.reserved) === 'true';
   const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
 
   const Sparkline = ({ values = [], color = '#34D399', width = 120, height = 36 }) => {
@@ -669,6 +670,7 @@ function App() {
     }
   });
   const [riderAssignmentModal, setRiderAssignmentModal] = useState(null);
+  const [expandedMergeGroup, setExpandedMergeGroup] = useState(null);
 
   useEffect(() => {
     const updateMobile = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth <= 900);
@@ -1245,6 +1247,7 @@ function App() {
 
   useEffect(() => {
     const dueExist = posOrders.some(o =>
+      !isReserved(o) &&
       (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') &&
       (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')
     );
@@ -1255,6 +1258,7 @@ function App() {
   }, [posOrders, dueHornPlayed]);
 
   const isLateOrder = (order) => {
+    if (isReserved(order)) return false;
     if (!order.createdAt) return false;
     const created = new Date(order.createdAt);
     const now = Date.now();
@@ -1272,11 +1276,14 @@ function App() {
 
   const hasLateOrders = posOrders.some(isLateOrder);
 
-  const openBulkRiderAssignmentModal = () => {
-    if (!selectedOrders.length) return;
+  const openBulkRiderAssignmentModalFor = (ids) => {
+    if (!ids.length) return;
+    setSelectedOrders(ids);
     setBulkRiderAssignmentOpen(true);
     setSelectedRider('');
   };
+
+  const openBulkRiderAssignmentModal = () => openBulkRiderAssignmentModalFor(selectedOrders);
 
   async function assignRiderToSelectedOrders() {
     if (!selectedOrders.length || !selectedRider) return;
@@ -4588,6 +4595,92 @@ try {
     }
   };
 
+  const toggleGroupSelection = (memberIds, allSel) => setSelectedOrders(prev =>
+    allSel ? prev.filter(id => !memberIds.includes(id)) : Array.from(new Set([...prev, ...memberIds]))
+  );
+
+  async function toggleOrderReserved(order) {
+    if (!order?.id) return;
+    const reserve = !isReserved(order);
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ reserved: reserve, reservedAt: reserve ? new Date().toISOString() : '' })
+      });
+      setMessage(reserve ? `Order ${order.orderNumber || order.id} reserved.` : `Order ${order.orderNumber || order.id} unreserved.`);
+      await loadOrdersData();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  async function bulkSetOrderReserved(ids, reserve) {
+    if (!ids.length) return;
+    setLoading(true);
+    setMessage('');
+    try {
+      await Promise.all(ids.map(id => fetchJson(`${apiBase}/pos/orders/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ reserved: reserve, reservedAt: reserve ? new Date().toISOString() : '' })
+      })));
+      setMessage(reserve ? `Marked ${ids.length} orders reserved.` : `Unreserved ${ids.length} orders.`);
+      setSelectedOrders([]);
+      await loadOrdersData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const bulkSetReserved = (v) => bulkSetOrderReserved(selectedOrders, v);
+
+  async function mergeSelectedOrders() {
+    if (!selectedOrders.length) return;
+    if (selectedOrders.length < 2) {
+      setMessage('Select at least 2 orders to merge.');
+      return;
+    }
+    setLoading(true);
+    setMessage('');
+    try {
+      const sel = posOrders.filter(o => selectedOrders.includes(o.id));
+      const groupId = `MG${Date.now()}`;
+      const mergedTotal = sel.reduce((s, o) => s + (Number(o.total || o.amount) || 0), 0);
+      const memberIds = sel.map(o => o.id);
+      await Promise.all(sel.map(o => fetchJson(`${apiBase}/pos/orders/${o.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          mergeGroupId: groupId,
+          mergedOrderIds: memberIds.filter(id => id !== o.id),
+          mergedTotal,
+          mergedAt: new Date().toISOString()
+        })
+      })));
+      setMessage(`Merged ${sel.length} orders.`);
+      setSelectedOrders([]);
+      await loadOrdersData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  async function unmergeOrder(order) {
+    if (!order?.id) return;
+    try {
+      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ mergeGroupId: '', mergedOrderIds: [], mergedTotal: 0, mergedAt: '' })
+      });
+      setMessage(`Order ${order.orderNumber || order.id} unmerged.`);
+      await loadOrdersData();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
   async function deleteMultipleTakeawayOrders() {
     if (selectedTakeawayOrders.length === 0) return;
     if (!confirm(`Delete ${selectedTakeawayOrders.length} selected takeaway orders?`)) return;
@@ -7531,7 +7624,7 @@ try {
               }`}>🔔</span>
               <span>
                 {(() => {
-                  const count = posOrders.filter(o => (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length;
+                  const count = posOrders.filter(o => !isReserved(o) && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length;
                   return count > 0 ? `${count} Due` : 'No Dues';
                 })()}
               </span>
@@ -7557,7 +7650,7 @@ try {
                       { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
                       { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
                     ].map(({ key, icon, label, activeCls, inactiveCls }) => {
-                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due')).length;
+                      const count = posOrders.filter(o => !isReserved(o) && o.orderType === key && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due')).length;
                       return (
                         <button
                           key={key}
@@ -7584,7 +7677,7 @@ try {
                   {(() => {
                     const type = dueOrdersTab;
                     const dueOrders = posOrders
-                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due'))
+                      .filter(o => !isReserved(o) && o.orderType === type && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due'))
                       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
                     if (dueOrders.length === 0) return (
@@ -10836,6 +10929,12 @@ try {
               >
                 👤 Assigned
               </button>
+              <button
+                onClick={() => setDeliverySubTab('reserved')}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'reserved' ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300'}`}
+              >
+                🔴 Reserved ({posOrders.filter((o) => o.orderType === 'Delivery' && isReserved(o)).length})
+              </button>
             </div>
           )}
 
@@ -10908,6 +11007,12 @@ try {
                       >
                         📋 All Orders
                       </button>
+                      <button
+                        onClick={() => { setDeliverySubTab('reserved'); setShowOrdersMobileFilters(false); }}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'reserved' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
+                      >
+                        🔴 Reserved Orders
+                      </button>
                     </div>
                   </div>
                 )}
@@ -10973,16 +11078,24 @@ try {
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
     const sortedDelivery = [...deliveryOrders].sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
+    const isReservedTab = deliverySubTab === 'reserved';
     const filteredOrders = sortedDelivery.filter((o) => {
       const status = String(o.status || '').toLowerCase();
-      const hasRider = Boolean(o.deliveryAgent);
-      const isNewOrdersTab = deliverySubTab === 'kitchen';
-      let matchesDeliveryTab = true;
-      if (isNewOrdersTab) {
-        matchesDeliveryTab = !hasRider || status === 'kitchen';
-      } else if (deliverySubTab === 'assigned') {
-        const isPaid = ['completed', 'payment collected'].includes(status);
-        matchesDeliveryTab = !isPaid && (hasRider || status === 'riders assigned');
+      const reservedFlag = isReserved(o);
+      if (reservedFlag && !isReservedTab) return false;
+      if (isReservedTab) {
+        if (status === 'cancelled') return false;
+      } else {
+        const hasRider = Boolean(o.deliveryAgent);
+        const isNewOrdersTab = deliverySubTab === 'kitchen';
+        let matchesDeliveryTab = true;
+        if (isNewOrdersTab) {
+          matchesDeliveryTab = !hasRider || status === 'kitchen';
+        } else if (deliverySubTab === 'assigned') {
+          const isPaid = ['completed', 'payment collected'].includes(status);
+          matchesDeliveryTab = !isPaid && (hasRider || status === 'riders assigned');
+        }
+        if (!matchesDeliveryTab) return false;
       }
       const matchesSearch = !orderSearch || 
         (String(o.orderNumber || o.id)).toLowerCase().includes(orderSearch.toLowerCase()) ||
@@ -11022,24 +11135,110 @@ try {
         const orderDate = o.createdAt ? new Date(o.createdAt) : o.date ? new Date(o.date) : null;
         matchesDate = orderDate ? orderDate >= from && orderDate <= to : false;
       }
-      return matchesDeliveryTab && matchesSearch && matchesRider && matchesPayment && matchesDate;
+      return matchesSearch && matchesRider && matchesPayment && matchesDate;
     });
-    const pageCount = orderPageSize > 0 ? Math.max(1, Math.ceil(filteredOrders.length / orderPageSize)) : 1;
-    const paginatedOrders = orderPageSize > 0 ? filteredOrders.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize) : filteredOrders;
+    const mergeBuckets = new Map();
+    const mergeOrdered = [];
+    for (const o of filteredOrders) {
+      const g = String(o.mergeGroupId || '');
+      if (g) {
+        if (!mergeBuckets.has(g)) mergeBuckets.set(g, []);
+        mergeBuckets.get(g).push(o);
+      } else {
+        mergeOrdered.push({ type: 'order', order: o });
+      }
+    }
+    for (const [g, members] of mergeBuckets.entries()) {
+      members.sort((a, b) => (new Date(a.createdAt || a.date || 0)) - (new Date(b.createdAt || b.date || 0)));
+      if (members.length > 1) mergeOrdered.push({ type: 'group', mergeGroupId: g, members });
+      else mergeOrdered.push({ type: 'order', order: members[0] });
+    }
+    const totalEntries = mergeOrdered.length;
+    const pageCount = orderPageSize > 0 ? Math.max(1, Math.ceil(totalEntries / orderPageSize)) : 1;
+    const paginatedItems = orderPageSize > 0 ? mergeOrdered.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize) : mergeOrdered;
+    const idsOf = (it) => it.type === 'group' ? it.members.map((m) => m.id) : [it.order.id];
+    const allPaginatedSelected = paginatedItems.length > 0 && paginatedItems.every((it) => idsOf(it).every((id) => selectedOrders.includes(id)));
+    const reservedCount = deliveryOrders.filter((o) => isReserved(o)).length;
+
+    const renderMergedGroupBlock = (group, variant) => {
+      const { mergeGroupId, members } = group;
+      const memberIds = members.map((m) => m.id);
+      const expanded = expandedMergeGroup === mergeGroupId;
+      const total = members.reduce((s, o) => s + (Number(o.total || o.amount) || 0), 0);
+      const allSel = memberIds.every((id) => selectedOrders.includes(id));
+      const riders = Array.from(new Set(members.map((m) => m.deliveryAgent).filter(Boolean))).join(', ');
+      const block = (
+        <div className="rounded-3xl border-2 border-purple-600 bg-violet-950/30 p-4 text-xs shadow-soft">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={allSel}
+                onChange={() => toggleGroupSelection(memberIds, allSel)}
+                className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-purple-500"
+              />
+              <div>
+                <div className="text-sm font-bold text-purple-300 uppercase tracking-wide">Merged Order · {members.length} orders</div>
+                <div className="mt-0.5 text-[11px] text-slate-400">{members[0].address || 'No address'}{members.length > 1 ? ` +${members.length - 1} more` : ''}</div>
+                {riders ? <div className="mt-0.5 text-[11px] text-blue-400">Rider: {riders}</div> : null}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-purple-300">{total} Rs</div>
+              <button onClick={() => setExpandedMergeGroup(expanded ? null : mergeGroupId)} className="mt-1 rounded-full border border-purple-600 px-3 py-1 text-[10px] font-semibold text-purple-300 hover:bg-purple-600 hover:text-white">
+                {expanded ? 'Close' : `View ${members.length} orders`}
+              </button>
+            </div>
+          </div>
+          {expanded && (
+            <div className="mt-3 space-y-2">
+              {members.map((m) => (
+                <div key={m.id} className="rounded-2xl border border-purple-900 bg-slate-900 p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <button type="button" onClick={() => setQuickOrderDetail(m)} className="font-bold text-slate-100 hover:text-emerald-300">{m.orderNumber || m.id}</button>
+                    <div className="font-semibold text-white">{Number(m.total || m.amount || 0)} Rs</div>
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-slate-400">{m.address || '-'} · {m.status || '-'} · {m.paymentStatus || '-'}</div>
+                  {(m.items || []).length > 0 && (
+                    <div className="mt-1.5 text-[11px] text-slate-300">{m.items.map((it) => `${it.quantity}x ${it.name || it.title || ''}`).join(', ')}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={() => openBulkRiderAssignmentModalFor(memberIds)} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-purple-500">Assign Rider</button>
+            <button onClick={() => bulkSetOrderReserved(memberIds, true)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-500">Mark Reserved</button>
+            <button onClick={() => members.forEach((m) => printReceipt(m))} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-emerald-500">Print All</button>
+            <button onClick={() => members.forEach(unmergeOrder)} className="rounded-full border border-amber-600 bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-500">Unmerge</button>
+            <button onClick={() => members.forEach((m) => deleteOrder(m.id))} className="rounded-full border border-rose-800 bg-rose-800 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-700">Delete Group</button>
+          </div>
+        </div>
+      );
+      if (variant === 'table') return <td colSpan={12}>{block}</td>;
+      return block;
+    };
+
+    const reserveBtn = (order) => (
+      <button type="button" title={isReserved(order) ? 'Unreserve order' : 'Mark order reserved'} onClick={() => toggleOrderReserved(order)} className="rounded-full border border-rose-600 bg-rose-700 px-3 py-2 text-white transition hover:bg-rose-600">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm-3 8V6a3 3 0 016 0v3H9zm3 4a2 2 0 011 3.732V19h-2v-2.268A2 2 0 0112 13z"/></svg>
+      </button>
+    );
+
     return (
       <>
         {/* Desktop */}
         <div className="hidden md:block space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-wrap">
-              {['kitchen', 'assigned', 'all'].map((status) => (
+              {['kitchen', 'assigned', 'reserved', 'all'].map((status) => (
                 <button
                   key={status}
                   onClick={() => setDeliverySubTab(status)}
-                  className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-transform transform hover:-translate-y-0.5 ${deliverySubTab === status ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg scale-105' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-transform transform hover:-translate-y-0.5 ${deliverySubTab === status ? (status === 'reserved' ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg scale-105' : 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg scale-105') : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                 >
-                  <span className="text-lg">{status === 'kitchen' ? '🆕' : status === 'assigned' ? '👤' : '📋'}</span>
-                  <span className="uppercase text-xs tracking-wide">{status === 'kitchen' ? 'New' : status === 'assigned' ? 'Assigned' : 'All'}</span>
+                  <span className="text-lg">{status === 'kitchen' ? '🆕' : status === 'assigned' ? '👤' : status === 'reserved' ? '🔴' : '📋'}</span>
+                  <span className="uppercase text-xs tracking-wide">{status === 'kitchen' ? 'New' : status === 'assigned' ? 'Assigned' : status === 'reserved' ? `Reserved (${reservedCount})` : 'All'}</span>
                 </button>
               ))}
 
@@ -11115,7 +11314,10 @@ try {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={clearOrderSelection} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Clear</button>
-                  <button onClick={openBulkRiderAssignmentModal} className="rounded-3xl border border-purple-600 bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500">Assign Rider</button>
+                  <button onClick={mergeSelectedOrders} className="rounded-3xl border border-purple-600 bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500">Merge</button>
+                  <button onClick={() => bulkSetReserved(true)} className="rounded-3xl border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">Mark Reserved</button>
+                  <button onClick={() => bulkSetReserved(false)} className="rounded-3xl border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500">Unreserve</button>
+                  <button onClick={openBulkRiderAssignmentModal} className="rounded-3xl border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500">Assign Rider</button>
                 </div>
               </div>
           )}
@@ -11128,8 +11330,8 @@ try {
                     <th className="px-2 py-2">
                         <input
                           type="checkbox"
-                          checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
-                          onChange={(e) => e.target.checked ? selectAllOrders(paginatedOrders) : clearOrderSelection()}
+                          checked={allPaginatedSelected}
+                          onChange={(e) => e.target.checked ? selectAllOrders(paginatedItems.flatMap((it) => idsOf(it).map((id) => ({ id })))) : clearOrderSelection()}
                           className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
                         />
                     </th>
@@ -11147,7 +11349,12 @@ try {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {paginatedOrders.map((order) => (
+                  {paginatedItems.map((it) => {
+                    if (it.type === 'group') {
+                      return <tr key={it.mergeGroupId} className="hover:bg-slate-950/40 transition">{renderMergedGroupBlock(it, 'table')}</tr>;
+                    }
+                    const order = it.order;
+                    return (
                     <tr key={order.id} className="hover:bg-slate-950/80 transition">
                       <td className="px-2 py-2">
                           <input
@@ -11188,6 +11395,7 @@ try {
                       <td className="px-2 py-2">
                         <div className="flex flex-wrap gap-2">
                           {renderOrderEditButton(order)}
+                          {reserveBtn(order)}
                           <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">
                             <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                           </button>
@@ -11202,13 +11410,16 @@ try {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-3">
-              {paginatedOrders.map((order) => {
+              {paginatedItems.map((it) => {
+                if (it.type === 'group') return <div key={it.mergeGroupId} className="lg:col-span-3">{renderMergedGroupBlock(it, 'tile')}</div>;
+                const order = it.order;
                 const paidStatus = ['Completed', 'Payment Collected', 'Delivered'].includes(order.status) ? 'Paid' : 'Due';
                 const isSelected = selectedOrders.includes(order.id);
                 return (
@@ -11285,6 +11496,9 @@ try {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
+                        <button type="button" title="Reserve/Unreserve order" onClick={() => toggleOrderReserved(order)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-700 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-600`}>
+                          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm-3 8V6a3 3 0 016 0v3H9zm3 4a2 2 0 011 3.732V19h-2v-2.268A2 2 0 0112 13z"/></svg>
+                        </button>
                         <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-500`}>
                           <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                         </button>
@@ -11305,7 +11519,7 @@ try {
             </div>
           )}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
-            <div>{filteredOrders.length ? (orderPageSize > 0 ? `Showing ${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, filteredOrders.length)} of ${filteredOrders.length} orders` : `Showing 1-${filteredOrders.length} of ${filteredOrders.length} orders`) : 'No orders available'}</div>
+            <div>{totalEntries ? (orderPageSize > 0 ? `Showing ${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, totalEntries)} of ${totalEntries} items` : `Showing 1-${totalEntries} of ${totalEntries} items`) : 'No orders available'}</div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Per page:</span>
               {[20, 50, 100, 'All'].map((size) => (
@@ -11335,18 +11549,23 @@ try {
           {selectedOrders.length > 0 && (
             <div className="flex flex-wrap items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 gap-2">
               <div className="text-xs text-slate-300">{selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected</div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button onClick={clearOrderSelection} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">Clear</button>
-                <button onClick={openBulkRiderAssignmentModal} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1 text-xs font-semibold text-white">Assign Rider</button>
-                <button onClick={deleteMultipleOrders} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white">Delete</button>
+                <button onClick={mergeSelectedOrders} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1 text-xs font-semibold text-white">Merge</button>
+                <button onClick={() => bulkSetReserved(true)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white">Reserve</button>
+                <button onClick={() => bulkSetReserved(false)} className="rounded-full border border-amber-600 bg-amber-600 px-3 py-1 text-xs font-semibold text-white">Unreserve</button>
+                <button onClick={openBulkRiderAssignmentModal} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">Assign Rider</button>
+                <button onClick={deleteMultipleOrders} className="rounded-full border border-rose-800 bg-rose-800 px-3 py-1 text-xs font-semibold text-white">Delete</button>
               </div>
             </div>
           )}
 
-          {paginatedOrders.length === 0 ? (
+          {paginatedItems.length === 0 ? (
             <div className="text-center text-sm text-slate-500 py-8">No orders found</div>
           ) : (
-            paginatedOrders.map((order) => {
+            paginatedItems.map((it) => {
+              if (it.type === 'group') return <div key={it.mergeGroupId}>{renderMergedGroupBlock(it, 'mobile')}</div>;
+              const order = it.order;
               const paidStatusClass = ['Completed', 'Payment Collected', 'Delivered'].includes(order.status) ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300';
               return (
                 <div key={order.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200">
@@ -11410,6 +11629,10 @@ try {
                                   Assign Rider
                                 </button>
                               )}
+                              <button onClick={() => { toggleOrderReserved(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-rose-300 hover:bg-slate-800 flex items-center gap-1.5">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm-3 8V6a3 3 0 016 0v3H9zm3 4a2 2 0 011 3.732V19h-2v-2.268A2 2 0 0112 13z"/></svg>
+                                {isReserved(order) ? 'Unreserve' : 'Reserve'}
+                              </button>
                               <div className="border-t border-slate-800" />
                               <button onClick={() => { openShiftOrderPopup(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-cyan-300 hover:bg-slate-800 flex items-center gap-1.5">
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
@@ -11426,9 +11649,9 @@ try {
             })
           )}
 
-          {paginatedOrders.length > 0 && (
+          {paginatedItems.length > 0 && (
             <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-300">
-              <div>{filteredOrders.length ? `${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, filteredOrders.length)} of ${filteredOrders.length}` : 'No orders'}</div>
+              <div>{totalEntries ? `${orderPageIndex * orderPageSize + 1}-${Math.min((orderPageIndex + 1) * orderPageSize, totalEntries)} of ${totalEntries}` : 'No orders'}</div>
               <div className="flex items-center gap-2">
                 <button disabled={orderPageIndex === 0 || pageCount === 1} onClick={() => setOrderPageIndex((prev) => Math.max(prev - 1, 0))} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200 disabled:opacity-50">←</button>
                 <span className="text-[10px] text-slate-400">{orderPageIndex + 1}/{pageCount}</span>
