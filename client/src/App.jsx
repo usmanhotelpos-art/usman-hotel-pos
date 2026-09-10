@@ -330,7 +330,6 @@ function App() {
   const pollingRef = useRef(null);
 
   const normalizeText = (value) => String(value || '').trim().toLowerCase();
-  const isReserved = (o) => o?.reserved === true || String(o?.reserved) === 'true';
   const getTableLabel = (table) => String(table.label || table.name || table.number || `Table ${table.id}`);
 
   const Sparkline = ({ values = [], color = '#34D399', width = 120, height = 36 }) => {
@@ -1247,7 +1246,6 @@ function App() {
 
   useEffect(() => {
     const dueExist = posOrders.some(o =>
-      !isReserved(o) &&
       (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') &&
       (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')
     );
@@ -1258,7 +1256,6 @@ function App() {
   }, [posOrders, dueHornPlayed]);
 
   const isLateOrder = (order) => {
-    if (isReserved(order)) return false;
     if (!order.createdAt) return false;
     const created = new Date(order.createdAt);
     const now = Date.now();
@@ -4599,42 +4596,6 @@ try {
     allSel ? prev.filter(id => !memberIds.includes(id)) : Array.from(new Set([...prev, ...memberIds]))
   );
 
-  async function toggleOrderReserved(order) {
-    if (!order?.id) return;
-    const reserve = !isReserved(order);
-    try {
-      await fetchJson(`${apiBase}/pos/orders/${order.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ reserved: reserve, reservedAt: reserve ? new Date().toISOString() : '' })
-      });
-      setMessage(reserve ? `Order ${order.orderNumber || order.id} reserved.` : `Order ${order.orderNumber || order.id} unreserved.`);
-      await loadOrdersData();
-    } catch (error) {
-      setMessage(error.message);
-    }
-  };
-
-  async function bulkSetOrderReserved(ids, reserve) {
-    if (!ids.length) return;
-    setLoading(true);
-    setMessage('');
-    try {
-      await Promise.all(ids.map(id => fetchJson(`${apiBase}/pos/orders/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ reserved: reserve, reservedAt: reserve ? new Date().toISOString() : '' })
-      })));
-      setMessage(reserve ? `Marked ${ids.length} orders reserved.` : `Unreserved ${ids.length} orders.`);
-      setSelectedOrders([]);
-      await loadOrdersData();
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const bulkSetReserved = (v) => bulkSetOrderReserved(selectedOrders, v);
-
   async function mergeSelectedOrders() {
     if (!selectedOrders.length) return;
     if (selectedOrders.length < 2) {
@@ -7624,7 +7585,7 @@ try {
               }`}>🔔</span>
               <span>
                 {(() => {
-                  const count = posOrders.filter(o => !isReserved(o) && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length;
+                  const count = posOrders.filter(o => (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due') && (o.orderType === 'Dine-In' || o.orderType === 'Takeaway' || o.orderType === 'Delivery')).length;
                   return count > 0 ? `${count} Due` : 'No Dues';
                 })()}
               </span>
@@ -7650,7 +7611,7 @@ try {
                       { key: 'Takeaway', icon: '🛍️', label: 'Take Away', activeCls: 'from-amber-600 to-orange-600', inactiveCls: 'border-slate-700 text-slate-400' },
                       { key: 'Delivery', icon: '🚚', label: 'Delivery', activeCls: 'from-sky-600 to-blue-600', inactiveCls: 'border-slate-700 text-slate-400' },
                     ].map(({ key, icon, label, activeCls, inactiveCls }) => {
-                      const count = posOrders.filter(o => !isReserved(o) && o.orderType === key && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due')).length;
+                      const count = posOrders.filter(o => o.orderType === key && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due')).length;
                       return (
                         <button
                           key={key}
@@ -7677,7 +7638,7 @@ try {
                   {(() => {
                     const type = dueOrdersTab;
                     const dueOrders = posOrders
-                      .filter(o => !isReserved(o) && o.orderType === type && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due'))
+                      .filter(o => o.orderType === type && (o.status === 'Payment Pending' || o.status === 'Due' || o.paymentStatus === 'Due'))
                       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
                     if (dueOrders.length === 0) return (
@@ -10929,12 +10890,6 @@ try {
               >
                 👤 Assigned
               </button>
-              <button
-                onClick={() => setDeliverySubTab('reserved')}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'reserved' ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300'}`}
-              >
-                🔴 Reserved ({posOrders.filter((o) => o.orderType === 'Delivery' && isReserved(o)).length})
-              </button>
             </div>
           )}
 
@@ -11007,12 +10962,6 @@ try {
                       >
                         📋 All Orders
                       </button>
-                      <button
-                        onClick={() => { setDeliverySubTab('reserved'); setShowOrdersMobileFilters(false); }}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${deliverySubTab === 'reserved' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}
-                      >
-                        🔴 Reserved Orders
-                      </button>
                     </div>
                   </div>
                 )}
@@ -11078,25 +11027,18 @@ try {
   function renderDeliveryOrders() {
     const deliveryOrders = posOrders.filter((o) => o.orderType === 'Delivery');
     const sortedDelivery = [...deliveryOrders].sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
-    const isReservedTab = deliverySubTab === 'reserved';
     const filteredOrders = sortedDelivery.filter((o) => {
       const status = String(o.status || '').toLowerCase();
-      const reservedFlag = isReserved(o);
-      if (reservedFlag && !isReservedTab) return false;
-      if (isReservedTab) {
-        if (status === 'cancelled') return false;
-      } else {
-        const hasRider = Boolean(o.deliveryAgent);
-        const isNewOrdersTab = deliverySubTab === 'kitchen';
-        let matchesDeliveryTab = true;
-        if (isNewOrdersTab) {
-          matchesDeliveryTab = !hasRider || status === 'kitchen';
-        } else if (deliverySubTab === 'assigned') {
-          const isPaid = ['completed', 'payment collected'].includes(status);
-          matchesDeliveryTab = !isPaid && (hasRider || status === 'riders assigned');
-        }
-        if (!matchesDeliveryTab) return false;
+      const hasRider = Boolean(o.deliveryAgent);
+      const isNewOrdersTab = deliverySubTab === 'kitchen';
+      let matchesDeliveryTab = true;
+      if (isNewOrdersTab) {
+        matchesDeliveryTab = !hasRider || status === 'kitchen';
+      } else if (deliverySubTab === 'assigned') {
+        const isPaid = ['completed', 'payment collected'].includes(status);
+        matchesDeliveryTab = !isPaid && (hasRider || status === 'riders assigned');
       }
+      if (!matchesDeliveryTab) return false;
       const matchesSearch = !orderSearch || 
         (String(o.orderNumber || o.id)).toLowerCase().includes(orderSearch.toLowerCase()) ||
         (o.customerName || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
@@ -11158,7 +11100,6 @@ try {
     const paginatedItems = orderPageSize > 0 ? mergeOrdered.slice(orderPageIndex * orderPageSize, (orderPageIndex + 1) * orderPageSize) : mergeOrdered;
     const idsOf = (it) => it.type === 'group' ? it.members.map((m) => m.id) : [it.order.id];
     const allPaginatedSelected = paginatedItems.length > 0 && paginatedItems.every((it) => idsOf(it).every((id) => selectedOrders.includes(id)));
-    const reservedCount = deliveryOrders.filter((o) => isReserved(o)).length;
 
     const renderMergedGroupBlock = (group, variant) => {
       const { mergeGroupId, members } = group;
@@ -11208,7 +11149,6 @@ try {
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={() => openBulkRiderAssignmentModalFor(memberIds)} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-purple-500">Assign Rider</button>
-            <button onClick={() => bulkSetOrderReserved(memberIds, true)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-500">Mark Reserved</button>
             <button onClick={() => members.forEach((m) => printReceipt(m))} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-emerald-500">Print All</button>
             <button onClick={() => members.forEach(unmergeOrder)} className="rounded-full border border-amber-600 bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-500">Unmerge</button>
             <button onClick={() => members.forEach((m) => deleteOrder(m.id))} className="rounded-full border border-rose-800 bg-rose-800 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-700">Delete Group</button>
@@ -11219,26 +11159,20 @@ try {
       return block;
     };
 
-    const reserveBtn = (order) => (
-      <button type="button" title={isReserved(order) ? 'Unreserve order' : 'Mark order reserved'} onClick={() => toggleOrderReserved(order)} className="rounded-full border border-rose-600 bg-rose-700 px-3 py-2 text-white transition hover:bg-rose-600">
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm-3 8V6a3 3 0 016 0v3H9zm3 4a2 2 0 011 3.732V19h-2v-2.268A2 2 0 0112 13z"/></svg>
-      </button>
-    );
-
     return (
       <>
         {/* Desktop */}
         <div className="hidden md:block space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-wrap">
-              {['kitchen', 'assigned', 'reserved', 'all'].map((status) => (
+              {['kitchen', 'assigned', 'all'].map((status) => (
                 <button
                   key={status}
                   onClick={() => setDeliverySubTab(status)}
-                  className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-transform transform hover:-translate-y-0.5 ${deliverySubTab === status ? (status === 'reserved' ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg scale-105' : 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg scale-105') : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-transform transform hover:-translate-y-0.5 ${deliverySubTab === status ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg scale-105' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                 >
-                  <span className="text-lg">{status === 'kitchen' ? '🆕' : status === 'assigned' ? '👤' : status === 'reserved' ? '🔴' : '📋'}</span>
-                  <span className="uppercase text-xs tracking-wide">{status === 'kitchen' ? 'New' : status === 'assigned' ? 'Assigned' : status === 'reserved' ? `Reserved (${reservedCount})` : 'All'}</span>
+                  <span className="text-lg">{status === 'kitchen' ? '🆕' : status === 'assigned' ? '👤' : '📋'}</span>
+                  <span className="uppercase text-xs tracking-wide">{status === 'kitchen' ? 'New' : status === 'assigned' ? 'Assigned' : 'All'}</span>
                 </button>
               ))}
 
@@ -11315,8 +11249,6 @@ try {
                 <div className="flex flex-wrap gap-2">
                   <button onClick={clearOrderSelection} className="rounded-3xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Clear</button>
                   <button onClick={mergeSelectedOrders} className="rounded-3xl border border-purple-600 bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500">Merge</button>
-                  <button onClick={() => bulkSetReserved(true)} className="rounded-3xl border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">Mark Reserved</button>
-                  <button onClick={() => bulkSetReserved(false)} className="rounded-3xl border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-500">Unreserve</button>
                   <button onClick={openBulkRiderAssignmentModal} className="rounded-3xl border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500">Assign Rider</button>
                 </div>
               </div>
@@ -11395,7 +11327,6 @@ try {
                       <td className="px-2 py-2">
                         <div className="flex flex-wrap gap-2">
                           {renderOrderEditButton(order)}
-                          {reserveBtn(order)}
                           <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-500">
                             <svg viewBox="0 0 24 24" className="h-4 w-4"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                           </button>
@@ -11496,9 +11427,6 @@ try {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
-                        <button type="button" title="Reserve/Unreserve order" onClick={() => toggleOrderReserved(order)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-700 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-600`}>
-                          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm-3 8V6a3 3 0 016 0v3H9zm3 4a2 2 0 011 3.732V19h-2v-2.268A2 2 0 0112 13z"/></svg>
-                        </button>
                         <button type="button" title="Delete order" onClick={() => deleteOrder(order.id)} className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-600 bg-rose-600 text-white shadow-[0_12px_18px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:bg-rose-500`}>
                           <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                         </button>
@@ -11552,8 +11480,6 @@ try {
               <div className="flex gap-2 flex-wrap">
                 <button onClick={clearOrderSelection} className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">Clear</button>
                 <button onClick={mergeSelectedOrders} className="rounded-full border border-purple-600 bg-purple-600 px-3 py-1 text-xs font-semibold text-white">Merge</button>
-                <button onClick={() => bulkSetReserved(true)} className="rounded-full border border-rose-600 bg-rose-600 px-3 py-1 text-xs font-semibold text-white">Reserve</button>
-                <button onClick={() => bulkSetReserved(false)} className="rounded-full border border-amber-600 bg-amber-600 px-3 py-1 text-xs font-semibold text-white">Unreserve</button>
                 <button onClick={openBulkRiderAssignmentModal} className="rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">Assign Rider</button>
                 <button onClick={deleteMultipleOrders} className="rounded-full border border-rose-800 bg-rose-800 px-3 py-1 text-xs font-semibold text-white">Delete</button>
               </div>
@@ -11629,10 +11555,6 @@ try {
                                   Assign Rider
                                 </button>
                               )}
-                              <button onClick={() => { toggleOrderReserved(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-rose-300 hover:bg-slate-800 flex items-center gap-1.5">
-                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm-3 8V6a3 3 0 016 0v3H9zm3 4a2 2 0 011 3.732V19h-2v-2.268A2 2 0 0112 13z"/></svg>
-                                {isReserved(order) ? 'Unreserve' : 'Reserve'}
-                              </button>
                               <div className="border-t border-slate-800" />
                               <button onClick={() => { openShiftOrderPopup(order); setDeliveryActionOpen(null); }} className="w-full px-3 py-1.5 text-left text-[11px] text-cyan-300 hover:bg-slate-800 flex items-center gap-1.5">
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
