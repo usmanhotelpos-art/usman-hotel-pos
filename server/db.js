@@ -13,20 +13,42 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbFile = path.join(__dirname, 'data', 'db.json');
 const postgresUrl = process.env.DATABASE_URL || process.env.PG_CONNECTION_STRING || '';
 
+// Decide whether SSL is needed based on the connection host. Locally-hosted
+// Postgres (localhost/127.0.0.1/10.x/192.168.x) usually has SSL disabled,
+// while hosted providers (Railway, Neon, Suaas, etc.) require it.
+function shouldUseSsl(connectionString) {
+  try {
+    const parsed = new URL(connectionString);
+    const host = parsed.hostname || '';
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return false;
+    if (host.startsWith('10.') || host.startsWith('192.168.')) return false;
+    const parts = host.split('.');
+    if (parts.length === 4 && parts[0] === '172') {
+      const second = Number(parts[1]);
+      if (second >= 16 && second <= 31) return false;
+    }
+    return true;
+  } catch (_) {
+    return true;
+  }
+}
+
 // Railway and most hosted Postgres providers expose a connection string through
 // DATABASE_URL or PG_CONNECTION_STRING. If provided, the app will use Postgres
 // for persistence; otherwise it falls back to local JSON storage for development.
 const pgClient = postgresUrl
   ? new Client({
       connectionString: postgresUrl,
-      ssl: {
-        rejectUnauthorized: false
-      }
+      ssl: shouldUseSsl(postgresUrl)
+        ? { rejectUnauthorized: false }
+        : false
     })
   : null;
 
 let dbCache = null;
 let pgConnected = false;
+let persistOk = true;
+let pendingPersists = 0;
 
 const defaultData = {
   settings: {
@@ -342,7 +364,9 @@ async function loadDbFromPostgres() {
 }
 
 async function saveDbToPostgres(data) {
-  if (!pgClient || !pgConnected) return;
+  if (!pgClient || !pgConnected) {
+    throw new Error('Postgres not connected');
+  }
   try {
     await pgClient.query(
       `INSERT INTO pos_data(id, payload) VALUES ($1, $2)
@@ -351,6 +375,7 @@ async function saveDbToPostgres(data) {
     );
   } catch (error) {
     console.error('Failed to save DB to Postgres:', error);
+    throw error;
   }
 }
 
@@ -405,14 +430,35 @@ export function writeDb(data) {
   }
 
   dbCache = data;
-  if (pgConnected) {
-    return saveDbToPostgres(data).catch((error) => {
-      console.error('Failed to persist DB to Postgres:', error);
-    });
+  if (pgClient) {
+    if (!pgConnected) {
+      persistOk = false;
+      writeDbFile(data);
+      return Promise.resolve(false);
+    }
+    pendingPersists++;
+    return saveDbToPostgres(data)
+      .then(() => {
+        persistOk = true;
+      })
+      .catch((error) => {
+        persistOk = false;
+        console.error('Failed to save DB to Postgres:', error);
+      })
+      .finally(() => {
+        pendingPersists--;
+      });
   }
 
   writeDbFile(data);
-  return Promise.resolve();
+  return Promise.resolve(true);
+}
+
+export async function waitForPersist() {
+  while (pendingPersists > 0) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  return persistOk;
 }
 
 export function getCollection(name) {

@@ -244,6 +244,11 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   bool _busy = false;
   final Set<String> _fadingIds = {};
 
+  bool _dbWarning = false;
+  bool _dbBlink = true;
+  Timer? _dbBlinkTimer;
+  int _dbUnsyncedOrders = 0;
+
   void _fadeOutOrders(List<Map<String, dynamic>> list) {
     final ids = list.map((o) => sOf(o['id'])).where((x) => x.isNotEmpty).toList();
     if (ids.isEmpty) return;
@@ -274,6 +279,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     _ordersTimer?.cancel();
     _messageTimer?.cancel();
     _pressTimer?.cancel();
+    _dbBlinkTimer?.cancel();
     for (final t in _feedbackTimers) t.cancel();
     _now.dispose();
     for (final c in fieldCtrls.values) c.dispose();
@@ -286,6 +292,33 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     _messageTimer?.cancel();
     _messageTimer = Timer(Duration(seconds: seconds), () {
       if (mounted) setState(() => message = '');
+    });
+  }
+
+  void _setDbWarning(bool show) {
+    if (!mounted) return;
+    if (_dbWarning == show) {
+      if (show) setState(() => _dbBlink = !_dbBlink);
+      return;
+    }
+    setState(() {
+      _dbWarning = show;
+      _dbBlink = true;
+    });
+    _dbBlinkTimer?.cancel();
+    if (show) {
+      _dbBlinkTimer = Timer.periodic(const Duration(milliseconds: 600), (_) {
+        if (mounted) setState(() => _dbBlink = !_dbBlink);
+      });
+    }
+  }
+
+  void _dismissDbWarning() {
+    _dbBlinkTimer?.cancel();
+    setState(() {
+      _dbWarning = false;
+      _dbBlink = true;
+      _dbUnsyncedOrders = 0;
     });
   }
 
@@ -731,6 +764,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         if (paid && cashReceived > 0) 'cashReceived': cashReceived,
       };
       final created = await _fetch('/pos/orders', method: 'POST', body: payload);
+      final dbSaveFailed = created is Map &&
+          (created['notPersisted'] == true || created['persisted'] == false);
+      if (dbSaveFailed) _dbUnsyncedOrders++;
+      _setDbWarning(dbSaveFailed);
       if (created is Map && sOf(created['source']).trim().isEmpty) {
         final cid = sOf(created['id']);
         if (cid.isNotEmpty) {
@@ -772,11 +809,13 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         _addrSuggestions = [];
         showCart = false;
       });
-      toast(paid
-          ? 'Order created & paid \u2705'
-          : orderType == 'Takeaway'
-              ? 'Takeaway order (Pay Later) created \u{1F6CD}'
-              : 'Order created successfully \u2705');
+      toast(dbSaveFailed
+          ? '\u26A0\uFE0F Order created in memory ONLY \u2014 NOT saved to database!'
+          : (paid
+              ? 'Order created & paid \u2705'
+              : orderType == 'Takeaway'
+                  ? 'Takeaway order (Pay Later) created \u{1F6CD}'
+                  : 'Order created successfully \u2705'));
       if ((btConnected || btInfo != null || settings['btPrintEnabled'] == true) &&
           created is Map) {
         final printOrder = Map<String, dynamic>.from(created);
@@ -1120,6 +1159,37 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     }
   }
 
+  Future<void> _bulkMarkReserved() async => _bulkMarkReservedList(_selectedOrdersList);
+
+  Future<void> _bulkMarkReservedList(List<Map<String, dynamic>> list) async {
+    if (list.isEmpty) return;
+    if (_busy) return;
+    setState(() => _busy = true);
+    final now = DateTime.now().toUtc().toIso8601String();
+    final ids = list.map((o) => sOf(o['id'])).where((x) => x.isNotEmpty).toList();
+    _fadeOutOrders(list);
+    try {
+      await Future.wait(ids.map((id) => _fetch('/pos/orders/$id', method: 'PUT', body: {'reserved': true, 'reservedAt': now}).catchError((_) => null)));
+      if (!mounted) return;
+      setState(() {
+        for (final o in orders.whereType<Map>()) {
+          if (ids.contains(sOf(o['id']))) {
+            o['reserved'] = true;
+            o['reservedAt'] = now;
+          }
+        }
+        selectMode = false;
+        _selectedOrderIds.clear();
+      });
+      toast('${ids.length} order(s) marked reserved \u{1F512}');
+      await _refreshOrdersOnly();
+    } catch (e) {
+      toast(e.toString(), seconds: 6);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   // ------------------------------------------------------------- riders list
   List<String> get ridersList {
     final names = <String, bool>{};
@@ -1291,6 +1361,11 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   bool _isManager() {
     final role = sOf(user['role']).toLowerCase();
     return role.contains('manager') || role.contains('admin');
+  }
+
+  bool _isCashier() {
+    final role = sOf(user['role']).toLowerCase();
+    return role.contains('cashier');
   }
 
   // ----------------------------------------------------------- orders screen
@@ -1500,6 +1575,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           children: [
             Column(
               children: [
+                if (_dbWarning) _dbWarningStrip(),
                 _header(),
                 _typeTabs(),
                 _searchBar(),
@@ -1535,6 +1611,38 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             if (showOrdersScreen) _ordersScreen(),
             if (message.isNotEmpty) _toastOverlay(),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dbWarningStrip() {
+    final count = _dbUnsyncedOrders;
+    return GestureDetector(
+      onTap: _dismissDbWarning,
+      child: Material(
+        color: _dbBlink ? const Color(0xFFDC2626) : const Color(0xFF7F1D1D),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              const Text('\u26A0\uFE0F',
+                  style: TextStyle(fontSize: 18, color: Colors.white)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  count > 0
+                      ? 'ORDER NOT SAVED TO DATABASE! $count order(s) sirf server memory mein hain. Postgres check karein.'
+                      : 'ORDER NOT SAVED TO DATABASE! Server se Postgres save fail ho raha hai.',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const Text('\u2715',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+            ],
+          ),
         ),
       ),
     );
@@ -1605,51 +1713,102 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
       child: Row(
-        children: orderTypes.map((t) {
-          final sel = activeType == t;
-          final emoji = t == 'Delivery'
-              ? '\u{1F4E6}'
-              : t == 'Parcel'
-                  ? '\u{1F4E6}'
-                  : t == 'Table'
-                      ? '\u{1F37D}'
-                      : '\u{1F6CD}';
-          final count = carts[t]?.length ?? 0;
-          return Expanded(
-            child: GestureDetector(
+        children: [
+          ...orderTypes.map((t) {
+            final sel = activeType == t;
+            final count = carts[t]?.length ?? 0;
+            return GestureDetector(
               onTap: () => setState(() {
                 activeType = t;
                 showCart = false;
                 selectedCategory = posCategories.isNotEmpty ? posCategories.first : 'All';
               }),
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                margin: const EdgeInsets.only(right: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: sel ? const Color(0xFF059669) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(100),
                 ),
-                child: Column(children: [
-                  Text(emoji, style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 2),
-                  Text(t,
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: sel ? Colors.white : const Color(0xFF475569))),
-                  if (count > 0)
-                    Text('$count',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('\u{1F4E6}', style: TextStyle(fontSize: 13)),
+                    const SizedBox(width: 4),
+                    Text(t,
                         style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: sel ? Colors.white70 : const Color(0xFF94A3B8))),
-                ]),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: sel ? Colors.white : const Color(0xFF475569))),
+                    if (count > 0) ...[
+                      const SizedBox(width: 4),
+                      Text('$count',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: sel ? Colors.white70 : const Color(0xFF94A3B8))),
+                    ],
+                  ],
+                ),
               ),
+            );
+          }),
+          const Spacer(),
+          GestureDetector(
+            onTap: _openQuickDueScreen,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(
+                color: Color(0xFFDC2626),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: Color(0x66DC2626), blurRadius: 10, offset: Offset(0, 2)),
+                ],
+              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 22),
             ),
-          );
-        }).toList(),
+          ),
+        ],
       ),
     );
+  }
+
+  void _openQuickDueScreen() {
+    final cartItems = carts['Delivery'] ?? const <Map<String, dynamic>>[];
+    final snapCart = cartItems.map((e) => Map<String, dynamic>.from(e)).toList();
+    final cartTotal = snapCart.fold<num>(0, (s, i) => s + (numOf(i['price']) * numOf(i['quantity'])));
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+          builder: (_) => QuickPickupDueScreen(
+            token: token,
+            user: user,
+            customers: customers,
+            zones: deliveryZones,
+            cartItems: snapCart,
+            cartTotal: cartTotal,
+            initialAddress: _c('address').text.trim(),
+            initialPhone: _c('phone').text.trim(),
+            initialZone: selectedZone,
+            initialNotes: _c('notes').text.trim(),
+            onOrderPlaced: () {
+              if (mounted) {
+                setState(() {
+                  carts['Delivery'] = [];
+                  showCart = false;
+                  selectedZone = '';
+                  selectedRider = '';
+                  for (final k in ['cust', 'phone', 'address', 'table', 'notes', 'fee', 'zone']) {
+                    _c(k).clear();
+                  }
+                });
+              }
+            },
+          ),
+        ))
+        .then((_) {
+      if (mounted) _refreshOrdersOnly();
+    });
   }
 
   Widget _searchBar() {
@@ -1934,19 +2093,28 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                   margin: const EdgeInsets.symmetric(vertical: 10),
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: editingOrder != null
-                        ? updateOrder
-                        : () => createOrder('Delivery', paid: false),
-                    icon: Icon(
-                        editingOrder != null ? Icons.save : Icons.shopping_cart_checkout,
-                        color: Colors.white,
-                        size: 20),
+                    onPressed: _busy
+                        ? null
+                        : (editingOrder != null ? updateOrder : () => createOrder('Delivery', paid: false)),
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white70))
+                        : Icon(
+                            editingOrder != null ? Icons.save : Icons.shopping_cart_checkout,
+                            color: Colors.white,
+                            size: 20),
                     label: Text(
-                        editingOrder != null ? 'Update Order' : 'Create Delivery Order',
+                        _busy
+                            ? 'Creating\u2026'
+                            : (editingOrder != null ? 'Update Order' : 'Create Delivery Order'),
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF059669),
+                      backgroundColor: _busy ? const Color(0xFF94A3B8) : const Color(0xFF059669),
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFCBD5E1),
+                      disabledForegroundColor: Colors.white70,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -2595,8 +2763,9 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             child: Wrap(spacing: 8, runSpacing: 8, children: [
-              _actBtn('Mark Paid', const Color(0xFF059669),
-                  () => _bulkMarkPaidList(members)),
+              if (!_isCashier())
+                _actBtn('Mark Paid', const Color(0xFF059669),
+                    () => _bulkMarkPaidList(members)),
               _actBtn('Mark Due', const Color(0xFFF59E0B),
                   () => _bulkMarkDueList(members)),
               _actBtn('Assign Rider', const Color(0xFF2563EB),
@@ -2733,8 +2902,11 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         Wrap(spacing: 8, runSpacing: 8, children: [
           _actBtn('Select All', const Color(0xFF0EA5E9),
               filteredVisibleOrders.isEmpty ? null : _toggleSelectAll, glow: true),
-          _actBtn('Assign', const Color(0xFF2563EB), _selectedOrderIds.isEmpty ? null : _bulkRider, glow: true),
-          _actBtn('Mark Paid', const Color(0xFF059669), _selectedOrderIds.isEmpty ? null : _bulkMarkPaid, glow: true),
+          if (!_isCashier())
+            _actBtn('Assign', const Color(0xFF2563EB), _selectedOrderIds.isEmpty ? null : _bulkRider, glow: true),
+          if (!_isCashier())
+            _actBtn('Mark Paid', const Color(0xFF059669), _selectedOrderIds.isEmpty ? null : _bulkMarkPaid, glow: true),
+          _actBtn('Reserve', const Color(0xFF991B1B), _selectedOrderIds.isEmpty ? null : _bulkMarkReserved, glow: true),
           _actBtn('Due', const Color(0xFFF59E0B), _selectedOrderIds.isEmpty ? null : _bulkMarkDue, glow: true),
           if (_isManager())
             _actBtn('Delete', const Color(0xFFDC2626), _selectedOrderIds.isEmpty ? null : _bulkDelete, glow: true),
@@ -2874,25 +3046,27 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
               try { await printOrderBT(o); toast('Printed'); } catch (e) { toast('$e', seconds: 6); }
             }),
             _actBtn('Mark Due', const Color(0xFFF59E0B), () => markDue(o)),
-            _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
+            if (!_isCashier())
+              _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
             _actBtn('Unreserve', const Color(0xFF991B1B), () => unmarkReserved(o)),
             if (_isManager())
               _actBtn('Delete', const Color(0xFF7F1D1D), () => _deleteOrder(o)),
           ] else ...[
             if (type == 'Delivery' && !_isDeliveryPaid(o) && !_isDeliveredOrDone(o))
               _actBtn(rider.isEmpty ? 'Assign Rider' : 'Change Rider', const Color(0xFF2563EB), () => _pickRiderAndAssign(o)),
-            if (_isManager() && type == 'Delivery' && !_isDeliveryPaid(o) && !_isDeliveryDue(o) && !_isDeliveredOrDone(o)) ...[
+            if (_isManager() && !_isCashier() && type == 'Delivery' && !_isDeliveryPaid(o) && !_isDeliveryDue(o) && !_isDeliveredOrDone(o)) ...[
               _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
               _actBtn('Due', const Color(0xFFF59E0B), () => markDue(o)),
             ],
-            if (_isManager() && type == 'Delivery' && _isDeliveryDue(o))
+            if (_isManager() && !_isCashier() && type == 'Delivery' && _isDeliveryDue(o))
               _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
             if (type != 'Delivery' && !_isPaidOrDone(o)) ...[
-              _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
+              if (!_isCashier())
+                _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
               if (!_isDueStatus(o))
                 _actBtn('Mark Due', const Color(0xFFF59E0B), () => markDue(o)),
             ],
-            if (_isManager() && type != 'Delivery' && _isDueStatus(o))
+            if (_isManager() && !_isCashier() && type != 'Delivery' && _isDueStatus(o))
               _actBtn('Mark Paid', const Color(0xFF059669), () => markPaid(o)),
             _actBtn(o['reserved'] == true ? 'Unreserve' : 'Reserve', const Color(0xFF991B1B), () =>
                 o['reserved'] == true ? unmarkReserved(o) : markReserved(o)),
@@ -3067,6 +3241,488 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+}
+
+class QuickPickupDueScreen extends StatefulWidget {
+  final String token;
+  final Map<String, dynamic> user;
+  final List<dynamic> customers;
+  final List<Map<String, dynamic>> zones;
+  final List<Map<String, dynamic>> cartItems;
+  final num cartTotal;
+  final String initialAddress;
+  final String initialPhone;
+  final String initialZone;
+  final String initialNotes;
+  final void Function() onOrderPlaced;
+
+  const QuickPickupDueScreen({
+    super.key,
+    required this.token,
+    required this.user,
+    required this.customers,
+    this.zones = const [],
+    this.cartItems = const [],
+    this.cartTotal = 0,
+    this.initialAddress = '',
+    this.initialPhone = '',
+    this.initialZone = '',
+    this.initialNotes = '',
+    required this.onOrderPlaced,
+  });
+
+  @override
+  State<QuickPickupDueScreen> createState() => _QuickPickupDueScreenState();
+}
+
+class _QuickPickupDueScreenState extends State<QuickPickupDueScreen> {
+  final TextEditingController _addrC = TextEditingController();
+  final TextEditingController _phoneC = TextEditingController();
+  final TextEditingController _amountC = TextEditingController(text: '0');
+  final TextEditingController _notesC = TextEditingController();
+  final List<Map<String, dynamic>> _suggestions = [];
+  String _zone = '';
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _addrC.text = widget.initialAddress;
+    _phoneC.text = widget.initialPhone;
+    _notesC.text = widget.initialNotes;
+    _zone = widget.initialZone;
+  }
+
+  @override
+  void dispose() {
+    _addrC.dispose();
+    _phoneC.dispose();
+    _amountC.dispose();
+    _notesC.dispose();
+    super.dispose();
+  }
+
+  String get _me {
+    final name = sOf(widget.user['name']);
+    if (name.isNotEmpty) return name;
+    return sOf(widget.user['username']).isNotEmpty
+        ? sOf(widget.user['username'])
+        : sOf(widget.user['email']);
+  }
+
+  List<Map<String, dynamic>> get _custs => widget.customers
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+
+  void _onAddrChanged(String v) {
+    final term = v.trim().toLowerCase();
+    final out = <Map<String, dynamic>>[];
+    if (term.length >= 2) {
+      for (final c in _custs) {
+        final addr = sOf(c['address']).toLowerCase();
+        final name = sOf(c['name']).toLowerCase();
+        final phone = sOf(c['phone']).toLowerCase();
+        if (addr.contains(term) || name.contains(term) || phone.contains(term)) {
+          out.add(c);
+        }
+        if (out.length >= 5) break;
+      }
+    }
+    setState(() {
+      _suggestions
+        ..clear()
+        ..addAll(out);
+    });
+  }
+
+  Future<void> _pickLocation() async {
+    final zones = widget.zones;
+    if (zones.isEmpty) return;
+    final pick = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title:
+            const Text('Delivery Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: zones.length,
+            itemBuilder: (_, i) {
+              final z = zones[i];
+              return ListTile(
+                title: Text(sOf(z['name'])),
+                subtitle: Text('Delivery Fee: ${_fmtNum(numOf(z['deliveryFee']))} PKR'),
+                trailing:
+                    _zone == sOf(z['name']) ? const Icon(Icons.check, color: Color(0xFF059669)) : null,
+                onTap: () => Navigator.pop(ctx, sOf(z['name'])),
+              );
+            },
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))],
+      ),
+    );
+    if (pick != null && mounted) setState(() => _zone = pick);
+  }
+
+  Future<void> _markDue() async {
+    if (_busy) return;
+    final addr = _addrC.text.trim();
+    if (addr.isEmpty) {
+      _show('Address required');
+      return;
+    }
+    if (_zone.isEmpty) {
+      _show('Delivery location pick karein');
+      return;
+    }
+    final hasCart = widget.cartItems.isNotEmpty;
+    final amount = double.tryParse(_amountC.text.trim()) ?? 0;
+    if (!hasCart && amount <= 0) {
+      _show('Amount enter karein first');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final me = _me;
+      final items = widget.cartItems.map((i) => {
+            'productId': sOf(i['id']),
+            'name': sOf(i['name']),
+            'price': numOf(i['price']),
+            'quantity': numOf(i['quantity']),
+            'code': sOf(i['code']),
+            'weight': sOf(i['weight']),
+            'flavor': sOf(i['flavor']),
+          }).toList();
+      final body = <String, dynamic>{
+        'items': items,
+        'pickup': true,
+        'orderType': 'Delivery',
+        'source': 'bbq-delivery-app',
+        'customerName': me,
+        'phone': _phoneC.text.trim(),
+        'address': addr,
+        'notes': _notesC.text.trim(),
+        'orderTaker': me,
+        'waiter': me,
+        'status': 'Due',
+        'paymentStatus': 'Due',
+        'serviceType': _zone,
+        'deliveryAgent': '',
+        'deliveryFee': 0,
+      };
+      if (!hasCart) {
+        body['allowEmptyCart'] = true;
+        body['total'] = amount;
+      }
+      final snack = ScaffoldMessenger.of(context);
+      final created = await ApiClient.send('POST', '/pos/orders',
+          token: widget.token, body: body);
+      if (!mounted) return;
+      widget.onOrderPlaced();
+      Navigator.pop(context, created is Map ? created : true);
+      snack.showSnackBar(SnackBar(
+          content: Text('Pick Up order #${sOf((created is Map ? created : {})['orderNumber'])} marked Due')));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        _show(e.toString());
+      }
+    }
+  }
+
+  void _show(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(m), duration: const Duration(seconds: 4)));
+  }
+
+  Widget _cartItemsList() {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.shopping_cart_outlined, size: 16, color: Color(0xFF059669)),
+          const SizedBox(width: 6),
+          const Text('Cart Items', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+          const Spacer(),
+          Text('${widget.cartItems.length}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+        ]),
+        const Divider(height: 14),
+        ...widget.cartItems.map((i) {
+          final qty = numOf(i['quantity']);
+          final price = numOf(i['price']);
+          final flavor = sOf(i['flavor']);
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6)),
+                child: Text('$qty',
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${sOf(i['name'])}${flavor.isNotEmpty ? ' ($flavor)' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Text(_fmtNum(price * qty),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+            ]),
+          );
+        }).toList(),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCart = widget.cartItems.isNotEmpty;
+    final amount = hasCart ? widget.cartTotal : (double.tryParse(_amountC.text.trim()) ?? 0);
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        leading: const BackButton(),
+        title: const Text('Pick Up \u2014 Mark Due',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
+        elevation: 0.5,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(14),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              TextField(
+                controller: _addrC,
+                onChanged: _onAddrChanged,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Address (House / Area)',
+                  labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  hintText: 'Type address \u2026 saved addresses show ho jayenge',
+                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF059669)),
+                  suffixIcon: _addrC.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 16, color: Color(0xFF94A3B8)),
+                          onPressed: () {
+                            _addrC.clear();
+                            setState(() => _suggestions.clear());
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF059669))),
+                ),
+              ),
+              if (_suggestions.isNotEmpty)
+                ..._suggestions.map((c) {
+                  final addr = sOf(c['address']);
+                  final name = sOf(c['name']);
+                  final phone = sOf(c['phone']);
+                  return Container(
+                    margin: const EdgeInsets.only(top: 5),
+                    padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF059669)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.person_pin_circle, color: Color(0xFF059669), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(
+                            '${name.isNotEmpty ? '$name \u00B7 ' : ''}${addr.isNotEmpty ? addr : '\u2014'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF065F46)),
+                          ),
+                          if (phone.isNotEmpty)
+                            Text(phone, style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
+                        ]),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _addrC.text = addr;
+                            _suggestions.clear();
+                          });
+                          _pickLocation();
+                        },
+                        child: const Text('Select',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+                      ),
+                    ]),
+                  );
+                }),
+            ]),
+          ),
+          GestureDetector(
+            onTap: _pickLocation,
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+              decoration: BoxDecoration(
+                color: _zone.isNotEmpty ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: _zone.isNotEmpty ? const Color(0xFF059669) : const Color(0xFFE2E8F0)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.location_on, size: 18, color: Color(0xFF059669)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _zone.isEmpty ? 'Select Delivery Location' : 'Location: $_zone',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _zone.isNotEmpty ? const Color(0xFF059669) : const Color(0xFF475569)),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+              ]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextField(
+              controller: _phoneC,
+              keyboardType: TextInputType.phone,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Phone (optional)',
+                labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                hintText: 'Customer phone number \u2026',
+                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                filled: true,
+                fillColor: Colors.white,
+                isDense: true,
+                prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: Color(0xFF059669)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF059669))),
+              ),
+            ),
+          ),
+          if (hasCart) _cartItemsList(),
+          if (widget.cartItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextField(
+                controller: _amountC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF059669)),
+                decoration: InputDecoration(
+                  labelText: 'Amount (PKR)',
+                  labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  hintText: '',
+                  filled: true,
+                  fillColor: Colors.white,
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.payments_outlined, size: 18, color: Color(0xFF059669)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF059669))),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: TextField(
+              controller: _notesC,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Notes (optional)',
+                labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                hintText: 'Random notes yahan type karein \u2026',
+                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                filled: true,
+                fillColor: Colors.white,
+                isDense: true,
+                prefixIcon: const Icon(Icons.notes, size: 18, color: Color(0xFF94A3B8)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF059669))),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(children: [
+              const Text('Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text('${_fmtNum(amount)} PKR',
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFFF59E0B))),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _busy ? null : _markDue,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white70))
+                  : const Icon(Icons.schedule, color: Colors.white, size: 20),
+              label: Text(_busy ? 'Saving\u2026' : 'Mark Due',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _busy ? const Color(0xFF94A3B8) : const Color(0xFFF59E0B),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFCBD5E1),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

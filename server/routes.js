@@ -10,6 +10,7 @@ import {
   removeRecord,
   updateRecord,
   saveCollection,
+  waitForPersist,
   writeDb
 } from './db.js';
 import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup-restore.js';
@@ -468,7 +469,7 @@ router.get('/stock/products', authenticate, (req, res) => {
 router.get('/stock/orders', authenticate, (req, res) => {
   const orders = getCollection('stock_orders') || [];
   let filtered = [...orders];
-  const { startDate, endDate, status } = req.query;
+  const { startDate, endDate, status, heading } = req.query;
 
   if (startDate) {
     filtered = filtered.filter(o => o.date >= startDate);
@@ -479,6 +480,9 @@ router.get('/stock/orders', authenticate, (req, res) => {
   if (status) {
     filtered = filtered.filter(o => o.status === status);
   }
+  if (heading) {
+    filtered = filtered.filter(o => (o.heading || '') === heading);
+  }
 
   filtered.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   res.send(filtered);
@@ -486,7 +490,7 @@ router.get('/stock/orders', authenticate, (req, res) => {
 
 // Create new stock order
 router.post('/stock/orders', authenticate, (req, res) => {
-  const { items, notes, addedBy, approvedBy } = req.body;
+  const { items, notes, addedBy, counterName, approvedBy, heading } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).send({ error: 'At least one item required' });
   }
@@ -504,9 +508,12 @@ router.post('/stock/orders', authenticate, (req, res) => {
       productId: item.productId || '',
       quantity: Number(item.quantity) || 0,
       unit: item.unit || 'pcs',
+      description: item.description || '',
     })),
     notes: notes || '',
+    heading: heading || '',
     addedBy: addedBy || req.user.name || '',
+    counterName: counterName || '',
     approvedBy: approvedBy || '',
     status: 'pending',
     date: dateStr,
@@ -594,9 +601,39 @@ router.delete('/stock/orders/:id', authenticate, (req, res) => {
   if (!removed) return res.status(404).send({ error: 'Order not found' });
   res.send({ ok: true });
 });
+
+// List stock order headings
+router.get('/stock/headings', authenticate, (req, res) => {
+  const headings = getCollection('stock_headings') || [];
+  headings.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  res.send(headings);
+});
+
+// Create stock order heading (manager only)
+router.post('/stock/headings', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const name = (req.body.name || '').toString().trim();
+  if (!name) {
+    return res.status(400).send({ error: 'Heading name required' });
+  }
+  const created = createRecord('stock_headings', { name });
+  res.status(201).send(created);
+});
+
+// Delete stock order heading (manager only)
+router.delete('/stock/headings/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const removed = removeRecord('stock_headings', req.params.id);
+  if (!removed) return res.status(404).send({ error: 'Heading not found' });
+  res.send({ ok: true });
+});
 router.use(authenticate);
 
-const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests'];
+const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests', 'stock_headings'];
 
 router.get('/dashboard', (req, res) => {
   const db = readDb();
@@ -1016,7 +1053,7 @@ router.get('/pos/orders/:id', (req, res) => {
   res.send(order);
 });
 
-router.post('/pos/orders', (req, res) => {
+router.post('/pos/orders', async (req, res) => {
   const {
     items,
     orderType,
@@ -1039,7 +1076,9 @@ router.post('/pos/orders', (req, res) => {
   } = req.body;
 
   if (!items || !items.length) {
-    return res.status(400).send({ error: 'Cart cannot be empty' });
+    if (!req.body.allowEmptyCart) {
+      return res.status(400).send({ error: 'Cart cannot be empty' });
+    }
   }
 
   if (!orderType) {
@@ -1091,7 +1130,10 @@ router.post('/pos/orders', (req, res) => {
   const taxValue = ((subtotal - discountValue) * (Number(taxPercent) || 0)) / 100;
   const deliveryValue = orderType === 'Delivery' ? (Number(deliveryFee) || 0) : 0;
   const serviceValue = Number(serviceCharge) || 0;
-  const total = Math.max(0, subtotal - discountValue + taxValue + deliveryValue + serviceValue);
+  const computedTotal = Math.max(0, subtotal - discountValue + taxValue + deliveryValue + serviceValue);
+  const total = req.body.allowEmptyCart && req.body.total != null
+    ? (Number(req.body.total) || 0)
+    : computedTotal;
 
   const customers = getCollection('pos_customers');
   let customerId;
@@ -1134,6 +1176,7 @@ router.post('/pos/orders', (req, res) => {
     notes,
     items: orderItems,
     serviceType,
+    pickup: !!req.body.pickup,
     subtotal,
     total,
     status: orderStatus,
@@ -1153,6 +1196,12 @@ router.post('/pos/orders', (req, res) => {
     }
   });
 
+  const persisted = await waitForPersist();
+  if (!persisted) {
+    console.error(`[persist] Order ${order.orderNumber} created in memory but NOT saved to Postgres!`);
+    res.status(201).send({ ...order, notPersisted: true });
+    return;
+  }
   res.status(201).send(order);
 });
 
