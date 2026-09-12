@@ -3,6 +3,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import helmet from 'helmet';
 import bcrypt from 'bcryptjs';
 import { router } from './routes.js';
@@ -19,6 +20,7 @@ const port = process.env.PORT || 4000;
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
