@@ -1072,8 +1072,18 @@ router.post('/pos/orders', async (req, res) => {
     notes = '',
     orderTaker = '',
     waiter = '',
-    source = ''
+    source = '',
+    clientId
   } = req.body;
+
+  // Idempotent: if a client-provided clientId is supplied and an order with
+  // that clientId already exists, return it instead of creating a duplicate.
+  if (clientId) {
+    const existing = getCollection('pos_orders').find(o => o.clientId === clientId);
+    if (existing) {
+      return res.status(201).send(existing);
+    }
+  }
 
   if (!items || !items.length) {
     if (!req.body.allowEmptyCart) {
@@ -1160,7 +1170,7 @@ router.post('/pos/orders', async (req, res) => {
 
   const orderStatus = req.body.status || (orderType === 'Delivery' ? (deliveryAgent ? 'Riders Assigned' : 'Pending') : 'New');
   const order = createRecord('pos_orders', {
-    orderNumber: `ORD-${getNextOrderNumber()}`,
+    orderNumber: req.body.orderNumber || `ORD-${getNextOrderNumber()}`,
     orderType,
     customerName,
     phone,
@@ -1184,8 +1194,9 @@ router.post('/pos/orders', async (req, res) => {
     orderTaker,
     waiter,
     source,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    clientId: clientId || null,
+    createdAt: req.body.createdAt ? new Date(req.body.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: req.body.createdAt ? new Date(req.body.createdAt).toISOString() : new Date().toISOString()
   });
 
   products.forEach((product) => {
