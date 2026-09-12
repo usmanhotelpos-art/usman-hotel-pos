@@ -49,6 +49,9 @@ let dbCache = null;
 let pgConnected = false;
 let persistOk = true;
 let pendingPersists = 0;
+let persistTimer = null;
+let persistFlush = null;
+let flushDirty = false;
 
 const defaultData = {
   settings: {
@@ -430,32 +433,51 @@ export function writeDb(data) {
   }
 
   dbCache = data;
-  if (pgClient) {
-    if (!pgConnected) {
-      persistOk = false;
-      writeDbFile(data);
-      return Promise.resolve(false);
-    }
-    pendingPersists++;
-    return saveDbToPostgres(data)
-      .then(() => {
-        persistOk = true;
-      })
-      .catch((error) => {
-        persistOk = false;
-        console.error('Failed to save DB to Postgres:', error);
-      })
-      .finally(() => {
-        pendingPersists--;
-      });
+  if (!pgClient) {
+    writeDbFile(data);
+    return Promise.resolve(true);
   }
 
-  writeDbFile(data);
+  flushDirty = true;
+  pendingPersists++;
+  scheduleDbFlush();
   return Promise.resolve(true);
 }
 
+function scheduleDbFlush() {
+  if (!flushDirty) return;
+  if (persistTimer != null || persistFlush != null) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistFlush = flushDb();
+  }, 250);
+}
+
+async function flushDb() {
+  flushDirty = false;
+  const snapshot = dbCache;
+  try {
+    writeDbFile(snapshot);
+  } catch (error) {
+    console.error('Failed to write db file:', error);
+    persistOk = false;
+  }
+  if (pgClient && pgConnected) {
+    try {
+      await saveDbToPostgres(snapshot);
+      persistOk = true;
+    } catch (error) {
+      console.error('Failed to save DB to Postgres:', error);
+      persistOk = false;
+    }
+  }
+  pendingPersists = 0;
+  persistFlush = null;
+  if (flushDirty) scheduleDbFlush();
+}
+
 export async function waitForPersist() {
-  while (pendingPersists > 0) {
+  while (pendingPersists > 0 || persistTimer != null || persistFlush != null) {
     await new Promise((r) => setTimeout(r, 5));
   }
   return persistOk;
@@ -512,3 +534,26 @@ export function removeRecord(collectionName, id) {
   saveCollection(collectionName, filtered);
   return filtered.length !== items.length;
 }
+
+function flushBeforeExit() {
+  if (persistTimer != null) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  const snapshot = dbCache;
+  if (snapshot == null) return process.exit(0);
+  try {
+    writeDbFile(snapshot);
+  } catch (_) {}
+  const done = () => process.exit(0);
+  const force = setTimeout(done, 3000);
+  force.unref();
+  if (pgClient && pgConnected) {
+    saveDbToPostgres(snapshot).then(done).catch(done);
+  } else {
+    done();
+  }
+}
+
+process.on('SIGTERM', flushBeforeExit);
+process.on('SIGINT', flushBeforeExit);
