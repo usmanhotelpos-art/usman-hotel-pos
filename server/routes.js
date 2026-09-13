@@ -423,13 +423,14 @@ router.post('/stock/login', safe(async (req, res) => {
   }
 
   const roleString = (staff.role || '').toString().trim();
-  const isManager = /manager|admin/i.test(roleString);
+  const isAdmin = /admin/i.test(roleString);
+  const isManager = /manager/i.test(roleString);
   const isCashier = /cashier/i.test(roleString);
-  if (!isManager && !isCashier) {
-    return res.status(403).send({ error: 'Only Manager and Cashier can login to the Stock App' });
+  if (!isAdmin && !isManager && !isCashier) {
+    return res.status(403).send({ error: 'Only Admin, Manager and Cashier can login to the Stock App' });
   }
 
-  const role = isManager ? 'manager' : 'cashier';
+  const role = isAdmin ? 'admin' : isManager ? 'manager' : 'cashier';
   const token = jwt.sign(
     { id: staff.id, name: staff.name, role, username: staff.username },
     JWT_SECRET,
@@ -490,7 +491,7 @@ router.get('/stock/orders', authenticate, (req, res) => {
 
 // Create new stock order
 router.post('/stock/orders', authenticate, (req, res) => {
-  const { items, notes, addedBy, counterName, approvedBy, heading } = req.body;
+  const { items, notes, addedBy, counterName, approvedBy, heading, photo } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).send({ error: 'At least one item required' });
   }
@@ -519,6 +520,7 @@ router.post('/stock/orders', authenticate, (req, res) => {
     date: dateStr,
     time: timeStr,
     dateTime: pkTime.toISOString(),
+    photo: photo || '',
     createdBy: req.user.id,
   };
 
@@ -526,10 +528,10 @@ router.post('/stock/orders', authenticate, (req, res) => {
   res.status(201).send(created);
 });
 
-// Approve stock order (manager only)
+// Approve stock order (manager or admin)
 router.put('/stock/orders/:id/approve', authenticate, (req, res) => {
-  if (req.user.role !== 'manager') {
-    return res.status(403).send({ error: 'Manager access required' });
+  if (req.user.role !== 'manager' && req.user.role !== 'admin') {
+    return res.status(403).send({ error: 'Manager or Admin access required' });
   }
   const orders = getCollection('stock_orders') || [];
   const idx = orders.findIndex(o => o.id === req.params.id);
@@ -565,10 +567,10 @@ router.put('/stock/orders/:id/approve', authenticate, (req, res) => {
   res.send(orders[idx]);
 });
 
-// Reject stock order (manager only)
+// Reject stock order (manager or admin)
 router.put('/stock/orders/:id/reject', authenticate, (req, res) => {
-  if (req.user.role !== 'manager') {
-    return res.status(403).send({ error: 'Manager access required' });
+  if (req.user.role !== 'manager' && req.user.role !== 'admin') {
+    return res.status(403).send({ error: 'Manager or Admin access required' });
   }
   const orders = getCollection('stock_orders') || [];
   const idx = orders.findIndex(o => o.id === req.params.id);
@@ -582,6 +584,42 @@ router.put('/stock/orders/:id/reject', authenticate, (req, res) => {
     status: 'rejected',
     approvedBy: req.user.name,
     rejectedAt: pkTime.toISOString(),
+    updatedAt: pkTime.toISOString(),
+  };
+
+  const db = readDb();
+  db.stock_orders = orders;
+  writeDb(db);
+
+  res.send(orders[idx]);
+});
+
+// Admin: attach a message (type + text) to a stock order — shown to manager & cashier
+router.put('/stock/orders/:id/message', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send({ error: 'Admin access required' });
+  }
+  const orders = getCollection('stock_orders') || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).send({ error: 'Order not found' });
+
+  const type = (req.body.type || 'Note').toString().trim();
+  const text = (req.body.text || '').toString().trim();
+  if (!text) {
+    return res.status(400).send({ error: 'Message text required' });
+  }
+
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+  orders[idx] = {
+    ...orders[idx],
+    message: {
+      type,
+      text,
+      sentBy: req.user.name,
+      sentAt: pkTime.toISOString(),
+    },
     updatedAt: pkTime.toISOString(),
   };
 
@@ -618,7 +656,7 @@ router.post('/stock/headings', authenticate, (req, res) => {
   if (!name) {
     return res.status(400).send({ error: 'Heading name required' });
   }
-  const created = createRecord('stock_headings', { name });
+  const created = createRecord('stock_headings', { name, photo: (req.body.photo || '').toString() });
   res.status(201).send(created);
 });
 
