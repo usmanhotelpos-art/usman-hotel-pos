@@ -1593,7 +1593,7 @@ class StockListScreenState extends State<StockListScreen> {
                 ),
               ),
               const Spacer(),
-              if (orderId != null)
+              if (orderId != null && Session.isManager)
                 GestureDetector(
                   onTap: () => _deleteMessage(orderId, replyIndex),
                   child: Icon(

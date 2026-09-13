@@ -706,6 +706,7 @@ router.put('/stock/orders/:id/reply', authenticate, (req, res) => {
 // (text + voice) while keeping the replies thread. Deletes the whole message
 // object when there are no replies left.
 router.delete('/stock/orders/:id/message', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') return res.status(403).send({ error: 'Only Manager can delete messages' });
   const orders = getCollection('stock_orders') || [];
   const idx = orders.findIndex(o => o.id === req.params.id);
   if (idx === -1) return res.status(404).send({ error: 'Order not found' });
@@ -738,6 +739,7 @@ router.delete('/stock/orders/:id/message', authenticate, (req, res) => {
 
 // Any stock user can delete a single reply from the order's message thread.
 router.delete('/stock/orders/:id/reply/:replyIndex', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') return res.status(403).send({ error: 'Only Manager can delete messages' });
   const orders = getCollection('stock_orders') || [];
   const idx = orders.findIndex(o => o.id === req.params.id);
   if (idx === -1) return res.status(404).send({ error: 'Order not found' });
