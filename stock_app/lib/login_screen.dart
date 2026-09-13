@@ -243,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          'Manager & Cashier only',
+                          'Admin, Manager & Cashier',
                           style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
                         ),
                       ),

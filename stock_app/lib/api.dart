@@ -17,6 +17,10 @@ class ApiClient {
   static const String defaultHost =
       'https://usman-hotel-pos-server-production.up.railway.app';
 
+  /// Invoked when a request fails with 401/403 (invalid or expired token).
+  /// Set by the app to force-logout back to the login screen.
+  static void Function()? onAuthError;
+
   static String get base => '$host/api';
 
   static void setHost(String url) {
@@ -97,7 +101,11 @@ class ApiClient {
 
     if (res.statusCode >= 400) {
       final msg = (json is Map && json['error'] != null) ? json['error'].toString() : 'Request failed (${res.statusCode})';
-      throw ApiException(msg, statusCode: res.statusCode);
+      final err = ApiException(msg, statusCode: res.statusCode);
+      if (err.isAuthError && !path.contains('/stock/login')) {
+        onAuthError?.call();
+      }
+      throw err;
     }
 
     return json;
@@ -130,11 +138,15 @@ class ApiClient {
     String? startDate,
     String? endDate,
     String? status,
+    String? heading,
   }) async {
     final params = <String>[];
     if (startDate != null && startDate.isNotEmpty) params.add('startDate=$startDate');
     if (endDate != null && endDate.isNotEmpty) params.add('endDate=$endDate');
     if (status != null && status.isNotEmpty) params.add('status=$status');
+    if (heading != null && heading.isNotEmpty) {
+      params.add('heading=${Uri.encodeQueryComponent(heading)}');
+    }
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     final res = await send('GET', '/stock/orders$query', token: token);
     return res as List<dynamic>;
@@ -157,5 +169,90 @@ class ApiClient {
 
   static Future<void> deleteStockOrder(String id, {String? token}) async {
     await send('DELETE', '/stock/orders/$id', token: token);
+  }
+
+  static Future<Map<String, dynamic>> sendStockOrderMessage(
+    String id,
+    String type,
+    String text, {
+    String voice = '',
+    int voiceDuration = 0,
+    String? token,
+  }) async {
+    final res = await send(
+      'PUT',
+      '/stock/orders/$id/message',
+      token: token,
+      body: {'type': type, 'text': text, 'voice': voice, 'voiceDuration': voiceDuration},
+    );
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> replyStockOrderMessage(
+    String id, {
+    String text = '',
+    String voice = '',
+    int voiceDuration = 0,
+    String? token,
+  }) async {
+    final res = await send(
+      'PUT',
+      '/stock/orders/$id/reply',
+      token: token,
+      body: {'type': 'Reply', 'text': text, 'voice': voice, 'voiceDuration': voiceDuration},
+    );
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<List<dynamic>> getMessageTypes({String? token}) async {
+    final res = await send('GET', '/stock/message-types', token: token);
+    return res as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> createMessageType(String name, {String? token}) async {
+    final res = await send('POST', '/stock/message-types', token: token, body: {'name': name});
+    return res as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> updateMessageType(String oldName, String newName, {String? token}) async {
+    final res = await send(
+      'PUT',
+      '/stock/message-types',
+      token: token,
+      body: {'oldName': oldName, 'newName': newName},
+    );
+    return res as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> deleteMessageType(String name, {String? token}) async {
+    final res = await send(
+      'DELETE',
+      '/stock/message-types?name=${Uri.encodeQueryComponent(name)}',
+      token: token,
+    );
+    return res as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> getStockHeadings({String? token}) async {
+    final res = await send('GET', '/stock/headings', token: token);
+    return res as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> createStockHeading(
+    String name, {
+    String photo = '',
+    String? token,
+  }) async {
+    final res = await send(
+      'POST',
+      '/stock/headings',
+      token: token,
+      body: {'name': name, 'photo': photo},
+    );
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<void> deleteStockHeading(String id, {String? token}) async {
+    await send('DELETE', '/stock/headings/$id', token: token);
   }
 }

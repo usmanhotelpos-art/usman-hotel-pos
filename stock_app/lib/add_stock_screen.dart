@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'api.dart';
 import 'session.dart';
+import 'stock_photo.dart';
 
 class AddStockScreen extends StatefulWidget {
   const AddStockScreen({super.key});
@@ -11,88 +16,403 @@ class AddStockScreen extends StatefulWidget {
 }
 
 class _AddStockScreenState extends State<AddStockScreen> {
-  final _searchCtrl = TextEditingController();
-  final _qtyCtrl = TextEditingController();
+  final _customNameCtrl = TextEditingController();
+  final _customQtyCtrl = TextEditingController();
+  final _customDescCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _addedByCtrl = TextEditingController();
+  final _counterCtrl = TextEditingController();
 
-  List<dynamic> _products = [];
-  List<dynamic> _filtered = [];
-  final Set<String> _selectedProductIds = {};
-  final Map<String, String> _selectedQtys = {};
+  // Custom (manually typed) items
+  final List<Map<String, String>> _customItems = [];
 
-  bool _loading = true;
+  List<dynamic> _headings = [];
+  String _selectedHeading = '';
+  bool _headingsLoading = true;
+
   bool _saving = false;
-  String? _error;
   bool _showApprover = false;
   String _approvedBy = '';
+  String _photoDataUrl = '';
 
   @override
   void initState() {
     super.initState();
     _addedByCtrl.text = Session.userName;
-    _loadProducts();
+    _loadHeadings();
   }
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
-    _qtyCtrl.dispose();
+    _customNameCtrl.dispose();
+    _customQtyCtrl.dispose();
+    _customDescCtrl.dispose();
     _notesCtrl.dispose();
     _addedByCtrl.dispose();
+    _counterCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadHeadings() async {
     try {
-      final products = await ApiClient.getProducts(token: Session.token);
+      final headings = await ApiClient.getStockHeadings(token: Session.token);
+      if (!mounted) return;
       setState(() {
-        _products = products;
-        _filtered = products;
+        _headings = headings;
+        if (_selectedHeading.isEmpty && headings.isNotEmpty) {
+          _selectedHeading = (headings.first['name'] ?? '').toString();
+        }
       });
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
+    } on ApiException {
+      // Heading load optional - order can proceed without heading
     } catch (e) {
-      setState(() => _error = 'Failed to load products');
+      // ignore
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _headingsLoading = false);
     }
   }
 
-  void _search(String query) {
-    if (query.isEmpty) {
-      setState(() => _filtered = _products);
+  void _addCustomItem() {
+    final name = _customNameCtrl.text.trim();
+    final qty = _customQtyCtrl.text.trim();
+    final desc = _customDescCtrl.text.trim();
+    if (name.isEmpty) {
+      _showMsg('Product name likhein', isError: true);
+      return;
+    }
+    if (qty.isEmpty || (int.tryParse(qty) ?? 0) <= 0) {
+      _showMsg('Sahi quantity dalein', isError: true);
       return;
     }
     setState(() {
-      _filtered = _products.where((p) {
-        final name = (p['name'] ?? '').toString().toLowerCase();
-        final category = (p['category'] ?? '').toString().toLowerCase();
-        return name.contains(query.toLowerCase()) || category.contains(query.toLowerCase());
-      }).toList();
+      _customItems.add({'name': name, 'quantity': qty, 'description': desc, 'photo': ''});
+      _customNameCtrl.clear();
+      _customQtyCtrl.clear();
+      _customDescCtrl.clear();
     });
+    _showMsg('"$name" add ho gaya');
   }
 
-  void _toggleProduct(dynamic product) {
-    final id = product['id'].toString();
-    setState(() {
-      if (_selectedProductIds.contains(id)) {
-        _selectedProductIds.remove(id);
-        _selectedQtys.remove(id);
-      } else {
-        _selectedProductIds.add(id);
-        _selectedQtys[id] = '1';
-      }
-    });
+  void _removeCustomItem(int index) {
+    setState(() => _customItems.removeAt(index));
+  }
+
+  Uint8List? get _photoBytes {
+    if (_photoDataUrl.isEmpty) return null;
+    final i = _photoDataUrl.indexOf(',');
+    if (i < 0) return null;
+    try {
+      return base64Decode(_photoDataUrl.substring(i + 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _attachPhoto() async {
+    try {
+      final x = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+      if (x == null) return;
+      final bytes = await x.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _photoDataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      });
+    } catch (e) {
+      if (mounted) _showMsg('Photo attach failed (camera)', isError: true);
+    }
+  }
+
+  void _viewPhoto() {
+    final bytes = _photoBytes;
+    if (bytes == null || !mounted) return;
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: InteractiveViewer(
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _attachItemPhoto(int idx) async {
+    try {
+      final x = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+      if (x == null) return;
+      final bytes = await x.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _customItems[idx]['photo'] = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      });
+    } catch (_) {
+      if (mounted) _showMsg('Item photo attach failed (camera)', isError: true);
+    }
+  }
+
+  void _viewItemPhoto(int idx) {
+    final raw = _customItems[idx]['photo'] ?? '';
+    if (raw.isEmpty || !mounted) return;
+    final i = raw.indexOf(',');
+    if (i < 0) return;
+    try {
+      final bytes = base64Decode(raw.substring(i + 1));
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.9),
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(ctx).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: InteractiveViewer(
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  Widget _itemPhotoAction(int idx, Map<String, String> ci) {
+    final raw = ci['photo'] ?? '';
+    if (raw.isEmpty) {
+      return GestureDetector(
+        onTap: () => _attachItemPhoto(idx),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF38BDF8).withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+          ),
+          child: const Icon(Icons.photo_camera, size: 16, color: Color(0xFF38BDF8)),
+        ),
+      );
+    }
+    final i = raw.indexOf(',');
+    Uint8List? bytes;
+    if (i >= 0) {
+      try {
+        bytes = base64Decode(raw.substring(i + 1));
+      } catch (_) {}
+    }
+    if (bytes == null) {
+      return GestureDetector(
+        onTap: () => _attachItemPhoto(idx),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF38BDF8).withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+          ),
+          child: const Icon(Icons.photo_camera, size: 16, color: Color(0xFF38BDF8)),
+        ),
+      );
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: () => _viewItemPhoto(idx),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              bytes,
+              width: 36,
+              height: 36,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        Positioned(
+          top: -7,
+          right: -7,
+          child: GestureDetector(
+            onTap: () => setState(() => _customItems[idx]['photo'] = ''),
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFEF4444),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 11, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoAttach() {
+    final bytes = _photoBytes;
+    if (bytes == null) {
+      return GestureDetector(
+        onTap: _attachPhoto,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF38BDF8).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+          ),
+          child: const Column(
+            children: [
+              Icon(Icons.photo_camera, size: 30, color: Color(0xFF38BDF8)),
+              SizedBox(height: 8),
+              Text(
+                'Photo lene ke liye tap karein (Camera)',
+                style: TextStyle(fontSize: 13, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: _viewPhoto,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.memory(
+              bytes,
+              width: 110,
+              height: 110,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Photo attached',
+                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.7)),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Tap photo baraye poori photo.',
+                style: TextStyle(fontSize: 11, color: Colors.white38),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _smallPhotoAction(
+                    icon: Icons.photo_camera,
+                    label: 'Retake',
+                    color: const Color(0xFF38BDF8),
+                    onTap: _attachPhoto,
+                  ),
+                  const SizedBox(width: 8),
+                  _smallPhotoAction(
+                    icon: Icons.delete_outline,
+                    label: 'Remove',
+                    color: Colors.redAccent,
+                    onTap: () => setState(() => _photoDataUrl = ''),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _smallPhotoAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _save() async {
-    if (_selectedProductIds.isEmpty) {
-      _showMsg('Select at least one item', isError: true);
+    if (_customItems.isEmpty) {
+      _showMsg('Kam se kam ek item type karein', isError: true);
       return;
     }
     if (_addedByCtrl.text.trim().isEmpty) {
@@ -100,18 +420,22 @@ class _AddStockScreenState extends State<AddStockScreen> {
       return;
     }
 
-    final items = _selectedProductIds.map((id) {
-      final product = _products.firstWhere((p) => p['id'].toString() == id);
-      return {
-        'productId': id,
-        'productName': product['name'],
-        'quantity': int.tryParse(_selectedQtys[id] ?? '') ?? 0,
-        'unit': 'pcs',
-      };
-    }).where((i) => i['quantity'] > 0).toList();
+    final items = <Map<String, dynamic>>[];
+    for (final ci in _customItems) {
+      final qty = int.tryParse(ci['quantity'] ?? '') ?? 0;
+      if (qty > 0) {
+        items.add({
+          'productName': ci['name'],
+          'quantity': qty,
+          'unit': 'pcs',
+          'description': ci['description'] ?? '',
+          'photo': ci['photo'] ?? '',
+        });
+      }
+    }
 
     if (items.isEmpty) {
-      _showMsg('Enter quantity for selected items', isError: true);
+      _showMsg('Enter quantity for items', isError: true);
       return;
     }
 
@@ -121,20 +445,21 @@ class _AddStockScreenState extends State<AddStockScreen> {
         {
           'items': items,
           'notes': _notesCtrl.text.trim(),
+          'heading': _selectedHeading,
           'addedBy': _addedByCtrl.text.trim(),
+          'counterName': _counterCtrl.text.trim(),
           'approvedBy': Session.isManager ? _approvedBy : '',
+          'photo': _photoDataUrl,
         },
         token: Session.token,
       );
       if (mounted) {
         _showMsg('Stock order created successfully');
         setState(() {
-          _selectedProductIds.clear();
-          _selectedQtys.clear();
+          _customItems.clear();
           _notesCtrl.clear();
+          _photoDataUrl = '';
         });
-        _searchCtrl.clear();
-        _search('');
       }
     } on ApiException catch (e) {
       _showMsg(e.message, isError: true);
@@ -196,305 +521,401 @@ class _AddStockScreenState extends State<AddStockScreen> {
           ),
         ),
         Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
-              : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.cloud_off, size: 48, color: Colors.white.withOpacity(0.3)),
-                          const SizedBox(height: 12),
-                          Text(_error!, style: TextStyle(color: Colors.white.withOpacity(0.5))),
-                          const SizedBox(height: 16),
-                          ElevatedButton(onPressed: _loadProducts, child: const Text('Retry')),
-                        ],
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Heading selector
+              _headingCard(),
+              const SizedBox(height: 12),
+              // Custom item entry
+              _sectionCard(
+                title: 'Naya Product Likhein (Custom)',
+                icon: Icons.edit_note,
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        // Product search & select
-                        _sectionCard(
-                          title: 'Select Items',
-                          icon: Icons.food_bank_outlined,
-                          child: Column(
-                            children: [
-                              // Search box
-                              TextField(
-                                controller: _searchCtrl,
-                                onChanged: _search,
-                                style: const TextStyle(color: Colors.white, fontSize: 14),
-                                decoration: InputDecoration(
-                                  hintText: 'Search products...',
-                                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                                  prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.3), size: 20),
-                                  filled: true,
-                                  fillColor: Colors.white.withOpacity(0.05),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                ),
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: _customNameCtrl,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(
+                              hintText: 'Product ka naam...',
+                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                              prefixIcon: Icon(Icons.inventory_2_outlined, color: Colors.white.withOpacity(0.3), size: 20),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.05),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                               ),
-                              const SizedBox(height: 12),
-                              // Products list (searchable)
-                              if (_filtered.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Text(
-                                    'No products found',
-                                    style: TextStyle(color: Colors.white.withOpacity(0.3)),
-                                  ),
-                                )
-                              else
-                                Container(
-                                  constraints: const BoxConstraints(maxHeight: 200),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.03),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                  ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: _filtered.length,
-                                    itemBuilder: (ctx, i) {
-                                      final p = _filtered[i];
-                                      final id = p['id'].toString();
-                                      final selected = _selectedProductIds.contains(id);
-                                      final stock = p['availableStock'] ?? p['stock'] ?? 0;
-                                      return InkWell(
-                                        onTap: () => _toggleProduct(p),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: selected
-                                                ? const Color(0xFF38BDF8).withOpacity(0.1)
-                                                : Colors.transparent,
-                                            border: Border(
-                                              bottom: BorderSide(color: Colors.white.withOpacity(0.03)),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 80,
+                          child: TextField(
+                            controller: _customQtyCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Qty',
+                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.05),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _addCustomItem,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF22C55E).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3)),
+                            ),
+                            child: const Icon(Icons.add_circle, size: 22, color: Color(0xFF22C55E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Item description
+                    TextField(
+                      controller: _customDescCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        hintText: 'Description (optional)...',
+                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                        prefixIcon: Icon(Icons.notes, color: Colors.white.withOpacity(0.3), size: 20),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                    // Custom items list
+                    if (_customItems.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.15)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Items (${_customItems.length})',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF22C55E),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ..._customItems.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final ci = entry.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.label_important, size: 14, color: Color(0xFF22C55E)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            ci['name'] ?? '',
+                                            style: const TextStyle(fontSize: 13, color: Colors.white),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if ((ci['description'] ?? '').isNotEmpty)
+                                            Text(
+                                              ci['description'] ?? '',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.white.withOpacity(0.45),
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                selected ? Icons.check_circle : Icons.circle_outlined,
-                                                size: 20,
-                                                color: selected ? const Color(0xFF38BDF8) : Colors.white24,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      p['name'] ?? '',
-                                                      style: const TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: Colors.white,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      '${p['category'] ?? ''} · Stock: ${stock}',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: Colors.white.withOpacity(0.35),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              // Selected items with quantity
-                              if (_selectedProductIds.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF38BDF8).withOpacity(0.06),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.15)),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Selected (${_selectedProductIds.length})',
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF22C55E).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        'Qty: ${ci['quantity']}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
-                                          color: Color(0xFF38BDF8),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      ..._selectedProductIds.map((id) {
-                                        final product = _products.firstWhere((p) => p['id'].toString() == id);
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 8),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  product['name'] ?? '',
-                                                  style: const TextStyle(fontSize: 13, color: Colors.white),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              Container(
-                                                width: 70,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white.withOpacity(0.06),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: TextField(
-                                                  controller: TextEditingController(text: _selectedQtys[id]),
-                                                  onChanged: (v) => setState(() => _selectedQtys[id] = v),
-                                                  keyboardType: TextInputType.number,
-                                                  textAlign: TextAlign.center,
-                                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                                  decoration: const InputDecoration(
-                                                    hintText: 'Qty',
-                                                    hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
-                                                    border: InputBorder.none,
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                  ),
-                                                ),
-                                              ),
-                                              IconButton(
-                                                onPressed: () => _toggleProduct(product),
-                                                icon: const Icon(Icons.remove_circle_outline,
-                                                    size: 18, color: Colors.redAccent),
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(),
-                                                splashRadius: 16,
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Details card
-                        _sectionCard(
-                          title: 'Order Details',
-                          icon: Icons.receipt_long_outlined,
-                          child: Column(
-                            children: [
-                              // Added by
-                              TextField(
-                                controller: _addedByCtrl,
-                                style: const TextStyle(color: Colors.white, fontSize: 14),
-                                decoration: _inputDecoration('Your name', Icons.person_outline),
-                              ),
-                              const SizedBox(height: 12),
-                              // Notes
-                              TextField(
-                                controller: _notesCtrl,
-                                style: const TextStyle(color: Colors.white, fontSize: 14),
-                                maxLines: 2,
-                                decoration: _inputDecoration('Notes (optional)', Icons.notes),
-                              ),
-                              const SizedBox(height: 12),
-                              // Approver (manager only)
-                              if (Session.isManager) ...[
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Approve this stock',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white.withOpacity(0.7),
+                                          color: Color(0xFF22C55E),
                                         ),
                                       ),
                                     ),
-                                    Switch(
-                                      value: _showApprover,
-                                      onChanged: (v) => setState(() => _showApprover = v),
-                                      activeColor: const Color(0xFF38BDF8),
+                                    const SizedBox(width: 6),
+                                    _itemPhotoAction(idx, ci),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () => _removeCustomItem(idx),
+                                      child: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.redAccent),
                                     ),
                                   ],
                                 ),
-                                if (_showApprover) ...[
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    onChanged: (v) => _approvedBy = v,
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                                    decoration: _inputDecoration('Approver name', Icons.verified_outlined),
-                                  ),
-                                ],
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Save button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _saving ? null : _save,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF38BDF8),
-                              foregroundColor: const Color(0xFF0F172A),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: _saving
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2.5, color: Color(0xFF0F172A)),
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.check_circle, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'CREATE STOCK ORDER',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                              );
+}),
+                           ],
+                         ),
+                       ),
+],
+                  const SizedBox(height: 12),
+                  _sectionCard(
+                    title: 'Photo Attach (Camera)',
+                    icon: Icons.photo_camera_outlined,
+                    child: _buildPhotoAttach(),
+                  ),
+                  const SizedBox(height: 14),
+                 Container(height: 1, color: Colors.white.withOpacity(0.08)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.receipt_long_outlined, size: 16, color: Color(0xFF38BDF8)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Order Details',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _addedByCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: _inputDecoration('Employee Name', Icons.person_outline),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _counterCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: _inputDecoration('Counter Name', Icons.storefront_outlined),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _notesCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  maxLines: 2,
+                  decoration: _inputDecoration('Notes (optional)', Icons.notes),
+                ),
+                const SizedBox(height: 12),
+                if (Session.isManager) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Approve this stock',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: _showApprover,
+                        onChanged: (v) => setState(() => _showApprover = v),
+                        activeColor: const Color(0xFF38BDF8),
+                      ),
+                    ],
+                  ),
+                  if (_showApprover) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      onChanged: (v) => _approvedBy = v,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDecoration('Approver name', Icons.verified_outlined),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+              // Save button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF38BDF8),
+                    foregroundColor: const Color(0xFF0F172A),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.5, color: Color(0xFF0F172A)),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'CREATE STOCK ORDER',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _headingCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.menu_book, size: 16, color: Color(0xFF38BDF8)),
+              SizedBox(width: 8),
+              Text(
+                'Stock Order Heading',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_headingsLoading)
+            const LinearProgressIndicator(minHeight: 2, color: Color(0xFF38BDF8))
+          else if (_headings.isEmpty)
+            Text(
+              'No headings - Manager "Add Headings" tab mein banayein',
+              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              ),
+              child: DropdownButton<String>(
+                value: _selectedHeading,
+                isExpanded: true,
+                isDense: true,
+                underline: const SizedBox(),
+                dropdownColor: const Color(0xFF1E293B),
+                style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.85)),
+                items: _headings.map((h) {
+                  final name = (h['name'] ?? '').toString();
+                  return DropdownMenuItem(
+                    value: name,
+                    child: Row(
+                      children: [
+                        stockCirclePhoto(
+                          stockPhotoBytes(h['photo']),
+                          fallbackIcon: Icons.label_important,
+                          fallbackColor: const Color(0xFF38BDF8),
+                          radius: 10,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(name, overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedHeading = v);
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 

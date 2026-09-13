@@ -5,6 +5,7 @@ import 'session.dart';
 import 'stock_list_screen.dart';
 import 'add_stock_screen.dart';
 import 'settings_screen.dart';
+import 'headings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,6 +17,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
   final _pageCtrl = PageController();
+  final _ordersKey = GlobalKey<StockListScreenState>();
 
   @override
   void dispose() {
@@ -24,12 +26,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _onTab(int index) {
+    if (index == 0) _ordersKey.currentState?.refresh();
     setState(() => _currentIndex = index);
     _pageCtrl.animateToPage(
       index,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
     );
+  }
+
+  void _onPageChanged(int index) {
+    if (index == 0) _ordersKey.currentState?.refresh();
+    setState(() => _currentIndex = index);
   }
 
   Future<void> _logout() async {
@@ -44,10 +52,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final isManager = Session.isManager;
+    final isAdmin = Session.isAdmin;
+    final roleColor = isAdmin
+        ? const Color(0xFFA78BFA)
+        : isManager
+            ? const Color(0xFF38BDF8)
+            : Colors.white54;
 
     final tabs = [
-      const StockListScreen(),
-      const AddStockScreen(),
+      StockListScreen(key: _ordersKey),
+      if (!isAdmin) const AddStockScreen(),
+      if (isManager) const HeadingsScreen(),
       if (isManager) const SettingsScreen(),
     ];
 
@@ -55,13 +70,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const BottomNavigationBarItem(
         icon: Icon(Icons.inventory_2_outlined),
         activeIcon: Icon(Icons.inventory_2),
-        label: 'Stock',
+        label: 'Orders',
       ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.add_circle_outline),
-        activeIcon: Icon(Icons.add_circle),
-        label: 'Add Stock',
-      ),
+      if (!isAdmin)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.add_circle_outline),
+          activeIcon: Icon(Icons.add_circle),
+          label: 'Add Stock',
+        ),
+      if (isManager)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.menu_book_outlined),
+          activeIcon: Icon(Icons.menu_book),
+          label: 'Headings',
+        ),
       if (isManager)
         const BottomNavigationBarItem(
           icon: Icon(Icons.settings_outlined),
@@ -100,24 +122,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Session.isManager
-                    ? const Color(0xFF38BDF8).withOpacity(0.2)
-                    : Colors.white.withOpacity(0.1),
+                color: roleColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Session.isManager
-                      ? const Color(0xFF38BDF8).withOpacity(0.4)
-                      : Colors.white.withOpacity(0.15),
-                ),
+                border: Border.all(color: roleColor.withOpacity(0.4)),
               ),
-              child: Text(
-                Session.userRole.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: Session.isManager ? const Color(0xFF38BDF8) : Colors.white54,
-                  letterSpacing: 1,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isAdmin) ...[
+                    const Icon(Icons.shield, size: 12, color: Color(0xFFA78BFA)),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    Session.userRole.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: roleColor,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -202,10 +227,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       body: PageView(
         controller: _pageCtrl,
-        onPageChanged: (i) => setState(() => _currentIndex = i),
+        onPageChanged: _onPageChanged,
         children: tabs,
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: isAdmin
+          ? null
+          : Container(
         decoration: BoxDecoration(
           color: const Color(0xFF1E293B),
           border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),

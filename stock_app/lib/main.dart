@@ -22,14 +22,24 @@ Future<void> main() async {
   runApp(const StockApp());
 }
 
+final navigatorKey = GlobalKey<NavigatorState>();
+
 class StockApp extends StatelessWidget {
   const StockApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    ApiClient.onAuthError = () {
+      Session.clear();
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    };
     return MaterialApp(
       title: 'Stock',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0F172A),

@@ -517,6 +517,7 @@ router.post('/stock/orders', authenticate, (req, res) => {
       quantity: Number(item.quantity) || 0,
       unit: item.unit || 'pcs',
       description: item.description || '',
+      photo: item.photo || '',
     })),
     notes: notes || '',
     heading: heading || '',
@@ -601,7 +602,8 @@ router.put('/stock/orders/:id/reject', authenticate, (req, res) => {
   res.send(orders[idx]);
 });
 
-// Admin: attach a message (type + text) to a stock order — shown to manager & cashier
+// Admin: attach a message (type + text + optional voice note) to a stock order —
+// shown to manager & cashier. Re-send overwrites the main message but keeps replies.
 router.put('/stock/orders/:id/message', authenticate, (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).send({ error: 'Admin access required' });
@@ -612,20 +614,83 @@ router.put('/stock/orders/:id/message', authenticate, (req, res) => {
 
   const type = (req.body.type || 'Note').toString().trim();
   const text = (req.body.text || '').toString().trim();
-  if (!text) {
-    return res.status(400).send({ error: 'Message text required' });
+  if (!text && !req.body.voice) {
+    return res.status(400).send({ error: 'Message text or voice required' });
   }
 
   const now = new Date();
   const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+  const prevMessage = (orders[idx].message && typeof orders[idx].message === 'object') ? orders[idx].message : null;
+  const prevReplies = [...((prevMessage && prevMessage.replies) || [])];
+  const voice = typeof req.body.voice === 'undefined'
+    ? ((prevMessage && prevMessage.voice) || '')
+    : (req.body.voice || '');
+  const voiceDuration = typeof req.body.voiceDuration === 'undefined'
+    ? ((prevMessage && prevMessage.voiceDuration) || 0)
+    : (Number(req.body.voiceDuration) || 0);
 
   orders[idx] = {
     ...orders[idx],
     message: {
       type,
       text,
+      voice,
+      voiceDuration,
       sentBy: req.user.name,
+      role: req.user.role,
       sentAt: pkTime.toISOString(),
+      replies: prevReplies,
+    },
+    updatedAt: pkTime.toISOString(),
+  };
+
+  const db = readDb();
+  db.stock_orders = orders;
+  writeDb(db);
+
+  res.send(orders[idx]);
+});
+
+// Any stock user (admin/manager/cashier) can reply to an order's message thread
+// with text and/or a voice note. Replies append to message.replies (two-way).
+router.put('/stock/orders/:id/reply', authenticate, (req, res) => {
+  const orders = getCollection('stock_orders') || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).send({ error: 'Order not found' });
+
+  const text = (req.body.text || '').toString().trim();
+  if (!text && !req.body.voice) {
+    return res.status(400).send({ error: 'Reply text or voice required' });
+  }
+
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+  const reply = {
+    type: (req.body.type || 'Reply').toString().trim(),
+    text,
+    voice: req.body.voice || '',
+    voiceDuration: Number(req.body.voiceDuration) || 0,
+    sentBy: req.user.name,
+    role: req.user.role,
+    sentAt: pkTime.toISOString(),
+  };
+
+  const prevMessage = (orders[idx].message && typeof orders[idx].message === 'object') ? orders[idx].message : null;
+  const replies = [...((prevMessage && prevMessage.replies) || []), reply];
+
+  orders[idx] = {
+    ...orders[idx],
+    message: {
+      type: prevMessage ? prevMessage.type : (req.body.type || 'Reply'),
+      text: prevMessage ? (prevMessage.text || '') : '',
+      voice: prevMessage ? (prevMessage.voice || '') : '',
+      voiceDuration: prevMessage ? (prevMessage.voiceDuration || 0) : 0,
+      sentBy: prevMessage ? prevMessage.sentBy : req.user.name,
+      role: prevMessage ? prevMessage.role : req.user.role,
+      sentAt: prevMessage ? prevMessage.sentAt : pkTime.toISOString(),
+      replies,
     },
     updatedAt: pkTime.toISOString(),
   };
@@ -675,6 +740,80 @@ router.delete('/stock/headings/:id', authenticate, (req, res) => {
   const removed = removeRecord('stock_headings', req.params.id);
   if (!removed) return res.status(404).send({ error: 'Heading not found' });
   res.send({ ok: true });
+});
+
+// Message types (stock app) — stored in settings, editable by Manager only.
+const DEFAULT_MESSAGE_TYPES = ['Note', 'Query', 'Warning', 'Instruction', 'Important'];
+
+function getStockMessageTypes() {
+  const db = readDb();
+  const stored = db.settings && Array.isArray(db.settings.stockMessageTypes)
+    ? db.settings.stockMessageTypes
+    : DEFAULT_MESSAGE_TYPES;
+  return stored.filter(t => (t || '').toString().trim().length > 0);
+}
+
+function setStockMessageTypes(list) {
+  const db = readDb();
+  db.settings = { ...(db.settings || {}), stockMessageTypes: list };
+  writeDb(db);
+}
+
+// List message types (any stock user)
+router.get('/stock/message-types', authenticate, (req, res) => {
+  res.send(getStockMessageTypes());
+});
+
+// Add a message type (manager only)
+router.post('/stock/message-types', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const name = (req.body.name || '').toString().trim();
+  if (!name) {
+    return res.status(400).send({ error: 'Message type name required' });
+  }
+  const list = getStockMessageTypes();
+  if (!list.some(t => t.toLowerCase() === name.toLowerCase())) {
+    list.push(name);
+    setStockMessageTypes(list);
+  }
+  res.send(getStockMessageTypes());
+});
+
+// Rename a message type (manager only)
+router.put('/stock/message-types', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const oldName = (req.body.oldName || '').toString().trim();
+  const newName = (req.body.newName || '').toString().trim();
+  if (!oldName || !newName) {
+    return res.status(400).send({ error: 'oldName and newName required' });
+  }
+  const list = getStockMessageTypes();
+  const idx = list.findIndex(t => t.toLowerCase() === oldName.toLowerCase());
+  if (idx === -1) return res.status(404).send({ error: 'Message type not found' });
+  if (list.some(t => t.toLowerCase() === newName.toLowerCase())) {
+    return res.status(400).send({ error: 'Message type already exists' });
+  }
+  list[idx] = newName;
+  setStockMessageTypes(list);
+  res.send(getStockMessageTypes());
+});
+
+// Delete a message type (manager only)
+router.delete('/stock/message-types', authenticate, (req, res) => {
+  if (req.user.role !== 'manager') {
+    return res.status(403).send({ error: 'Manager access required' });
+  }
+  const name = (req.query.name || '').toString().trim();
+  if (!name) {
+    return res.status(400).send({ error: 'name query required' });
+  }
+  const list = getStockMessageTypes().filter(t => t.toLowerCase() !== name.toLowerCase());
+  setStockMessageTypes(list);
+  res.send(getStockMessageTypes());
 });
 router.use(authenticate);
 

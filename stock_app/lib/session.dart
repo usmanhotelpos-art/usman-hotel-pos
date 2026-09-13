@@ -10,7 +10,9 @@ class Session {
   static Map<String, dynamic>? get user => _user;
   static String get userName => _user?['name'] ?? 'User';
   static String get userRole => _user?['role'] ?? 'staff';
-  static bool get isManager => userRole == 'manager';
+  static bool get isManager => userRole.toLowerCase() == 'manager';
+  static bool get isCashier => userRole.toLowerCase() == 'cashier';
+  static bool get isAdmin => userRole.toLowerCase() == 'admin';
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
