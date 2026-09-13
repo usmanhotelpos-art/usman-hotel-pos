@@ -9,6 +9,18 @@ import 'dashboard_screen.dart';
 import 'login_screen.dart';
 import 'session.dart';
 
+final navigatorKey = GlobalKey<NavigatorState>();
+
+void _forceLogout() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('orderTakerToken');
+  await prefs.remove('orderTakerUser');
+  navigatorKey.currentState?.pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const LoginScreen()),
+    (route) => false,
+  );
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -20,6 +32,7 @@ Future<void> main() async {
   ));
   final prefs = await SharedPreferences.getInstance();
   ApiClient.setHost(prefs.getString('serverUrl') ?? ApiClient.defaultHost);
+  ApiClient.onAuthError = _forceLogout;
   runApp(const OrderTakerApp());
 }
 
@@ -29,6 +42,7 @@ class OrderTakerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Usman Hotel Order Taker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

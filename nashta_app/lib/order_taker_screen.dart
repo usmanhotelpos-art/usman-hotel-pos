@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -87,19 +87,19 @@ double nOf(dynamic v) {
 double numOf(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;
 String two(int n) => n.toString().padLeft(2, '0');
 
-String time12(String? iso) {
+String time12(String? iso, {int utcOffset = 5}) {
   final raw = DateTime.tryParse(iso ?? '');
   if (raw == null) return '';
-  final d = raw.isUtc ? raw.add(const Duration(hours: 5)) : raw.add(const Duration(hours: 5));
+  final d = raw.add(Duration(hours: utcOffset));
   var h = d.hour % 12;
   if (h == 0) h = 12;
   return '$h:${two(d.minute)} ${d.hour < 12 ? 'AM' : 'PM'}';
 }
 
-String dateTime12(String? iso) {
+String dateTime12(String? iso, {int utcOffset = 5}) {
   final raw = DateTime.tryParse(iso ?? '');
   if (raw == null) return '';
-  final d = raw.isUtc ? raw.add(const Duration(hours: 5)) : raw.add(const Duration(hours: 5));
+  final d = raw.add(Duration(hours: utcOffset));
   var h = d.hour % 12;
   if (h == 0) h = 12;
   return '${two(d.day)}/${two(d.month)} ${two(d.year)} '
@@ -213,6 +213,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   DateTime? ordersToDate;
 
   bool showCart = false;
+  Map<String, dynamic>? editingOrder;
   bool showVariant = false;
   Map<String, dynamic>? variantProduct;
   Map<String, dynamic>? variantFlavor;
@@ -222,6 +223,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   bool showOrdersScreen = false;
   String ordersView = 'Delivery';
   String ordersSubTab = 'active';
+  String ordersSearch = '';
 
   final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(DateTime.now());
 
@@ -231,6 +233,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   static const _btOverridesKey = 'nshBtPrinterOverrides';
   Map<String, dynamic> get btSettings =>
       <String, dynamic>{...settings, ...btOverrides};
+
+  int get tzOffset => (btSettings['timezoneOffset'] as num?)?.toInt() ?? 5;
 
   String message = '';
   Timer? _messageTimer;
@@ -333,6 +337,20 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   }
 
   Future<void> _loadData({bool silent = false}) async {
+    try {
+      if (!silent && initialLoading) {
+        final critical = await Future.wait([
+          _fetch('/pos/categories').catchError((_) => null),
+          _fetch('/pos/products').catchError((_) => null),
+        ]);
+        if (!mounted) return;
+        setState(() {
+          if (critical[0] is List) categories = critical[0] as List<dynamic>;
+          if (critical[1] is List) products = critical[1] as List<dynamic>;
+          initialLoading = false;
+        });
+      }
+    } catch (_) {}
     try {
       final results = await Future.wait([
         _fetch('/pos/categories').catchError((_) => null),
@@ -618,6 +636,66 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           .where((i) => numOf(i['quantity']) > 0)
           .toList();
     });
+  }
+
+  Future<void> _editCartName(Map<String, dynamic> item) async {
+    final ctrl = TextEditingController(text: sOf(item['name']));
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Item Name', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Item Name', isDense: true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Save')),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newName == null || newName.isEmpty || !mounted) return;
+    setState(() {
+      for (final x in carts[activeType]!) {
+        if (x['itemId'] == item['itemId']) x['name'] = newName;
+      }
+    });
+  }
+
+  Future<void> _editCartPrice(Map<String, dynamic> item) async {
+    final ctrl = TextEditingController(text: numOf(item['price']).toStringAsFixed(0));
+    final newPrice = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Item Price', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Price (PKR)', isDense: true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final v = double.tryParse(ctrl.text.trim().replaceAll(',', ''));
+              Navigator.pop(ctx, v);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newPrice == null || newPrice < 0 || !mounted) return;
+    setState(() {
+      for (final x in carts[activeType]!) {
+        if (x['itemId'] == item['itemId']) x['price'] = newPrice;
+      }
+    });
+    toast('Price updated', seconds: 2);
   }
 
   void removeFromCart(String itemId) =>
@@ -1420,8 +1498,31 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return !d.isBefore(from) && d.isBefore(to);
   }
 
-  List<Map<String, dynamic>> get filteredVisibleOrders =>
-      visibleOrders.where(_inOrdersDateRange).toList();
+  List<Map<String, dynamic>> get filteredVisibleOrders {
+    final q = ordersSearch.trim().toLowerCase();
+    if (q.isEmpty) return visibleOrders.where(_inOrdersDateRange).toList();
+    return visibleOrders.where((o) {
+      if (!_inOrdersDateRange(o)) return false;
+      final num = (sOf(o['orderNumber']).isEmpty ? sOf(o['id']) : sOf(o['orderNumber'])).toLowerCase();
+      final cust = sOf(o['customerName']).toLowerCase();
+      final phone = sOf(o['customerPhone']).toLowerCase();
+      final addr = sOf(o['address']).toLowerCase();
+      final agent = sOf(o['deliveryAgent']).toLowerCase();
+      final table = sOf(o['tableNumber']).toLowerCase();
+      final st = sOf(o['serviceType']).toLowerCase();
+      final loc = sOf(o['location']).toLowerCase();
+      final notes = sOf(o['notes']).toLowerCase();
+      return num.contains(q) ||
+          cust.contains(q) ||
+          phone.contains(q) ||
+          addr.contains(q) ||
+          agent.contains(q) ||
+          table.contains(q) ||
+          st.contains(q) ||
+          loc.contains(q) ||
+          notes.contains(q);
+    }).toList();
+  }
 
   void _openOrders() {
     setState(() => showOrdersScreen = true);
@@ -1709,7 +1810,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(8, 2, 12, 110),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 0.56,
+        crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 0.52,
       ),
       itemCount: prods.length,
       itemBuilder: (_, i) {
@@ -1747,7 +1848,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 86, height: 86,
+                      width: 100, height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
@@ -1757,10 +1858,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                       ),
                       child: ClipOval(
                         child: sOf(p['photo']).isNotEmpty
-                            ? SmartImage(src: sOf(p['photo']), size: 86)
+                            ? SmartImage(src: sOf(p['photo']), size: 100)
                             : Container(
                                 color: const Color(0xFFF1F5F9),
-                                child: const Icon(Icons.fastfood, color: Color(0xFF94A3B8), size: 34),
+                                child: const Icon(Icons.fastfood, color: Color(0xFF94A3B8), size: 40),
                               ),
                       ),
                     ),
@@ -1769,10 +1870,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                         maxLines: 2,
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const SizedBox(height: 2),
                     Text('${_fmtNum(numOf(p['price']))} PKR',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
                   ],
                 ),
                 if (qty > 0)
@@ -1824,10 +1925,17 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
 
   Widget _sheet(Widget child) => Positioned.fill(
         child: Column(children: [
-          Expanded(child: GestureDetector(onTap: () => setState(() { showCart = false; showVariant = false; }), child: Container(color: Colors.black54))),
+          Expanded(child: GestureDetector(onTap: _closeCartSheet, child: Container(color: Colors.black54))),
           child,
         ]),
       );
+
+  void _closeCartSheet() {
+    setState(() {
+      showCart = false;
+      showVariant = false;
+    });
+  }
 
   Widget _cartSheet() {
     final isDelivery = activeType == 'Delivery';
@@ -1841,9 +1949,9 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
           child: Row(children: [
-            Text('$activeType Order', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+            Text(_cartSheetTitle(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
             const Spacer(),
-            IconButton(onPressed: () => setState(() => showCart = false), icon: const Icon(Icons.close)),
+            IconButton(onPressed: _closeCartSheet, icon: const Icon(Icons.close)),
           ]),
         ),
         Expanded(
@@ -1888,10 +1996,16 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                     margin: const EdgeInsets.symmetric(vertical: 10),
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () => createOrder('Delivery', paid: false),
-                      icon: const Icon(Icons.shopping_cart_checkout, color: Colors.white, size: 20),
-                      label: const Text('Create Delivery Order',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+                      onPressed: editingOrder != null
+                          ? updateOrder
+                          : () => createOrder('Delivery', paid: false),
+                      icon: Icon(
+                          editingOrder != null ? Icons.save : Icons.shopping_cart_checkout,
+                          color: Colors.white,
+                          size: 20),
+                      label: Text(
+                          editingOrder != null ? 'Update Order' : 'Create Delivery Order',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF059669),
                         foregroundColor: Colors.white,
@@ -2038,8 +2152,32 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
               ? SmartImage(src: sOf(i['photo']), size: 44)
               : Container(width: 44, height: 44, color: const Color(0xFFF1F5F9), child: const Icon(Icons.fastfood, color: Color(0xFF94A3B8))),
         ),
-        title: Text('${i['name']} ${sOf(i['flavor']).isNotEmpty ? '(${i['flavor']})' : ''}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        subtitle: Text('${_fmtNum(numOf(i['price']))} PKR', style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
+        title: Row(children: [
+          Expanded(
+            child: Text('${i['name']} ${sOf(i['flavor']).isNotEmpty ? '(${i['flavor']})' : ''}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          GestureDetector(
+            onTap: () => _editCartName(i),
+            child: const Padding(
+              padding: EdgeInsets.all(3),
+              child: Icon(Icons.edit, size: 13, color: Color(0xFF94A3B8)),
+            ),
+          ),
+        ]),
+        subtitle: Row(children: [
+          Text('${_fmtNum(numOf(i['price']))} PKR', style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () => _editCartPrice(i),
+            child: const Padding(
+              padding: EdgeInsets.all(3),
+              child: Icon(Icons.edit, size: 13, color: Color(0xFF94A3B8)),
+            ),
+          ),
+        ]),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton(onPressed: () => updateCartQty(sOf(i['itemId']), -1), icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFDC2626))),
           Text('${i['quantity']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
@@ -2467,6 +2605,30 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
               }).toList()),
             ),
           ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
+            child: TextField(
+              onChanged: (v) => setState(() => ordersSearch = v),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+              decoration: InputDecoration(
+                hintText: 'Search order #, customer, phone, address, rider, table, location...',
+                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF64748B)),
+                suffixIcon: ordersSearch.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                        onPressed: () => setState(() => ordersSearch = ''),
+                      )
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF059669), width: 1.5)),
+              ),
+            ),
+          ),
           _ordersDateFilterBar(),
           if (selectMode && _isManager())
             Padding(
@@ -2564,8 +2726,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             title: Text('#$num  \u00B7  $type', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             subtitle: Text(
               _isManager()
-                  ? '${cust.isNotEmpty ? cust : 'Walk-in'}  \u00B7  ${ot.isNotEmpty ? ot : '\u2014'}  \u00B7  ${time12(o['createdAt'])}'
-                  : '${cust.isNotEmpty ? cust : 'Walk-in'}  \u00B7  ${time12(o['createdAt'])}',
+                  ? '${cust.isNotEmpty ? cust : 'Walk-in'}  \u00B7  ${ot.isNotEmpty ? ot : '\u2014'}  \u00B7  ${time12(o['createdAt'], utcOffset: tzOffset)}'
+                  : '${cust.isNotEmpty ? cust : 'Walk-in'}  \u00B7  ${time12(o['createdAt'], utcOffset: tzOffset)}',
               style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
             ),
             trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -2664,260 +2826,125 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   }
 
   void _editOrder(Map<String, dynamic> o) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => EditOrderScreen(
-        token: token,
-        user: user,
-        order: Map<String, dynamic>.from(o),
-        riders: ridersList,
-        posItems: allNashtaProducts,
-        onSaved: () => _loadData(silent: true),
-      ),
-    ));
-  }
-}
+    final raw = (o['items'] as List?)?.whereType<Map>().toList() ?? [];
+    final list = raw.map((e) {
+      final m = Map<String, dynamic>.from(e);
+      final pid = sOf(m['productId']).isNotEmpty ? sOf(m['productId']) : sOf(m['id']);
+      m['id'] = pid;
+      m['productId'] = pid;
+      m['itemId'] = '${pid}_${sOf(m['flavor'])}_${DateTime.now().microsecondsSinceEpoch}';
+      return m;
+    }).toList();
 
-// ============================================================ Edit Order Screen
-class EditOrderScreen extends StatefulWidget {
-  final String token;
-  final Map<String, dynamic> user;
-  final Map<String, dynamic> order;
-  final List<String> riders;
-  final List<Map<String, dynamic>> posItems;
-  final VoidCallback onSaved;
-  const EditOrderScreen({super.key, required this.token, required this.user, required this.order, required this.riders, required this.posItems, required this.onSaved});
-
-  @override
-  State<EditOrderScreen> createState() => _EditOrderScreenState();
-}
-
-class _EditOrderScreenState extends State<EditOrderScreen> {
-  late List<Map<String, dynamic>> items;
-  final Map<String, TextEditingController> _c = {};
-  final TextEditingController _itemSearch = TextEditingController();
-  String _itemQ = '';
-  String status = '';
-  String rider = '';
-  bool _busy = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final raw = (widget.order['items'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
-    items = raw.map((it) => {...it, 'itemId': sOf(it['id']) + '_' + sOf(it['flavor']) + '_' + (it['quantity']?.toString() ?? '1')}).toList();
-    status = sOf(widget.order['status']);
-    rider = sOf(widget.order['deliveryAgent']);
-    _c['phone'] = TextEditingController(text: sOf(widget.order['phone']));
-    _c['address'] = TextEditingController(text: sOf(widget.order['address']));
-    _c['table'] = TextEditingController(text: sOf(widget.order['tableNumber']));
-    _c['notes'] = TextEditingController(text: sOf(widget.order['notes']));
-  }
-
-  @override
-  void dispose() {
-    _itemSearch.dispose();
-    for (final c in _c.values) c.dispose();
-    super.dispose();
-  }
-
-  List<Map<String, dynamic>> get _filteredPosItems {
-    final q = _itemQ.toLowerCase().trim();
-    if (q.isEmpty) return widget.posItems;
-    return widget.posItems.where((p) =>
-        sOf(p['name']).toLowerCase().contains(q) ||
-        sOf(p['category']).toLowerCase().contains(q) ||
-        sOf(p['code']).toLowerCase().contains(q)).toList();
-  }
-
-  void _addItem(Map<String, dynamic> p) {
-    final existing = items.where((it) =>
-        sOf(it['productId']) == sOf(p['id']) &&
-        sOf(it['flavor']) == sOf(p['flavor'] ?? '')).toList();
     setState(() {
-      if (existing.isNotEmpty) {
-        existing.first['quantity'] = numOf(existing.first['quantity']) + 1;
-      } else {
-        items.add({
-          'itemId': sOf(p['id']) + '_' + sOf(p['flavor'] ?? '') + '_' + DateTime.now().microsecondsSinceEpoch.toString(),
-          'productId': p['id'],
-          'id': p['id'],
-          'name': p['name'],
-          'price': numOf(p['price']),
-          'quantity': 1,
-          'code': sOf(p['code'] ?? ''),
-          'weight': sOf(p['weight'] ?? ''),
-          'flavor': sOf(p['flavor'] ?? ''),
-        });
-      }
-      _itemQ = '';
-      _itemSearch.clear();
+      showOrdersScreen = false;
+      editingOrder = Map<String, dynamic>.from(o);
+      carts['Delivery'] = list;
+      _c('cust').clear();
+      _c('phone').text = sOf(o['phone']);
+      _c('address').text = sOf(o['address']);
+      _c('notes').text = sOf(o['notes']);
+      _c('fee').text = numOf(o['deliveryFee']) > 0 ? numOf(o['deliveryFee']).toStringAsFixed(0) : '';
+      _c('zone').clear();
+      selectedZone = sOf(o['serviceType']);
+      selectedRider = sOf(o['deliveryAgent']);
+      selectedCustomerId = '';
+      _addrSuggestions = [];
+      showCart = true;
     });
+    toast('Editing order');
   }
 
-  int get _total => items.fold<int>(0, (s, it) => s + (numOf(it['price']) * numOf(it['quantity'])).round());
+  String _cartSheetTitle() {
+    final o = editingOrder;
+    if (o == null) return '$activeType Order';
+    final n = sOf(o['orderNumber']);
+    if (n.isNotEmpty) return 'Edit Order #$n';
+    final id = sOf(o['id']);
+    return 'Edit Order #${id.length > 6 ? id.substring(0, 6) : id}';
+  }
 
-  Future<void> _save() async {
+  Future<void> updateOrder() async {
+    final o = editingOrder;
+    if (o == null) return;
+    final list = carts['Delivery']!;
+    if (list.isEmpty) {
+      toast('Cart is empty');
+      return;
+    }
+    if (_c('address').text.trim().isEmpty) {
+      toast('Delivery address required');
+      return;
+    }
+    if (selectedZone.trim().isEmpty && _c('zone').text.trim().isEmpty) {
+      toast('Delivery area required');
+      return;
+    }
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final body = <String, dynamic>{
-        'items': items.map((it) => {
-              'productId': it['productId'] ?? it['id'],
-              'name': it['name'],
-              'price': numOf(it['price']),
-              'quantity': numOf(it['quantity']),
-              'code': it['code'] ?? '',
-              'weight': it['weight'] ?? '',
-              'flavor': it['flavor'] ?? '',
-            }).toList(),
+      final me = sOf(user['name']).isNotEmpty
+          ? sOf(user['name'])
+          : (sOf(user['username']).isNotEmpty ? sOf(user['username']) : sOf(user['email']));
+      final status = selectedRider.trim().isNotEmpty ? 'Riders Assigned' : 'Pending';
+      final deliveryFee = double.tryParse(_c('fee').text.trim()) ?? 0;
+      final String paymentStatus;
+      if (_isDeliveryPaid(o)) {
+        paymentStatus = 'Paid';
+      } else if (_isDeliveryDue(o)) {
+        paymentStatus = 'Due';
+      } else {
+        paymentStatus = 'Pending';
+      }
+      final payload = <String, dynamic>{
+        'items': list
+            .map((i) => {
+                  'productId': i['id'],
+                  'name': i['name'],
+                  'price': numOf(i['price']),
+                  'quantity': numOf(i['quantity']),
+                  'code': i['code'] ?? '',
+                  'weight': i['weight'] ?? '',
+                  'flavor': i['flavor'] ?? '',
+                })
+            .toList(),
+        'orderType': 'Delivery',
+        'source': _orderSource,
+        'customerName': _c('cust').text.trim().isEmpty
+            ? sOf(o['customerName'])
+            : _c('cust').text.trim(),
+        'phone': _c('phone').text.trim(),
+        'address': _c('address').text.trim(),
+        'notes': _c('notes').text.trim(),
+        'orderTaker': me,
+        'waiter': me,
         'status': status,
-        'phone': _c['phone']!.text.trim(),
-        'address': _c['address']!.text.trim(),
-        'tableNumber': _c['table']!.text.trim(),
-        'notes': _c['notes']!.text.trim(),
-        'deliveryAgent': rider,
-        'total': _total,
+        'paymentStatus': paymentStatus,
+        'serviceType': selectedZone.isNotEmpty ? selectedZone : _c('zone').text.trim(),
+        'deliveryAgent': selectedRider,
+        'deliveryFee': deliveryFee,
+        'total': cartTotal,
       };
-      await ApiClient.send('PUT', '/pos/orders/${widget.order['id']}', token: widget.token, body: body);
+      await _fetch('/pos/orders/${o['id']}', method: 'PUT', body: payload);
       if (!mounted) return;
-      widget.onSaved();
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order updated')));
+      setState(() {
+        carts['Delivery'] = [];
+        for (final k in ['cust', 'phone', 'address', 'table', 'notes', 'fee', 'zone']) {
+          _c(k).clear();
+        }
+        selectedZone = '';
+        selectedRider = '';
+        selectedCustomerId = '';
+        _addrSuggestions = [];
+        showCart = false;
+        editingOrder = null;
+      });
+      toast('Order updated \u2705');
+      await _refreshOrdersOnly();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'), backgroundColor: Colors.red));
+      toast(e.toString(), seconds: 6);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final type = sOf(widget.order['orderType']);
-    final num = widget.order['orderNumber']?.toString() ?? widget.order['id']?.toString() ?? '-';
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Edit #$num', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
-        elevation: 0.5,
-        actions: [
-          TextButton(onPressed: _busy ? null : _save, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669)))),
-        ],
-      ),
-      body: ListView(padding: const EdgeInsets.all(14), children: [
-        ...items.map((it) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('${it['name']} ${sOf(it['flavor']).isNotEmpty ? '(${it['flavor']})' : ''}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              subtitle: Text('${_fmtNum(numOf(it['price']))} PKR', style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(onPressed: () => setState(() => it['quantity'] = (numOf(it['quantity']) - 1).clamp(0, 999)), icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFDC2626))),
-                Text('${it['quantity']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                IconButton(onPressed: () => setState(() => it['quantity'] = numOf(it['quantity']) + 1), icon: const Icon(Icons.add_circle_outline, color: Color(0xFF059669))),
-                IconButton(onPressed: () => setState(() => items.removeWhere((x) => x['itemId'] == it['itemId'])), icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626))),
-              ]),
-            )),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Add Items from POS',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF15803D))),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _itemSearch,
-              onChanged: (v) => setState(() => _itemQ = v),
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Search items...',
-                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                isDense: true,
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFD1FAE5))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF059669))),
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (_filteredPosItems.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('No items found', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-              )
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 180),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _filteredPosItems.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final p = _filteredPosItems[i];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.add_box, color: Color(0xFF059669), size: 20),
-                      title: Text(sOf(p['name']),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                      subtitle: Text(sOf(p['category']),
-                          style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                      trailing: Text('${_fmtNum(numOf(p['price']))} PKR',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
-                      onTap: () => _addItem(p),
-                    );
-                  },
-                ),
-              ),
-          ]),
-        ),
-        const Divider(),
-        if (type == 'Delivery') ...[
-          _editField('Phone', _c['phone']!, type: TextInputType.phone),
-          _editField('Address', _c['address']!),
-          Row(children: [
-            const Text('Rider', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 10),
-            DropdownButton<String>(
-              value: widget.riders.contains(rider) ? rider : (widget.riders.isNotEmpty ? widget.riders.first : ''),
-              items: ['', ...widget.riders].map((r) => DropdownMenuItem(value: r, child: Text(r.isEmpty ? 'None' : r))).toList(),
-              onChanged: (v) => setState(() => rider = v ?? ''),
-            ),
-          ]),
-        ],
-        if (type == 'Table' || type == 'Dine-In') _editField('Table No', _c['table']!),
-        _editField('Notes', _c['notes']!),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(10)),
-          child: Row(children: [
-            const Text('Total', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
-            const Spacer(),
-            Text('$_total PKR', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  Widget _editField(String label, TextEditingController c, {TextInputType? type}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: TextField(
-          controller: c,
-          keyboardType: type,
-          style: const TextStyle(fontSize: 13),
-          decoration: InputDecoration(
-            labelText: label,
-            labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-            filled: true, fillColor: const Color(0xFFF8FAFC), isDense: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          ),
-        ),
-      );
 }

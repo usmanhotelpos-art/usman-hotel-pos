@@ -40,7 +40,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late List<dynamic> _orders = widget.orders;
   String _dashTab = 'due';
   String _dashQ = '';
+  String _riderF = '';
+  String _userF = '';
   final Set<String> _mergeSel = {};
+  final Set<String> _expandedItems = {};
 
   @override
   void initState() {
@@ -52,6 +55,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final r = sOf(widget.user['role']).toLowerCase();
     return r.contains('manager') || r.contains('admin');
   }
+
+  bool get _isCashier =>
+      sOf(widget.user['role']).toLowerCase().contains('cashier');
 
   static const Color _reserved = Color(0xFF991B1B);
   static const Color _reservedBg = Color(0xFFFFF1F2);
@@ -74,6 +80,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (sOf(o['orderType']).trim().toLowerCase() != 'delivery') return false;
         return sOf(o['source']).trim().toLowerCase() == 'bbq-delivery-app';
       })
+      .toList();
+
+  List<Map<String, dynamic>> get _allDelivery => _orders
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .where((o) => sOf(o['orderType']).trim().toLowerCase() == 'delivery')
       .toList();
 
   (DateTime, DateTime) _window() {
@@ -149,7 +161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       .where((o) => _isActiveDelivery(o) && sOf(o['deliveryAgent']).trim().isEmpty)
       .toList();
 
-  List<Map<String, dynamic>> get _dueOrders => _inRange
+  List<Map<String, dynamic>> get _dueOrders => _allDelivery
       .where((o) =>
           sOf(o['orderType']) == 'Delivery' &&
           _isDue(o) &&
@@ -157,14 +169,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
           !_isReserved(o))
       .toList();
 
-  List<Map<String, dynamic>> get _reservedOrders => _inRange
+  List<Map<String, dynamic>> get _reservedOrders => _allDelivery
       .where((o) =>
           _isReserved(o) && sOf(o['orderType']) == 'Delivery' && !_isCancelled(o))
       .toList();
 
   List<Map<String, dynamic>> _tabOrders(bool reserved) {
     final q = _dashQ.trim().toLowerCase();
-    final list = reserved ? _reservedOrders : _dueOrders;
+    var list = reserved ? _reservedOrders : _dueOrders;
+    if (_range == 'custom') {
+      final (from, to) = _window();
+      list = list
+          .where((o) {
+            final d = DateTime.tryParse(sOf(o['createdAt']));
+            return d != null && !d.isBefore(from) && d.isBefore(to);
+          })
+          .toList();
+    }
+    if (_riderF.isNotEmpty) {
+      final rf = _riderF.trim().toLowerCase();
+      list = list
+          .where((o) => sOf(o['deliveryAgent']).trim().toLowerCase() == rf)
+          .toList();
+    }
+    if (_userF.isNotEmpty) {
+      final uf = _userF.trim().toLowerCase();
+      list = list
+          .where((o) {
+            final ot = sOf(o['orderTaker']).trim().toLowerCase();
+            final ow = sOf(o['waiter']).trim().toLowerCase();
+            final name = ot.isNotEmpty ? ot : ow;
+            return name == uf;
+          })
+          .toList();
+    }
     if (q.isEmpty) return list;
     return list.where((o) {
       return sOf(o['orderNumber']).toLowerCase().contains(q) ||
@@ -186,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<Map<String, dynamic>> _mergedMembers(String groupId) {
-    final out = _all.where((o) => sOf(o['mergeGroupId']) == groupId).toList();
+    final out = _allDelivery.where((o) => sOf(o['mergeGroupId']) == groupId).toList();
     out.sort((a, b) {
       final ta = DateTime.tryParse(sOf(a['createdAt'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
       final tb = DateTime.tryParse(sOf(b['createdAt'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -218,10 +256,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refreshOrders() async {
+    final merged = <Map<String, dynamic>>[];
+    for (final s in ['bbq-delivery-app', 'nashta-app']) {
+      merged.addAll(await _fetchOrdersQ('?source=$s'));
+    }
+    final seen = <String>{};
+    final out = <Map<String, dynamic>>[];
+    for (final o in merged) {
+      final id = sOf(o['id']);
+      if (id.isNotEmpty && !seen.add(id)) continue;
+      out.add(o);
+    }
+    if (mounted) setState(() => _orders = out);
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchOrdersQ(String q) async {
     try {
-      final r = await ApiClient.send('GET', '/pos/orders?source=bbq-delivery-app', token: widget.token);
-      if (r is List && mounted) setState(() => _orders = r);
+      final r =
+          await ApiClient.send('GET', '/pos/orders$q', token: widget.token);
+      if (r is List) {
+        return r
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
     } catch (_) {}
+    return const [];
   }
 
   Future<void> _markDuePaid(Map<String, dynamic> o) async {
@@ -419,7 +479,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: _RidersOrdersSheet(
           riderName: riderName,
           orders: orders,
+          allRiders: _allRiders,
           token: widget.token,
+          isCashier: sOf(widget.user['role']).toLowerCase().contains('cashier'),
         ),
       ),
     ).whenComplete(_refreshOrders);
@@ -517,6 +579,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Row(children: [
+              Expanded(
+                child: _filterDropdown('All Riders', _riderF, _riderOptions,
+                    (v) => setState(() => _riderF = v)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _filterDropdown('All Users', _userF, _userOptions,
+                    (v) => setState(() => _userF = v)),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             child: _dashSearchField(),
           ),
           const Divider(height: 0, color: _border),
@@ -525,6 +601,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: _listSection(_dashTab == 'reserved'),
           ),
         ],
+      ),
+    );
+  }
+
+  List<String> get _riderOptions {
+    final s = <String>{};
+    for (final o in _allDelivery) {
+      final r = sOf(o['deliveryAgent']).trim();
+      if (r.isNotEmpty) s.add(r);
+    }
+    return s.toList()..sort();
+  }
+
+  List<String> get _userOptions {
+    final s = <String>{};
+    for (final o in _allDelivery) {
+      final ot = sOf(o['orderTaker']).trim();
+      final ow = sOf(o['waiter']).trim();
+      if (ot.isNotEmpty) s.add(ot);
+      if (ow.isNotEmpty) s.add(ow);
+    }
+    return s.toList()..sort();
+  }
+
+  Widget _filterDropdown(
+      String hint, String value, List<String> opts, ValueChanged<String> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value.isEmpty || !opts.contains(value) ? null : value,
+          isDense: true,
+          isExpanded: true,
+          hint: Text(hint, style: const TextStyle(fontSize: 12, color: _txtDim)),
+          icon: const Icon(Icons.arrow_drop_down, size: 18, color: _txtDim),
+          items: [
+            DropdownMenuItem(
+                value: '',
+                child: Text(hint, style: const TextStyle(fontSize: 12))),
+            ...opts.map((o) => DropdownMenuItem(
+                value: o, child: Text(o, style: const TextStyle(fontSize: 12)))),
+          ],
+          onChanged: (v) => onChanged(v ?? ''),
+        ),
       ),
     );
   }
@@ -604,17 +729,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (final o in singles)
         if (mergeable.contains(_sig(o))) _sig(o)
     };
-    final cards = <Widget>[
-      for (final o in singles)
-        _dashOrderCard(o, reservedTab: reservedTab, mergeable: mergeable.contains(_sig(o))),
-    ];
+    final units = <({String label, DateTime when, Widget card})>[];
+    for (final o in singles) {
+      units.add((
+        label: _dateHeaderOf(sOf(o['createdAt'])),
+        when: _whenOf(o),
+        card: _dashOrderCard(o,
+            reservedTab: reservedTab, mergeable: mergeable.contains(_sig(o))),
+      ));
+    }
     for (final g in groupList) {
       final membersG = _mergedMembers(g);
       if (membersG.isEmpty) continue;
-      cards.add(_mergedCard(g, pending: pendingSigs.contains(_sig(membersG.first))));
+      units.add((
+        label: _dateHeaderOf(sOf(membersG.first['createdAt'])),
+        when: _whenOf(membersG.first),
+        card: _mergedCard(g, pending: pendingSigs.contains(_sig(membersG.first))),
+      ));
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: cards);
+    units.sort((a, b) => b.when.compareTo(a.when));
+    final out = <Widget>[];
+    ({String label, List<Widget> cards})? cur;
+    for (final u in units) {
+      if (cur == null || cur.label != u.label) {
+        if (cur != null) {
+          out.add(_dateSep(cur.label));
+          out.addAll(cur.cards);
+        }
+        cur = (label: u.label, cards: [u.card]);
+      } else {
+        cur.cards.add(u.card);
+      }
+    }
+    if (cur != null) {
+      out.add(_dateSep(cur.label));
+      out.addAll(cur.cards);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: out);
   }
+
+  DateTime _whenOf(Map<String, dynamic> o) =>
+      DateTime.tryParse(sOf(o['createdAt'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _dateHeaderOf(String iso) {
+    final raw = DateTime.tryParse(iso);
+    if (raw == null) return '';
+    final d = esc.applyTimeZone(raw, 5);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(d.year, d.month, d.day);
+    final diff = day.difference(today).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == -1) return 'Yesterday';
+    const mons = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${d.day} ${mons[d.month - 1]} ${d.year}';
+  }
+
+  Widget _dateSep(String label) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Text(label.toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.4)),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(child: Divider(height: 1, color: Color(0xFFE2E8F0))),
+        ]),
+      );
 
   Widget _dashOrderCard(Map<String, dynamic> o,
       {required bool reservedTab, required bool mergeable}) {
@@ -623,22 +816,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final loc = sOf(o['serviceType']);
     final total = numOf(o['total'] ?? o['amount']);
     final dt = dateTime12(sOf(o['createdAt']));
+    final day = _dayOfWeek(sOf(o['createdAt']));
     final rider = sOf(o['deliveryAgent']);
+    final _custN = sOf(o['customerName']);
+    final _takerN = sOf(o['orderTaker']);
+    final _waiterN = sOf(o['waiter']);
+    final pickupFlagB = o['pickup'] == true || sOf(o['pickup']) == 'true';
+    final isPickup = rider.isEmpty &&
+        (pickupFlagB ||
+            (_custN.isNotEmpty &&
+                _custN == _takerN &&
+                (_waiterN.isEmpty || _custN == _waiterN)));
+    final pickUpName = isPickup ? _custN : '';
+    final deliveryUser = rider.isNotEmpty
+        ? rider
+        : (_takerN.isNotEmpty ? _takerN : _waiterN);
     final selected = _mergeSel.contains(id);
+    final items = (o['items'] as List?)?.whereType<Map>().toList() ?? [];
+    final expandItems = _expandedItems.contains(id);
     final border = selected
         ? _reserved
         : (mergeable
             ? const Color(0xFFB91C1C)
-            : (reservedTab ? const Color(0xFF7F1D1D) : const Color(0xFFFDE68A)));
+            : (reservedTab ? const Color(0xFF7F1D1D) : const Color(0xFFEA580C)));
     final bg =
-        mergeable ? _reservedBg : (reservedTab ? const Color(0xFFFFF7ED) : const Color(0xFFFFFBEB));
+        mergeable ? _reservedBg : (reservedTab ? const Color(0xFFFFF1F2) : const Color(0xFFFFF7ED));
+    final glow = reservedTab ? const Color(0xFFDC2626) : const Color(0xFFEA580C);
+    final glow2 = reservedTab ? const Color(0xFF991B1B) : const Color(0xFFB45309);
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: border, width: selected || mergeable ? 1.6 : 1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border, width: selected || mergeable ? 1.6 : 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: glow.withValues(alpha: 0.28),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -648,18 +866,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.only(right: 6),
               child: Icon(
                 selected ? Icons.check_circle : Icons.radio_button_off,
-                size: 20,
+                size: 22,
                 color: selected ? _reserved : const Color(0xFFCBD5E1),
               ),
             ),
           ),
           Expanded(
-            child: Text('#${sOf(o['orderNumber']).isNotEmpty ? o['orderNumber'] : id}',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w900,
-                  color: reservedTab ? _reserved : _txtDark,
-                )),
+            child: _glowText(
+                '#${sOf(o['orderNumber']).isNotEmpty ? o['orderNumber'] : id}',
+                color: reservedTab ? _reserved : _txtDark,
+                size: 15.5),
           ),
           if (mergeable)
             GestureDetector(
@@ -680,59 +896,158 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ]),
         if (dt.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 6),
             child: Row(children: [
-              const Icon(Icons.schedule, size: 13, color: Color(0xFFB45309)),
-              const SizedBox(width: 4),
-              Text(dt, style: const TextStyle(fontSize: 11, color: Color(0xFF78350F))),
+              const Icon(Icons.calendar_month, size: 17, color: Color(0xFF7C3AED)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _glowText(
+                    (day.isNotEmpty ? '$day \u00B7 ' : '') + dt,
+                    color: glow2,
+                    size: 16),
+              ),
             ]),
           ),
         if (loc.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 3),
+            padding: const EdgeInsets.only(top: 5),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.location_on_outlined, size: 13, color: Color(0xFFB45309)),
-              const SizedBox(width: 4),
+              const Icon(Icons.location_on_outlined, size: 17),
+              const SizedBox(width: 6),
               Expanded(
-                child: Text(loc, style: const TextStyle(fontSize: 12, color: Color(0xFF78350F))),
+                child: _glowText(loc, color: glow, size: 16),
               ),
             ]),
           ),
         if (addr.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.only(top: 4),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.location_on, size: 13, color: Color(0xFFB91C1C)),
-              const SizedBox(width: 4),
+              const Icon(Icons.location_on, size: 17),
+              const SizedBox(width: 6),
               Expanded(
-                child: Text(addr,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: mergeable ? FontWeight.w900 : FontWeight.w500,
-                      color: mergeable ? const Color(0xFFB91C1C) : const Color(0xFF78350F),
-                    )),
+                child: _glowText(
+                  addr,
+                  color: mergeable ? const Color(0xFFB91C1C) : glow2,
+                  size: 15.5,
+                  maxLines: 3,
+                ),
               ),
             ]),
           ),
+        if (isPickup) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(children: [
+              const Icon(Icons.takeout_dining, size: 18, color: Color(0xFFB45309)),
+              const SizedBox(width: 5),
+              Flexible(
+                child: _glowText(pickUpName.isEmpty ? 'Pick Up' : pickUpName,
+                    color: const Color(0xFFB45309), size: 16, maxLines: 1),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _typePill('PICK UP', const Color(0xFFB45309), Icons.takeout_dining),
+          ),
+        ] else if (deliveryUser.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(children: [
+              const Icon(Icons.delivery_dining, size: 18, color: Color(0xFF1D4ED8)),
+              const SizedBox(width: 5),
+              Flexible(
+                child: _glowText(deliveryUser,
+                    color: const Color(0xFF1D4ED8), size: 16, maxLines: 1),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _typePill('DELIVERY', const Color(0xFF1D4ED8), Icons.delivery_dining),
+          ),
+        ],
         Padding(
-          padding: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.only(top: 6),
           child: Row(children: [
-            Text('Total: ${_fmtNum(total)} PKR',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: reservedTab ? _reserved : const Color(0xFFB45309))),
+            _glowText('Total: ${_fmtNum(total)} PKR', color: glow2, size: 16),
             const Spacer(),
-            if (rider.isNotEmpty)
-              Text(rider, style: const TextStyle(fontSize: 11, color: const Color(0xFF1D4ED8))),
           ]),
         ),
+        if (items.isNotEmpty) ...[
+          InkWell(
+            onTap: () => _toggleItems(id),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(children: [
+                Icon(
+                    expandItems
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: glow2),
+                const SizedBox(width: 4),
+                Text('View Items (${items.length})',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: glow2)),
+              ]),
+            ),
+          ),
+          if (expandItems)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                for (final it in items)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(
+                          '${it['quantity']}x ${it['name']} ${sOf(it['flavor']).isNotEmpty ? '(${it['flavor']})' : ''}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E293B)),
+                        ),
+                      ),
+                      Text(
+                          _fmtNum(numOf(it['price']) * numOf(it['quantity'])),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E293B))),
+                    ]),
+                  ),
+              ]),
+            ),
+        ],
+        if (sOf(o['notes']).isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.notes, size: 15, color: Color(0xFF64748B)),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(sOf(o['notes']),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155))),
+              ),
+            ]),
+          ),
         if (reservedTab) ...[
-          if (isManager)
+          if (isManager && !_isCashier)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: 8),
               child: Wrap(spacing: 6, runSpacing: 6, children: [
                 _miniBtn('Print', () => _printDash(o)),
                 _miniBtn('Mark Paid', () => _markDuePaid(o)),
@@ -741,17 +1056,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
         ] else ...[
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: 8),
             child: Wrap(spacing: 6, runSpacing: 6, children: [
               _miniBtn('Print', () => _printDash(o)),
               _miniBtn('Mark Reserved', () => _markReservedDash(o)),
-              if (isManager) _miniBtn('Mark Paid', () => _markDuePaid(o)),
+              if (isManager && !_isCashier) _miniBtn('Mark Paid', () => _markDuePaid(o)),
             ]),
           ),
         ],
       ]),
     );
   }
+
+  String _dayOfWeek(String iso) {
+    final raw = DateTime.tryParse(iso);
+    if (raw == null) return '';
+    final d = esc.applyTimeZone(raw, 5);
+    const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    return days[d.weekday - 1];
+  }
+
+  Widget _glowText(String s,
+          {required Color color, double size = 13, FontWeight weight = FontWeight.w900, int? maxLines}) =>
+      Text(
+        s,
+        maxLines: maxLines,
+        overflow: maxLines != null ? TextOverflow.ellipsis : null,
+        style: TextStyle(
+          fontSize: size,
+          fontWeight: weight,
+          color: color,
+          shadows: [
+            Shadow(
+              color: color.withValues(alpha: 0.6),
+              blurRadius: 9,
+              offset: const Offset(0, 0),
+            ),
+          ],
+        ),
+      );
 
   void _toggleMergeId(Map<String, dynamic> o) {
     setState(() {
@@ -761,6 +1104,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } else {
         _mergeSel.add(id);
       }
+    });
+  }
+
+  void _toggleItems(String id) {
+    setState(() {
+      if (!_expandedItems.remove(id)) _expandedItems.add(id);
     });
   }
 
@@ -966,11 +1315,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final total = members.fold<num>(0, (s, o) => s + numOf(o['total'] ?? o['amount']));
     final first = members.first;
     final addr = sOf(first['address']);
+    final loc = sOf(first['serviceType']);
     final dt = dateTime12(sOf(first['createdAt']));
+    final day = _dayOfWeek(sOf(first['createdAt']));
+    String rider = '';
+    for (final m in members) {
+      final r = sOf(m['deliveryAgent']);
+      if (r.isNotEmpty) {
+        rider = r;
+        break;
+      }
+    }
     return InkWell(
       onTap: () => _openMergedSheet(members),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+        margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: pending ? _reservedBg : const Color(0xFFF5F3FF),
@@ -998,19 +1357,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ]),
           if (dt.isNotEmpty)
             Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: _glowText((day.isNotEmpty ? '$day \u00B7 ' : '') + dt,
+                  color: const Color(0xFF6D28D9), size: 15),
+            ),
+          if (loc.isNotEmpty)
+            Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(dt, style: const TextStyle(fontSize: 11, color: Color(0xFF6D28D9))),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.location_on_outlined, size: 15, color: Color(0xFF6D28D9)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: _glowText(loc, color: const Color(0xFF6D28D9), size: 15),
+                ),
+              ]),
             ),
           if (addr.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 3),
-              child: Text(addr,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: pending ? const Color(0xFFB91C1C) : Color(0xFF6D28D9))),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.location_on, size: 15, color: Color(0xFFB91C1C)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: _glowText(
+                    addr,
+                    color: pending ? const Color(0xFFB91C1C) : const Color(0xFF6D28D9),
+                    size: 14.5,
+                    maxLines: 2,
+                  ),
+                ),
+              ]),
+            ),
+          if (rider.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.delivery_dining, size: 18, color: Color(0xFF1D4ED8)),
+                const SizedBox(width: 5),
+                Flexible(child: _glowText(rider, color: const Color(0xFF1D4ED8), size: 16)),
+              ]),
             ),
           if (pending)
             Padding(
@@ -1026,7 +1411,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white)),
               ),
             ),
-          if (isManager)
+          if (isManager && !_isCashier)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Wrap(spacing: 6, runSpacing: 6, children: [
@@ -1209,10 +1594,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Divider(height: 12),
         Text('Total: ${_fmtNum(numOf(o['total'] ?? o['amount']))} PKR',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: _mergeBox)),
-        if (isManager)
+        if (isManager && !_isCashier)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Wrap(spacing: 6, runSpacing: 6, children: [
+              _miniBtn('Remove from Merge', () => _unmergeSingle(o)),
               _miniBtn('Mark Paid', () => _markDuePaid(o)),
               _miniBtn('Mark Due', () => _markOrderDueDash(o)),
               _miniBtn('Delete', () => _deleteOrderDash(o)),
@@ -1220,6 +1606,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
       ]),
     );
+  }
+
+  Future<void> _unmergeSingle(Map<String, dynamic> o) async {
+    final id = sOf(o['id']);
+    if (id.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ApiClient.send('PUT', '/pos/orders/$id',
+          token: widget.token,
+          body: {'mergeGroupId': '', 'mergedOrderIds': [], 'mergedTotal': 0});
+      if (!mounted) return;
+      Navigator.pop(context);
+      _refreshOrders();
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Removed from merged group \u2713')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _markOrderDueDash(Map<String, dynamic> o) async {
@@ -1407,6 +1816,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _typePill(String label, Color c, IconData icon) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: c),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: c),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: c,
+              letterSpacing: 0.5),
+        ),
+      ]),
+    );
+
   Widget _miniBtn(String label, VoidCallback onTap) => GestureDetector(
         onTap: _busy ? null : onTap,
         child: Container(
@@ -1443,12 +1873,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class _RidersOrdersSheet extends StatefulWidget {
   final String riderName;
   final List<Map<String, dynamic>> orders;
+  final List<String> allRiders;
   final String token;
+  final bool isCashier;
 
   const _RidersOrdersSheet({
     required this.riderName,
     required this.orders,
+    required this.allRiders,
     required this.token,
+    required this.isCashier,
   });
 
   @override
@@ -1530,6 +1964,54 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('${ids.length} order(s) marked due')));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _assignRiderSelected() async {
+    final ids = _selected.toList();
+    if (ids.isEmpty || _busy) return;
+    final riders = widget.allRiders;
+    if (riders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No riders available')));
+      return;
+    }
+    final pick = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Assign ${ids.length} order(s) to',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: riders.length,
+            itemBuilder: (_, i) => ListTile(
+              leading: const Icon(Icons.delivery_dining, color: Color(0xFF2563EB)),
+              title: Text(riders[i],
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              onTap: () => Navigator.pop(ctx, riders[i]),
+            ),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))],
+      ),
+    );
+    if (pick == null || pick.isEmpty || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await Future.wait(ids.map((id) => ApiClient.send('PUT', '/pos/orders/$id',
+          token: widget.token,
+          body: {'deliveryAgent': pick, 'status': 'Riders Assigned'}).catchError((_) => null)));
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ids.length} order(s) assigned to $pick \u2713')));
     } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
@@ -1687,15 +2169,26 @@ class _RidersOrdersSheetState extends State<_RidersOrdersSheet> {
                 Text('${_selected.length} selected',
                     style: const TextStyle(fontSize: 12, color: _txtDim)),
               OutlinedButton.icon(
-                onPressed: _busy || _selected.isEmpty ? null : _bulkMarkPaid,
-                icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: const Text('Mark Paid'),
+                onPressed: _busy || _selected.isEmpty ? null : _assignRiderSelected,
+                icon: const Icon(Icons.delivery_dining, size: 16),
+                label: const Text('Assign Rider'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _accent,
-                  side: const BorderSide(color: _accent),
+                  foregroundColor: const Color(0xFF7C3AED),
+                  side: const BorderSide(color: Color(0xFF7C3AED)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
               ),
+              if (!widget.isCashier)
+                OutlinedButton.icon(
+                  onPressed: _busy || _selected.isEmpty ? null : _bulkMarkPaid,
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text('Mark Paid'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _accent,
+                    side: const BorderSide(color: _accent),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                ),
               OutlinedButton.icon(
                 onPressed: _busy || _selected.isEmpty ? null : _bulkMarkDue,
                 icon: const Icon(Icons.schedule, size: 16),

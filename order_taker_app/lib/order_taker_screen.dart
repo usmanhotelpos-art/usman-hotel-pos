@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -13,6 +13,7 @@ import 'bt_service.dart';
 import 'dashboard_screen.dart';
 import 'escpos.dart' as esc;
 import 'login_screen.dart';
+import 'offline_store.dart';
 import 'session.dart';
 
 const Map<String, String> categoryIcons = {
@@ -48,6 +49,13 @@ String getCatIcon(String? name) {
 }
 
 String sOf(dynamic v) => v == null ? '' : v.toString();
+
+String photoSrcOf(dynamic p) {
+  if (p is! Map) return '';
+  final url = sOf(p['photoUrl']);
+  if (url.isNotEmpty) return url;
+  return sOf(p['photo']);
+}
 double nOf(dynamic v) {
   if (v is num) return v.toDouble();
   if (v is String) return double.tryParse(v.trim()) ?? 0;
@@ -172,6 +180,17 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   List<dynamic> mashallahSlots = [];
   Map<String, dynamic> settings = {};
 
+  /// Orders created/staged locally but not yet confirmed by the server
+  /// (offline queue). Displayed merged into [orders].
+  List<Map<String, dynamic>> pendingLocalOrders = [];
+
+  /// The last known-good server snapshot (before local pending orders are
+  /// merged in). Used so silent refreshes only rebuild when the server data
+  /// actually changed.
+  List<dynamic> serverOrders = [];
+  bool offline = false;
+  bool syncing = false;
+
   String activeType = 'Dine-In';
   String search = '';
   String selectedCategory = 'All';
@@ -203,8 +222,6 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   String paymentMethod = 'Cash';
 
   Map<String, dynamic>? editOrder;
-  List<Map<String, dynamic>> editCart = [];
-  String editAddSearch = '';
   dynamic expandedOrderId;
   bool popupRefreshing = false;
 
@@ -279,6 +296,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     }
     _loadData();
     _loadBtOverrides();
+    _restorePendingOrders();
     _loadTimer = Timer.periodic(
         const Duration(seconds: 20), (_) => _loadData(silent: true));
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -352,16 +370,76 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     return sig(categories) == sig(r[0]) &&
         sig(products) == sig(r[1]) &&
         sig(tables) == sig(r[2]) &&
-        sig(orders) == sig(_filterForeignOrders(r[3])) &&
+        sig(serverOrders) == sig(_filterForeignOrders(r[3])) &&
         sig(settings) == sig(_normSettings(r[4])) &&
         sig(mashallahSlots) == sig(r[5]);
   }
 
+  /// Merges any locally staged (offline) orders into the on-screen list so
+  /// they remain visible even before the server confirms them.
+  void _mergePendingOrders() {
+    final merged = <dynamic>[...serverOrders];
+    for (final po in pendingLocalOrders) {
+      if (!merged.any((e) => e is Map && sOf(e['id']) == sOf(po['id']))) {
+        merged.add(Map<String, dynamic>.from(po));
+      }
+    }
+    orders = merged;
+  }
+
   Future<void> _loadData({bool silent = false}) async {
+    if (!silent) {
+      try {
+        final critical = await Future.wait([
+          _fetch('/pos/categories').catchError((_) => null),
+          _fetch('/pos/products?light=1').catchError((_) => null),
+          _fetch('/pos/tables').catchError((_) => null),
+          _fetch('/pos/orders').catchError((_) => null),
+        ]);
+        if (!mounted) return;
+        setState(() {
+          if (critical[0] is List) categories = critical[0] as List<dynamic>;
+          if (critical[1] is List) products = critical[1] as List<dynamic>;
+          if (critical[2] is List) tables = critical[2] as List<dynamic>;
+          final ords = critical[3];
+          if (ords is List) {
+            serverOrders = _filterForeignOrders(ords);
+            _mergePendingOrders();
+            offline = false;
+            _saveCacheSnapshot();
+          } else {
+            offline = true;
+            if (serverOrders.isEmpty && orders.isEmpty) _loadOfflineSnapshot();
+          }
+          initialLoading = false;
+        });
+        if (critical[2] == null && offline) {
+          if (orders.isEmpty) {
+            toast('No internet - check connection or re-login');
+          }
+        }
+        if (!offline && (pendingLocalOrders.isNotEmpty || await OfflineStore.loadMutations().then((m) => m.isNotEmpty))) {
+          _syncPendingOrders();
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            initialLoading = false;
+            offline = true;
+            if (serverOrders.isEmpty && orders.isEmpty) _loadOfflineSnapshot();
+          });
+          if (mounted && orders.isEmpty) {
+            toast(e.toString());
+          }
+        }
+      }
+      _loadSecondaryData();
+      return;
+    }
     try {
       final results = await Future.wait([
         _fetch('/pos/categories').catchError((_) => null),
-        _fetch('/pos/products').catchError((_) => null),
+        _fetch('/pos/products?light=1').catchError((_) => null),
         _fetch('/pos/tables').catchError((_) => null),
         _fetch('/pos/orders').catchError((_) => null),
         _fetch('/settings').catchError((_) => null),
@@ -369,41 +447,227 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       ]);
       if (!mounted) return;
       if (silent && initialLoading == false && _sameAsOnScreen(results)) {
+        final pendSoon = pendingLocalOrders.isNotEmpty ||
+            await OfflineStore.loadMutations().then((m) => m.isNotEmpty);
+        if (!pendSoon) return;
+      }
+      if (silent && initialLoading == false && offline &&
+          results.every((r) => r == null)) {
         return;
       }
       setState(() {
         if (results[0] is List) categories = results[0] as List<dynamic>;
         if (results[1] is List) products = results[1] as List<dynamic>;
         if (results[2] is List) tables = results[2] as List<dynamic>;
-        if (results[3] is List) orders = _filterForeignOrders(results[3] as List<dynamic>);
+        final ords = results[3];
+        if (ords is List) {
+          serverOrders = _filterForeignOrders(ords);
+          _mergePendingOrders();
+          offline = false;
+          _saveCacheSnapshot();
+        } else {
+          offline = true;
+          if (serverOrders.isEmpty && orders.isEmpty) _loadOfflineSnapshot();
+        }
         if (results[4] is Map) settings = _normSettings(results[4]);
         if (results[5] is List) mashallahSlots = results[5] as List<dynamic>;
         initialLoading = false;
       });
-      if (!silent && results[2] == null) {
-        toast('Could not load tables from server - check connection or re-login');
+      if (!offline && (pendingLocalOrders.isNotEmpty ||
+          await OfflineStore.loadMutations().then((m) => m.isNotEmpty))) {
+        _syncPendingOrders();
       }
     } catch (e) {
       if (!silent && mounted) {
-        setState(() => initialLoading = false);
-        toast(e.toString());
+        setState(() {
+          initialLoading = false;
+          offline = true;
+          if (serverOrders.isEmpty && orders.isEmpty) _loadOfflineSnapshot();
+        });
+        if (mounted && orders.isEmpty) {
+          toast(e.toString());
+        }
+      } else if (silent && mounted) {
+        setState(() {
+          offline = true;
+          if (serverOrders.isEmpty && orders.isEmpty) _loadOfflineSnapshot();
+        });
       }
+    } finally {
+      if (!silent) _loadSecondaryData();
     }
+  }
+
+  void _saveCacheSnapshot() {
+    OfflineStore.saveCache({
+      'categories': categories,
+      'products': products,
+      'tables': tables,
+      'orders': serverOrders,
+      'settings': settings,
+      'mashallahSlots': mashallahSlots,
+    });
+  }
+
+  Future<void> _restorePendingOrders() async {
+    final pending = await OfflineStore.loadPendingOrders();
+    if (pending.isEmpty || !mounted) return;
+    setState(() {
+      pendingLocalOrders = pending
+          .map((e) => Map<String, dynamic>.from(e)
+            ..['localPending'] = true)
+          .toList();
+      _mergePendingOrders();
+    });
+    unawaited(_syncPendingOrders());
+  }
+
+  void _loadOfflineSnapshot() {
+    OfflineStore.loadCache().then((cache) {
+      if (cache == null || !mounted) return;
+      setState(() {
+        if (cache['categories'] is List) categories = cache['categories'] as List<dynamic>;
+        if (cache['products'] is List) products = cache['products'] as List<dynamic>;
+        if (cache['tables'] is List) tables = cache['tables'] as List<dynamic>;
+        if (cache['orders'] is List) serverOrders = _filterForeignOrders(cache['orders'] as List<dynamic>);
+        if (cache['settings'] is Map) settings = _normSettings(cache['settings']);
+        if (cache['mashallahSlots'] is List) {
+          mashallahSlots = cache['mashallahSlots'] as List<dynamic>;
+        }
+        _mergePendingOrders();
+        offline = true;
+        initialLoading = false;
+      });
+    });
+  }
+
+  Future<void> _loadSecondaryData() async {
+    try {
+      final results = await Future.wait([
+        _fetch('/settings').catchError((_) => null),
+        _fetch('/pos/mashallah-slots').catchError((_) => null),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        if (results[0] is Map) settings = _normSettings(results[0]);
+        if (results[1] is List) mashallahSlots = results[1] as List<dynamic>;
+      });
+      if (!offline && settings.isNotEmpty) {
+        OfflineStore.saveCache({
+          'categories': categories,
+          'products': products,
+          'tables': tables,
+          'orders': serverOrders,
+          'settings': settings,
+          'mashallahSlots': mashallahSlots,
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _refreshOrdersOnly({bool showSpin = false}) async {
     if (showSpin) setState(() => popupRefreshing = true);
     try {
       final ords = await _fetch('/pos/orders');
-      if (ords is List && mounted) setState(() => orders = _filterForeignOrders(ords));
+      if (ords is List && mounted) {
+        setState(() {
+          serverOrders = _filterForeignOrders(ords);
+          _mergePendingOrders();
+          offline = false;
+        });
+        _saveCacheSnapshot();
+      }
+      if (!offline && (pendingLocalOrders.isNotEmpty ||
+          await OfflineStore.loadMutations().then((m) => m.isNotEmpty))) {
+        _syncPendingOrders();
+      }
     } catch (e) {
-      if (!showSpin) toast(e.toString());
+      if (mounted) {
+        setState(() => offline = true);
+        if (serverOrders.isEmpty && orders.isEmpty) _loadOfflineSnapshot();
+      }
+      if (!showSpin && !offline && orders.isEmpty) toast(e.toString());
     } finally {
       if (showSpin) {
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) setState(() => popupRefreshing = false);
         });
       }
+    }
+  }
+
+  /// Pushes any locally-staged orders and queued mutations to the server.
+  Future<void> _syncPendingOrders() async {
+    if (syncing) return;
+    syncing = true;
+    try {
+      var pending = await OfflineStore.loadPendingOrders();
+      final mutations = await OfflineStore.loadMutations();
+      if (pending.isEmpty && mutations.isEmpty) return;
+      for (final m in List<Map<String, dynamic>>.from(mutations)) {
+        final id = sOf(m['id']);
+        try {
+          if (m['op'] == 'DELETE') {
+            await _fetch('/pos/orders/$id', method: 'DELETE');
+          } else {
+            await _fetch('/pos/orders/$id', method: 'PUT', body: m['body']);
+          }
+          final idx = (await OfflineStore.loadMutations()).indexWhere(
+              (x) => x['id'] == m['id'] && x['op'] == m['op']);
+          await OfflineStore.removeMutation(idx);
+        } catch (e) {
+          // server down: abort sync, keep queue
+          break;
+        }
+      }
+      await OfflineStore.compactMutations();
+      pending = await OfflineStore.loadPendingOrders();
+      for (final entry in List<Map<String, dynamic>>.from(pending)) {
+        final clientId = sOf(entry['clientId']);
+        try {
+          final created = await _fetch('/pos/orders',
+              method: 'POST', body: entry['payload']);
+          if (created is Map) {
+            await OfflineStore.removePendingOrder(clientId);
+            final paid = entry['paid'] == true;
+            if (paid) {
+              _fetch('/pos/payments', method: 'POST', body: {
+                'orderId': created['id'],
+                'amount': created['total'],
+                'paymentMethod': sOf(entry['payMethod']).isEmpty
+                    ? 'Cash'
+                    : entry['payMethod'],
+                'status': 'Completed',
+                'description':
+                    'Payment for order ${created['orderNumber'] ?? created['id']}',
+                'cashReceived': entry['cashReceived'],
+              }).catchError((_) => null);
+            }
+            if (mounted) {
+              setState(() {
+                pendingLocalOrders.removeWhere((p) => p['id'] == clientId);
+                if (created['id'] != null) {
+                  final i = orders.indexWhere(
+                      (o) => o is Map && sOf(o['id']) == clientId);
+                  if (i >= 0 && i < orders.length) {
+                    orders[i] = Map<String, dynamic>.from(created);
+                  } else {
+                    orders.insert(0, Map<String, dynamic>.from(created));
+                  }
+                }
+                offline = false;
+              });
+              toast('Offline order synced to server ✅',
+                  seconds: 3);
+            }
+          }
+        } catch (e) {
+          break;
+        }
+      }
+      if (mounted) _refreshOrdersOnly();
+    } finally {
+      syncing = false;
     }
   }
 
@@ -557,42 +821,28 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       _norm(sOf(o['status'])) == 'pay later' || (_norm(sOf(o['status'])) == 'pending' && !isPaidOrDone(o)));
 
   List<Map<String, dynamic>> get myTakeawayPaidOrders =>
-      myTakeawayOrdersBy((o) => isPaidOrDone(o));
+      myTakeawayOrdersBy((o) => isPaidOrDone(o) && !isCancelledOrder(o));
 
   List<Map<String, dynamic>> get myTakeawayDueOrders => myTakeawayOrdersBy((o) =>
       _norm(sOf(o['status'])) == 'due');
 
-  List<Map<String, dynamic>> get myTakeawayCancelledOrders {
-    final dayAgo =
-        DateTime.now().millisecondsSinceEpoch - 24 * 60 * 60 * 1000;
-    return myTakeawayOrdersBy((o) {
-      if (!isCancelledOrder(o)) return false;
-      final c = DateTime.tryParse(sOf(o['cancelledAt']));
-      return c == null || c.millisecondsSinceEpoch > dayAgo;
-    });
-  }
+  List<Map<String, dynamic>> get myTakeawayCancelledOrders =>
+      myTakeawayOrdersBy((o) => isCancelledOrder(o));
 
   List<Map<String, dynamic>> get myNewOrders => myOrdersBy((o) =>
       !isServedOrder(o) && !isCancelledOrder(o) && !isPaidOrDone(o));
 
   List<Map<String, dynamic>> get myServedOrders =>
-      myOrdersBy(isServedOrder);
+      myOrdersBy((o) => isServedOrder(o) && !isCancelledOrder(o));
 
   List<Map<String, dynamic>> get myTableDueOrders => myOrdersBy((o) =>
       _norm(sOf(o['status'])) == 'due');
 
   List<Map<String, dynamic>> get myTablePaidOrders =>
-      myOrdersBy((o) => isPaidOrDone(o));
+      myOrdersBy((o) => isPaidOrDone(o) && !isCancelledOrder(o));
 
-  List<Map<String, dynamic>> get myCancelledOrders {
-    final dayAgo =
-        DateTime.now().millisecondsSinceEpoch - 24 * 60 * 60 * 1000;
-    return myOrdersBy((o) {
-      if (!isCancelledOrder(o)) return false;
-      final c = DateTime.tryParse(sOf(o['cancelledAt']));
-      return c == null || c.millisecondsSinceEpoch > dayAgo;
-    });
-  }
+  List<Map<String, dynamic>> get myCancelledOrders =>
+      myOrdersBy((o) => isCancelledOrder(o));
 
   List<Map<String, dynamic>> get tableOrdersForCurrentTab {
     switch (ordersSubTab) {
@@ -847,6 +1097,67 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
   void removeFromCart(String itemId) =>
       setState(() => cart.removeWhere((i) => i['itemId'] == itemId));
 
+  Future<void> _editCartPrice(Map<String, dynamic> item) async {
+    final ctrl = TextEditingController(text: numOf(item['price']).toStringAsFixed(0));
+    final newPrice = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Price'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Price (PKR)', isDense: true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final v = double.tryParse(ctrl.text.trim().replaceAll(',', ''));
+              Navigator.pop(ctx, v);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newPrice == null || newPrice < 0 || !mounted) return;
+    setState(() {
+      final idx = cart.indexWhere((x) => x['itemId'] == item['itemId']);
+      if (idx >= 0) cart[idx]['price'] = newPrice;
+    });
+    toast('Price updated', seconds: 2);
+  }
+
+  Future<void> _editCartName(Map<String, dynamic> item) async {
+    final ctrl = TextEditingController(text: sOf(item['name']));
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Item Name'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Item Name', isDense: true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newName == null || newName.isEmpty || !mounted) return;
+    setState(() {
+      final idx = cart.indexWhere((x) => x['itemId'] == item['itemId']);
+      if (idx >= 0) cart[idx]['name'] = newName;
+    });
+  }
+
   void _removeProductLine(Map<String, dynamic> product) {
     final line = cart.where((i) => sOf(i['id']) == sOf(product['id'])).toList();
     if (line.isNotEmpty) removeFromCart(sOf(line.first['itemId']));
@@ -895,7 +1206,9 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : (sOf(user['username']).isNotEmpty ? sOf(user['username']) : '');
+      final clientId = await OfflineStore.nextClientId();
       final payload = {
+        'clientId': clientId,
         'items': cart
             .map((i) => {
                   'productId': i['id'],
@@ -929,18 +1242,33 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         'paymentMethod': isTakeaway ? payMethod : '',
         if (paid && cashReceived > 0) 'cashReceived': cashReceived,
       };
-      final created = await _fetch('/pos/orders',
-          method: 'POST', body: payload);
-      if (created is Map && paid) {
-        await _fetch('/pos/payments', method: 'POST', body: {
+      Map<String, dynamic>? created;
+      try {
+        final res = await _fetch('/pos/orders',
+            method: 'POST', body: payload);
+        if (res is Map) created = Map<String, dynamic>.from(res);
+      } on ApiException catch (e) {
+        if (e.statusCode != 0) rethrow;
+        // Offline / no internet: stage the order locally & print.
+        created = await _stageOrderLocally(
+            payload, clientId, me, isTakeaway, paid, payMethod, cashReceived);
+        unawaited(_syncPendingOrders());
+      }
+      if (created == null) {
+        toast('Could not create order - try again', seconds: 6);
+        return null;
+      }
+      if (paid && created['localPending'] != true) {
+        // Fire-and-forget: order save should not wait on the payment record.
+        _fetch('/pos/payments', method: 'POST', body: {
           'orderId': created['id'],
           'amount': created['total'],
           'paymentMethod': payMethod,
           'status': 'Completed',
           'description': 'Payment for order ${created['orderNumber'] ?? created['id']}',
-        });
+        }).catchError((_) => null);
       }
-      if (!mounted) return created is Map ? Map<String, dynamic>.from(created) : null;
+      if (!mounted) return created;
       setState(() {
         cart = [];
         customerNameCtrl.clear();
@@ -951,13 +1279,14 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         showCart = false;
         showPaymentPopup = false;
       });
-      toast(paid
-          ? 'Order created & payment completed ✅'
-          : isTakeaway
-              ? 'Takeaway order created 🛍️'
-              : 'Order created successfully ✅');
-      if ((btConnected || btInfo != null || settings['btPrintEnabled'] == true) &&
-          created is Map) {
+      toast(created['localPending'] == true
+          ? 'Order saved locally (offline - will auto-sync) ✅'
+          : paid
+              ? 'Order created & payment completed ✅'
+              : isTakeaway
+                  ? 'Takeaway order created 🛍️'
+                  : 'Order created successfully ✅');
+      if (btConnected || btInfo != null || settings['btPrintEnabled'] == true) {
         final printOrder = Map<String, dynamic>.from(created);
         if (sOf(printOrder['date']).isEmpty) {
           printOrder['date'] =
@@ -974,14 +1303,135 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           toast('Order created but Bluetooth print failed: $e', seconds: 6);
         });
       }
-      await _loadData(silent: true);
-      return created is Map ? Map<String, dynamic>.from(created) : null;
+      await _refreshOrdersOnly();
+      return created;
     } catch (e) {
       toast(e.toString(), seconds: 6);
       return null;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Save the order to the local offline store when the server is unreachable,
+  /// then return a display-ready order map so the UI/print flow keeps working.
+  Future<Map<String, dynamic>> _stageOrderLocally(
+      Map<String, dynamic> payload, String clientId, String me,
+      bool isTakeaway, bool paid, String payMethod, double cashReceived) async {
+    final items = (payload['items'] as List? ?? []).cast<dynamic>().toList();
+    final subtotal = items.fold<double>(
+        0, (a, i) => a + (i is Map ? numOf(i['quantity']) * numOf(i['price']) : 0));
+    final now = DateTime.now();
+    final display = <String, dynamic>{
+      'id': clientId,
+      'clientId': clientId,
+      'orderNumber': 'OT-$clientId',
+      'orderType': payload['orderType'],
+      'status': payload['status'],
+      'paymentStatus': paid ? 'Paid' : 'Pending',
+      'paymentMethod': isTakeaway ? payMethod : '',
+      'customerName': payload['customerName'],
+      'tableNumber': payload['tableNumber'],
+      'notes': payload['notes'],
+      'orderTaker': me,
+      'waiter': me,
+      'source': 'order-taker-app',
+      'cashReceived': cashReceived,
+      'items': items,
+      'subtotal': subtotal,
+      'total': subtotal,
+      'createdAt': now.toIso8601String(),
+      'date': now.toIso8601String(),
+      'localPending': true,
+    };
+    final local = Map<String, dynamic>.from(display)
+      ..['payload'] = payload
+      ..['paid'] = paid
+      ..['payMethod'] = payMethod
+      ..['cashReceived'] = cashReceived;
+    await OfflineStore.addPendingOrder(local);
+    if (mounted) {
+      setState(() {
+        pendingLocalOrders.add(display);
+        _mergePendingOrders();
+        offline = true;
+      });
+      toast('No internet - order saved locally, will sync automatically '
+          '(${pendingLocalOrders.length} pending)',
+          seconds: 5);
+    }
+    return display;
+  }
+
+  /// Applies a status/payment mutation either online, or (offline) queued to
+  /// the local store with an optimistic UI patch. Pending local orders are
+  /// patched in-place instead (they already get re-sent on sync).
+  /// Returns true when applied/queued, false on a real server error.
+  Future<bool> _offlineAwareOrderCall(
+      Map order, String method, Map<String, dynamic>? body) async {
+    final id = sOf(order['id']);
+    final isLocal = order['localPending'] == true;
+    if (isLocal) {
+      await _applyPendingLocalPatch(order, method, body);
+      return true;
+    }
+    try {
+      await _fetch('/pos/orders/$id', method: method, body: body);
+      return true;
+    } on ApiException catch (e) {
+      if (e.statusCode != 0) rethrow;
+      await OfflineStore.addMutation(
+          {'id': id, 'op': method == 'DELETE' ? 'DELETE' : 'PUT', if (body != null) 'body': body});
+      if (mounted) {
+        setState(() {
+          if (method == 'DELETE') {
+            orders.removeWhere((o) => o is Map && sOf(o['id']) == id);
+          } else if (body != null) {
+            final i = orders.indexWhere((o) => o is Map && sOf(o['id']) == id);
+            if (i >= 0 && orders[i] is Map) {
+              final m = Map<String, dynamic>.from(orders[i] as Map);
+              m.addAll(body);
+              orders[i] = m;
+            }
+          }
+          offline = true;
+        });
+      }
+      unawaited(_syncPendingOrders());
+      return true;
+    }
+  }
+
+  /// Patches a locally-pending (unsynced) order's display copy + persisted
+  /// payload so the mutations survive the eventual server sync.
+  Future<void> _applyPendingLocalPatch(
+      Map order, String method, Map<String, dynamic>? body) async {
+    final id = sOf(order['id']);
+    if (mounted) {
+      setState(() {
+        final i = pendingLocalOrders.indexWhere((p) => sOf(p['id']) == id);
+        if (method == 'DELETE') {
+          if (i >= 0) pendingLocalOrders.removeAt(i);
+        } else if (body != null && i >= 0) {
+          pendingLocalOrders[i] =
+              Map<String, dynamic>.from(pendingLocalOrders[i])..addAll(body);
+        }
+        _mergePendingOrders();
+      });
+    }
+    final pl = await OfflineStore.loadPendingOrders();
+    final pi = pl.indexWhere((p) => sOf(p['clientId']) == id || sOf(p['id']) == id);
+    if (pi < 0) return;
+    if (method == 'DELETE') {
+      pl.removeAt(pi);
+    } else if (body != null) {
+      final entry = Map<String, dynamic>.from(pl[pi]);
+      final payload = Map<String, dynamic>.from(entry['payload'] as Map? ?? {});
+      payload.addAll(body);
+      entry['payload'] = payload;
+      pl[pi] = entry;
+    }
+    await OfflineStore.savePendingOrders(pl);
   }
 
   void openEditOrder(Map order) {
@@ -991,31 +1441,42 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final m = Map<String, dynamic>.from(it);
       m['itemId'] = sOf(m['itemId']).isNotEmpty
           ? m['itemId']
-          : '${m['productId'] ?? m['id']}-${DateTime.now().millisecondsSinceEpoch}-${items.length}';
+          : '${sOf(m['productId'] ?? m['id'])}-${DateTime.now().millisecondsSinceEpoch}-${items.length}';
       items.add(m);
     }
     setState(() {
+      activeType =
+          sOf(order['orderType']).toLowerCase().contains('take')
+              ? 'Take Away'
+              : 'Dine-In';
       editOrder = Map<String, dynamic>.from(order);
-      editCart = items;
-      editAddSearch = '';
+      cart = items;
+      tableCtrl.text = sOf(order['tableNumber']);
+      customerNameCtrl.text = sOf(order['customerName']);
+      notesCtrl.text = sOf(order['notes']);
+      showOrdersScreen = false;
+      showCart = true;
     });
+    toast('Editing order');
   }
 
   Future<void> saveEditOrder() async {
     final eo = editOrder;
     if (eo == null) return;
-    if (editCart.isEmpty) {
+    if (cart.isEmpty) {
       toast('Order must have at least one item.');
       return;
     }
-    if (sOf(eo['tableNumber']).isEmpty) {
+    final isTakeaway = activeType == 'Take Away';
+    final t = tableCtrl.text.trim();
+    if (!isTakeaway && t.isEmpty) {
       toast('Please select a table or room for Dine-In orders.');
       return;
     }
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final subtotal = editCart.fold<double>(
+      final subtotal = cart.fold<double>(
           0, (sum, i) => sum + numOf(i['price']) * numOf(i['quantity']));
       final discount = numOf(eo['discount']);
       final tax = (subtotal - discount) * numOf(eo['taxPercent']) / 100;
@@ -1024,12 +1485,23 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : (sOf(user['username']).isNotEmpty ? sOf(user['username']) : '');
-      await _fetch('/pos/orders/${eo['id']}', method: 'PUT', body: {
-        'items': editCart,
-        'orderType': 'Dine-In',
-        'customerName': eo['customerName'] ?? '',
+      final editBody = {
+        'items': cart
+            .map((i) => {
+                  'productId': sOf(i['productId'] ?? i['id']),
+                  'id': i['id'],
+                  'name': i['name'],
+                  'price': numOf(i['price']),
+                  'quantity': numOf(i['quantity']),
+                  'code': i['code'] ?? '',
+                  'weight': i['weight'] ?? '',
+                  'flavor': i['flavor'] ?? '',
+                })
+            .toList(),
+        'orderType': isTakeaway ? 'Takeaway' : 'Dine-In',
+        'customerName': customerNameCtrl.text.trim(),
         'phone': eo['phone'] ?? '',
-        'tableNumber': eo['tableNumber'] ?? '',
+        'tableNumber': isTakeaway ? '' : t,
         'deliveryAgent': '',
         'serviceType': '',
         'deliveryFee': 0,
@@ -1039,20 +1511,31 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         'paymentMethod': sOf(eo['paymentMethod']).isEmpty
             ? 'Cash'
             : eo['paymentMethod'],
-        'paymentStatus': eo['paymentStatus'] ?? '',
-        'notes': eo['notes'] ?? '',
+        'paymentStatus': sOf(eo['paymentStatus']).isEmpty
+            ? 'Pending'
+            : eo['paymentStatus'],
+        'notes': notesCtrl.text.trim(),
         'status': sOf(eo['status']).isEmpty ? 'Pending' : eo['status'],
         'subtotal': subtotal,
         'total': total,
         'orderTaker': me,
-      });
+        'waiter': me,
+        'source': 'order-taker-app',
+      };
+      await _offlineAwareOrderCall(eo, 'PUT', editBody);
       if (!mounted) return;
       setState(() {
+        cart = [];
+        tableNumber = '';
+        tableCtrl.clear();
+        customerNameCtrl.clear();
+        notesCtrl.clear();
+        cashCtrl.clear();
+        showCart = false;
         editOrder = null;
-        editCart = [];
       });
-      toast('Order updated');
-      await _loadData(silent: true);
+      toast('Order updated \u2705');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1067,15 +1550,18 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : sOf(user['username']);
-      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+      final servedBody = {
         'status': 'Served',
         'servedAt': DateTime.now().toUtc().toIso8601String(),
         'orderTaker': me,
-      });
+      };
+      await _offlineAwareOrderCall(order, 'PUT', servedBody);
       if (!mounted) return;
       setState(() => expandedOrderId = null);
-      toast('Order #${order['orderNumber'] ?? order['id']} marked served ✅');
-      await _loadData(silent: true);
+      toast(offline
+          ? 'Marked served (offline - auto-sync ✅)'
+          : 'Order #${order['orderNumber'] ?? order['id']} marked served ✅');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1090,15 +1576,18 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : sOf(user['username']);
-      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+      final dueBody = {
         'status': 'Due',
         'dueAt': DateTime.now().toUtc().toIso8601String(),
         'orderTaker': me,
-      });
+      };
+      await _offlineAwareOrderCall(order, 'PUT', dueBody);
       if (!mounted) return;
       setState(() => expandedOrderId = null);
-      toast('Order #${order['orderNumber'] ?? order['id']} marked Due 💰');
-      await _loadData(silent: true);
+      toast(offline
+          ? 'Marked Due (offline - auto-sync ✅)'
+          : 'Order #${order['orderNumber'] ?? order['id']} marked Due 💰');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1113,16 +1602,19 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : sOf(user['username']);
-      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+      final paidBody = {
         'paymentStatus': 'paid',
         'status': 'Payment Collected',
         'paidAt': DateTime.now().toUtc().toIso8601String(),
         'orderTaker': me,
-      });
+      };
+      await _offlineAwareOrderCall(order, 'PUT', paidBody);
       if (!mounted) return;
       setState(() => expandedOrderId = null);
-      toast('Order #${order['orderNumber'] ?? order['id']} marked Paid ✅');
-      await _loadData(silent: true);
+      toast(offline
+          ? 'Marked Paid (offline - auto-sync ✅)'
+          : 'Order #${order['orderNumber'] ?? order['id']} marked Paid ✅');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1137,16 +1629,19 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : sOf(user['username']);
-      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+      final cancelBody = {
         'status': 'Cancelled',
         'cancelledAt': DateTime.now().toUtc().toIso8601String(),
         'paymentRequestStatus': '',
         'orderTaker': me,
-      });
+      };
+      await _offlineAwareOrderCall(order, 'PUT', cancelBody);
       if (!mounted) return;
       setState(() => expandedOrderId = null);
-      toast('Order #${order['orderNumber'] ?? order['id']} cancelled ❌');
-      await _loadData(silent: true);
+      toast(offline
+          ? 'Order cancelled (offline - auto-sync ✅)'
+          : 'Order #${order['orderNumber'] ?? order['id']} cancelled ❌');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1184,14 +1679,16 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     if (ok != true) return;
     setState(() => _busy = true);
     try {
-      await _fetch('/pos/orders/$id', method: 'DELETE');
+      await _offlineAwareOrderCall(order, 'DELETE', null);
       if (!mounted) return;
       setState(() {
         expandedOrderId = null;
         _selectedOrderIds.remove(id);
       });
-      toast('Order #${order['orderNumber'] ?? id} deleted 🗑️');
-      await _loadData(silent: true);
+      toast(offline
+          ? 'Order deleted (offline - auto-sync 🗑️)'
+          : 'Order #${order['orderNumber'] ?? id} deleted 🗑️');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1245,9 +1742,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     setState(() => _busy = true);
     try {
       for (final o in selected) {
-        final id = sOf(o['id']);
-        if (id.isEmpty) continue;
-        await _fetch('/pos/orders/$id', method: 'DELETE');
+        if (sOf(o['id']).isEmpty) continue;
+        await _offlineAwareOrderCall(o, 'DELETE', null);
       }
       if (!mounted) return;
       setState(() {
@@ -1255,8 +1751,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         selectMode = false;
         expandedOrderId = null;
       });
-      toast('${selected.length} order(s) deleted 🗑️');
-      await _loadData(silent: true);
+      toast(offline
+          ? '${selected.length} order(s) deleted (offline - auto-sync 🗑️)'
+          : '${selected.length} order(s) deleted 🗑️');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1273,9 +1771,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           ? sOf(user['name'])
           : sOf(user['username']);
       for (final o in selected) {
-        final id = sOf(o['id']);
-        if (id.isEmpty) continue;
-        await _fetch('/pos/orders/$id', method: 'PUT', body: {
+        if (sOf(o['id']).isEmpty) continue;
+        await _offlineAwareOrderCall(o, 'PUT', {
           'paymentStatus': 'paid',
           'status': 'Payment Collected',
           'paidAt': DateTime.now().toUtc().toIso8601String(),
@@ -1288,8 +1785,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         selectMode = false;
         expandedOrderId = null;
       });
-      toast('${selected.length} order(s) marked paid ✅');
-      await _loadData(silent: true);
+      toast(offline
+          ? '${selected.length} order(s) marked paid (offline - auto-sync ✅)'
+          : '${selected.length} order(s) marked paid ✅');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1306,9 +1805,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
           ? sOf(user['name'])
           : sOf(user['username']);
       for (final o in selected) {
-        final id = sOf(o['id']);
-        if (id.isEmpty) continue;
-        await _fetch('/pos/orders/$id', method: 'PUT', body: {
+        if (sOf(o['id']).isEmpty) continue;
+        await _offlineAwareOrderCall(o, 'PUT', {
           'status': 'Due',
           'dueAt': DateTime.now().toUtc().toIso8601String(),
           'orderTaker': me,
@@ -1320,8 +1818,10 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
         selectMode = false;
         expandedOrderId = null;
       });
-      toast('${selected.length} order(s) marked Due 💰');
-      await _loadData(silent: true);
+      toast(offline
+          ? '${selected.length} order(s) marked Due (offline - auto-sync 💰)'
+          : '${selected.length} order(s) marked Due 💰');
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
@@ -1343,13 +1843,13 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : sOf(user['username']);
-      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+      await _offlineAwareOrderCall(order, 'PUT', {
         'paymentRequestImage': image,
         'paymentRequestedAt': DateTime.now().toUtc().toIso8601String(),
         'orderTaker': me,
       });
       toast('Payment request sent with photo');
-      await _loadData(silent: true);
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     }
@@ -1366,7 +1866,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       final me = sOf(user['name']).isNotEmpty
           ? sOf(user['name'])
           : sOf(user['username']);
-      await _fetch('/pos/orders/${order['id']}', method: 'PUT', body: {
+      await _offlineAwareOrderCall(order, 'PUT', {
         'paymentRequestStatus': 'owner-request',
         'paymentRequestedAt': sOf(order['paymentRequestedAt']).isNotEmpty
             ? order['paymentRequestedAt']
@@ -1378,62 +1878,12 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
       Navigator.of(context, rootNavigator: true).pop();
       toast(
           'Payment request ($method) pushed to Farhan Owner for #${order['orderNumber'] ?? order['id']}');
-      await _loadData(silent: true);
+      await _refreshOrdersOnly();
     } catch (e) {
       toast(e.toString(), seconds: 6);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Map<String, int> get editQtyById {
-    final m = <String, int>{};
-    for (final i in editCart) {
-      final id = sOf(i['productId'] ?? i['id']);
-      if (id.isNotEmpty) m[id] = (m[id] ?? 0) + (numOf(i['quantity'])).round();
-    }
-    return m;
-  }
-
-  double editLiveTotal() {
-    final subtotal = editCart.fold<double>(
-        0, (s, i) => s + numOf(i['price']) * numOf(i['quantity']));
-    final discount = numOf(editOrder?['discount']);
-    final tax = (subtotal - discount) * numOf(editOrder?['taxPercent']) / 100;
-    final service = numOf(editOrder?['serviceCharge']);
-    return (subtotal - discount + tax + service).clamp(0, double.infinity);
-  }
-
-  List<Map<String, dynamic>> get filteredEditAddProducts {
-    final term = editAddSearch.toLowerCase().trim();
-    return products
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .where((p) =>
-            term.isEmpty || sOf(p['name']).toLowerCase().contains(term))
-        .take(50)
-        .toList();
-  }
-
-  void addProductToEditCart(Map product) {
-    final idx = editCart.indexWhere((i) =>
-        sOf(i['productId'] ?? i['id']) == sOf(product['id']));
-    setState(() {
-      if (idx >= 0) {
-        editCart[idx]['quantity'] = numOf(editCart[idx]['quantity']) + 1;
-      } else {
-        editCart.add({
-          'productId': product['id'],
-          'id': product['id'],
-          'name': product['name'],
-          'price': numOf(product['price']),
-          'quantity': 1,
-          'itemId':
-              '${product['id']}-${DateTime.now().millisecondsSinceEpoch}-${editCart.length}',
-        });
-      }
-    });
-    toast('${product['name']} added', seconds: 2);
   }
 
   // ----------------------------------------------------------- printing --
@@ -1750,6 +2200,23 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                 _header(),
                 _typeTabs(),
                 _searchBar(),
+                if (offline)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7),
+                    color: const Color(0xFF991B1B),
+                    child: Text(
+                      pendingLocalOrders.isNotEmpty
+                          ? '⚠ No internet — ${pendingLocalOrders.length} pending order(s) saved locally, auto-syncing when connected'
+                          : '⚠ No internet — checking connection',
+                      style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 Expanded(
                   child: initialLoading
                       ? const Center(
@@ -1764,7 +2231,7 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                 ),
               ],
             ),
-            if (cart.isNotEmpty && !showCart && editOrder == null)
+            if (cart.isNotEmpty && !showCart)
               Positioned(
                 right: 16,
                 bottom: 24,
@@ -1782,7 +2249,6 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
             if (showCart) _cartSheet(),
             if (showPaymentPopup) _takeawayPaymentSheet(),
             if (showOrdersScreen) _ordersScreen(),
-            if (editOrder != null) _editModal(),
             if (message.isNotEmpty) _toastOverlay(),
           ],
         ),
@@ -3134,8 +3600,8 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
                                 width: active ? 2.5 : 1),
                           ),
                           child: ClipOval(
-                            child: sOf(p['photo']).isNotEmpty
-                                ? SmartImage(src: sOf(p['photo']), size: 83)
+                            child: photoSrcOf(p).isNotEmpty
+                                ? SmartImage(src: photoSrcOf(p), size: 83)
                                 : Container(
                                     alignment: Alignment.center,
                                     decoration: const BoxDecoration(
@@ -3425,13 +3891,17 @@ class _OrderTakerScreenState extends State<OrderTakerScreen> {
     );
   }
 
-Widget _cartSheet() {
+void _closeCartSheet() {
+    setState(() => showCart = false);
+  }
+
+  Widget _cartSheet() {
     final isTakeaway = activeType == 'Take Away';
     return Positioned.fill(
       child: Column(children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => setState(() => showCart = false),
+            onTap: _closeCartSheet,
             child: Container(color: Colors.black54),
           ),
         ),
@@ -3448,14 +3918,14 @@ Widget _cartSheet() {
                   border:
                       Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
               child: Row(children: [
-                Text('🛒 $activeType Order ($cartCount items)',
+                Text('🛒 ${editOrder != null ? 'Edit Order' : '$activeType Order'} ($cartCount items)',
                     style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF059669))),
                 const Spacer(),
                 IconButton(
-                  onPressed: () => setState(() => showCart = false),
+                  onPressed: _closeCartSheet,
                   icon: const Icon(Icons.close),
                 ),
               ]),
@@ -3474,7 +3944,7 @@ Widget _cartSheet() {
                                 fontSize: 13, color: Color(0xFF94A3B8))),
                         const SizedBox(height: 10),
                         ElevatedButton(
-                          onPressed: () => setState(() => showCart = false),
+                          onPressed: _closeCartSheet,
                           style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF059669),
                               foregroundColor: Colors.white,
@@ -3501,12 +3971,34 @@ Widget _cartSheet() {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(sOf(item['name']),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700)),
+                                    Row(children: [
+                                      Expanded(
+                                        child: Text(sOf(item['name']),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700)),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => _editCartName(item),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text('Edit Name',
+                                                style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Color(0xFF2563EB),
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                            SizedBox(width: 2),
+                                            Icon(Icons.edit,
+                                                size: 12,
+                                                color: Color(0xFF2563EB)),
+                                          ],
+                                        ),
+                                      ),
+                                    ]),
                                     if (sOf(item['flavor']).isNotEmpty ||
                                         sOf(item['weight']).isNotEmpty)
                                       Text(
@@ -3518,6 +4010,22 @@ Widget _cartSheet() {
                                         style: const TextStyle(
                                             fontSize: 11,
                                             color: Color(0xFF94A3B8))),
+                                    GestureDetector(
+                                      onTap: () => _editCartPrice(item),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text('Edit Price',
+                                              style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Color(0xFF2563EB),
+                                                  fontWeight: FontWeight.w700)),
+                                          SizedBox(width: 2),
+                                          Icon(Icons.edit,
+                                              size: 12, color: Color(0xFF2563EB)),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -3614,7 +4122,9 @@ Widget _cartSheet() {
                     onPressed: (_busy || cart.isEmpty)
                         ? null
                         : () {
-                            if (isTakeaway) {
+                            if (editOrder != null) {
+                              saveEditOrder();
+                            } else if (isTakeaway) {
                               setState(() => showPaymentPopup = true);
                             } else {
                               tableNumber = tableCtrl.text.trim();
@@ -3640,10 +4150,12 @@ Widget _cartSheet() {
                     ),
                     child: Text(
                       _busy
-                          ? 'Creating...'
-                          : isTakeaway
-                              ? 'Place 🛍️ Take Away Order'
-                              : 'Place 🍽️ Dine-In Order',
+                          ? 'Saving...'
+                          : editOrder != null
+                              ? 'Update Order'
+                              : isTakeaway
+                                  ? 'Place 🛍️ Take Away Order'
+                                  : 'Place 🍽️ Dine-In Order',
                       style: const TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w800),
                     ),
@@ -4409,6 +4921,23 @@ Widget _cartSheet() {
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF818CF8))),
+                      if (o['localPending'] == true) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: .18),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: const Text('PENDING',
+                              style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: .8,
+                                  color: Color(0xFFFBBF24))),
+                        ),
+                      ],
                       const Spacer(),
                       if (createdMs != null && (st == 'new' || takeawayTab != null))
                         Padding(
@@ -4633,8 +5162,7 @@ Widget _cartSheet() {
                               toast('Bluetooth print failed: $e', seconds: 6);
                             }
                           }),
-                          _actionChip('✏️ Edit Order', const Color(0xFF1E293B),
-                              const Color(0xFFE2E8F0), () => openEditOrder(o)),
+                          _editIconChip(() => openEditOrder(o)),
                         ],
                         if (takeawayTab == 'pay_later') ...[
                           _actionChip(
@@ -4689,8 +5217,7 @@ Widget _cartSheet() {
                           }
                         }),
                         if (!printOnly) ...[
-                          _actionChip('✏️ Edit Order', const Color(0xFF1E293B),
-                              const Color(0xFFE2E8F0), () => openEditOrder(o)),
+                          _editIconChip(() => openEditOrder(o)),
                           _actionChip(
                               '✅ Mark Served',
                               const Color(0xFF059669),
@@ -5013,6 +5540,33 @@ Widget _cartSheet() {
     );
   }
 
+  Widget _editIconChip(VoidCallback onTap) {
+    return Tooltip(
+      message: 'Edit Order',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(100)),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.edit, color: Color(0xFF7C3AED), size: 14),
+              SizedBox(width: 4),
+              Text('Edit Order',
+                  style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF7C3AED))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _pushOwnerDialog(Map o) {
     showDialog(
       context: context,
@@ -5141,333 +5695,6 @@ Widget _cartSheet() {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ----------------------------------------------------------- edit modal --
-
-  Widget _editModal() {
-    final eo = editOrder!;
-    final allTables = availableDineInTables;
-    final addList = filteredEditAddProducts;
-    final qtyMap = <String, int>{};
-    for (final i in editCart) {
-      final key = sOf(i['productId'] ?? i['id']);
-      qtyMap[key] = (qtyMap[key] ?? 0) + (numOf(i['quantity'])).round();
-    }
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black54,
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            width: double.infinity,
-            constraints: BoxConstraints(
-                maxWidth: 440, maxHeight: MediaQuery.of(context).size.height * 0.9),
-            decoration: BoxDecoration(
-              color: const Color(0xFF020617),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF1E293B)),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                            '✏️ Edit Order #${sOf(eo['orderNumber']).isEmpty ? sOf(eo['id']) : sOf(eo['orderNumber'])}',
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white)),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(() {
-                          editOrder = null;
-                          editCart = [];
-                        }),
-                        icon: const Icon(Icons.close,
-                            size: 18, color: Color(0xFFCBD5E1)),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: Column(
-                      children: [
-                        DropdownButtonFormField<String>(
-                          initialValue:
-                              sOf(eo['tableNumber']).isEmpty ? '' : sOf(eo['tableNumber']),
-                          dropdownColor: const Color(0xFF0F172A),
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFFF1F5F9)),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF334155))),
-                          ),
-                          items: [
-                            const DropdownMenuItem(
-                                value: '', child: Text('Select table or room')),
-                            ...allTables.map((t) {
-                              final label = tableLabel(t);
-                              final busy = t['isOccupied'] == true &&
-                                  label != sOf(eo['tableNumber']);
-                              return DropdownMenuItem(
-                                  value: label,
-                                  child: Text('$label${busy ? ' (Busy)' : ''}',
-                                      style: const TextStyle(fontSize: 12)));
-                            }),
-                          ],
-                          onChanged: (v) =>
-                              setState(() => eo['tableNumber'] = v ?? ''),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          onChanged: (v) => eo['notes'] = v,
-                          controller: TextEditingController(text: sOf(eo['notes'])),
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFFF1F5F9)),
-                          decoration: InputDecoration(
-                            hintText: 'Notes',
-                            hintStyle: const TextStyle(color: Color(0xFF64748B)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF334155))),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...editCart.asMap().entries.map((e) {
-                          final idx = e.key;
-                          final item = e.value;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF1E293B)),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(sOf(item['name']),
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFFE2E8F0))),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      final q = numOf(item['quantity']) - 1;
-                                      if (q <= 0) {
-                                        editCart.removeAt(idx);
-                                      } else {
-                                        item['quantity'] = q;
-                                      }
-                                    });
-                                  },
-                                  child: circleIcon('−'),
-                                ),
-                                SizedBox(
-                                  width: 26,
-                                  child: Text('${numOf(item['quantity']).round()}',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white)),
-                                ),
-                                GestureDetector(
-                                  onTap: () => setState(() {
-                                    item['quantity'] = numOf(item['quantity']) + 1;
-                                  }),
-                                  child: circleIcon('+'),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF1E293B)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('➕ Add More Items',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF34D399))),
-                              const SizedBox(height: 8),
-                              TextField(
-                                onChanged: (v) => setState(() => editAddSearch = v),
-                                style: const TextStyle(
-                                    fontSize: 12, color: Color(0xFFF1F5F9)),
-                                decoration: InputDecoration(
-                                  hintText: 'Search items to add...',
-                                  hintStyle:
-                                      const TextStyle(color: Color(0xFF64748B)),
-                                  prefixIcon: const Icon(Icons.search,
-                                      size: 15, color: Color(0xFF64748B)),
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: const Color(0xFF020617),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                  enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                          color: Color(0xFF334155))),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                constraints:
-                                    const BoxConstraints(maxHeight: 176),
-                                decoration: BoxDecoration(
-                                  border:
-                                      Border.all(color: const Color(0xFF1E293B)),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: addList.isEmpty
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(12),
-                                        child: Text('No items found',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                                fontSize: 11,
-                                                color: Color(0xFF64748B))))
-                                    : ListView.builder(
-                                        shrinkWrap: true,
-                                        itemCount: addList.length,
-                                        itemBuilder: (_, i) {
-                                          final p = addList[i];
-                                          final pid = sOf(p['id']);
-                                          return InkWell(
-                                            onTap: () => addProductToEditCart(p),
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 8),
-                                              child: Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(sOf(p['name']),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style:
-                                                            const TextStyle(
-                                                                fontSize: 12,
-                                                                color: Color(
-                                                                    0xFFE2E8F0))),
-                                                  ),
-                                                  if ((qtyMap[pid] ?? 0) > 0)
-                                                    Padding(
-                                                      padding:
-                                                          const EdgeInsets.only(
-                                                              right: 6),
-                                                      child: Text(
-                                                          'x${qtyMap[pid]}',
-                                                          style: const TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight:
-                                                                  FontWeight.w900,
-                                                              color: Color(
-                                                                  0xFFFBBF24))),
-                                                    ),
-                                                  Text(
-                                                      '${_fmtNum(numOf(p['price']))} PKR',
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color:
-                                                              Color(0xFF34D399))),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0F172A),
-                    border: Border(top: BorderSide(color: Color(0xFF1E293B))),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Total',
-                              style: TextStyle(
-                                  fontSize: 13, color: Color(0xFF94A3B8))),
-                          Text('${_fmtNum(editLiveTotal())} PKR',
-                              style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF34D399))),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _busy ? null : saveEditOrder,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF059669),
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor:
-                                const Color(0xFF059669).withValues(alpha: .45),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text(_busy ? 'Saving...' : 'Save Changes',
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w800)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

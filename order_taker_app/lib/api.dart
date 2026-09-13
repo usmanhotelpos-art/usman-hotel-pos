@@ -22,6 +22,10 @@ class ApiClient {
 
   static String get base => '$host/api';
 
+  /// Invoked when a request fails with 401/403 (invalid or expired token).
+  /// Set by the app to force-logout back to the login screen.
+  static void Function()? onAuthError;
+
   static void setHost(String url) {
     var h = url.trim();
     if (_shouldUseDefault(h)) h = defaultHost;
@@ -114,7 +118,9 @@ class ApiClient {
           (data is Map && data['error'] != null)
               ? data['error'].toString()
               : 'Request failed';
-      throw ApiException(msg, statusCode: res.statusCode);
+      final err = ApiException(msg, statusCode: res.statusCode);
+      if (err.isAuthError && !path.contains('login')) onAuthError?.call();
+      throw err;
     }
     return data;
   }
