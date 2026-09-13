@@ -1,5 +1,18 @@
 # Project Memory / Agent Notes
 
+## Task: Piper — RESUME MARKER (jaise hi user "Piper" type kare, is task se shuru karo)
+- **Context:** Aap is session ko "Piper" naam se yaad rakho. User jab "Piper" type karta hai to is section se hi kaam shuru karna (teeno apps: delivery_orders_app / nashta_app / order_taker_app, stock_app, server/routes.js, usman_hotel_app sab D:\pos ke andar, Railway deploy via git push origin main).
+- **Latest state (Sep 2026) — stock app message/voice:**
+  - **Delete:** App + server double-gated — **sirf manager** role delete kar sakta hai. App: `stock_list_screen.dart` mein delete icon `if (orderId != null && Session.isManager)` (bubble + replies). Server: dono DELETE routes (`/stock/orders/:id/message` aur `/stock/orders/:id/reply/:replyIndex`) par `if (req.user.role !== 'manager') return 403`.
+  - **Cashier:** Full bubble render — voice bars, text, photo, timestamps, role chip (yellow `0xFFFACC15`), right-aligned — **admin/manager jaisa hi**, sirf delete icon nahi dikhta. Koi content-hide-gate nahi.
+  - **Colors:** admin purple `0xFFA78BFA`, manager teal-green `0xFF0D9488`, cashier clear yellow `0xFFFACC15`. Saare bubbles right-aligned.
+  - **Today/Yesterday filter:** stock orders tab mein quick chips (`_datePreset`/`_quickChip`).
+  - **Per-item photos:** order card mein har item ka 44px thumbnail + fullscreen overlay (`_photoThumb`/`_viewPhoto`); server `POST /stock/orders` per-item `photo` list store karta hai.
+  - **APK/Railway:** `D:\pos\UsmanHotel-StockApp.apk` (52.4MB) naya; server `48dd9b4` pushed → Railway auto-deploy. Verify: `node --check routes.js` NAHI — Flutter `flutter analyze` + `flutter build apk --release` + copy app-release.apk.
+- **Agar user ne iske baad kuch naya pucha to:** stock delete sirf manager (cashier ko full view + delete icon nahi), colors, alignment, today/yesterday filter, per-item photos — bas isi ke aas-paas focus; baki apps (delivery/nashta) ko sirf tab touch karo jab us se explicit reference ho.
+- **Kya BAKI HAI (pending decisions, user abhi tk confirm nahi):** (1) cashier ko order-card par approve/reject/delete buttons dikhne chahiye ya nahi — ye pucha tha, answer pending. (2) Age* kis cheez par color — aur koi request batao.
+
+
 ## Task: Three apps in ONE (Delivery + Nashta + Order Taker) — REVERTED
 - **Goal:** Nashta app aur Order Taker app ko Delivery app mein embed karna tha (aik hi app mein). Nahta app icon + Order Taker icon pick-up screen ke top par.
 - **Approach tried:** `path:` dependencies (nashta_app, order_taker_app) delivery pubspec mein + `lib/embedded_apps.dart` (setupEmbeddedApps/openNashtaApp/openOrderTakerApp) + pick-up screen par `_embeddedAppsStrip`.
@@ -71,10 +84,10 @@
 - **Procedure:** Staff delete sirf web dashboard (`usman_hotel_dashboard` → Staff screen → Delete) se hota hai → `DELETE /staff/:id` (`D:\pos\server\routes.js:878` generic collection delete) → `removeRecord('staff', id)` — sirf staff record remove hota hai, koi cascade nahi.
 - **Orders ka relation:** Orders mein staff ka naam plain string `orderTaker`/`waiter` field mein store hai (`_putOrder`/`createOrder` mein `'orderTaker': me`, order_taker_screen.dart ~557). Staff id FK nahi hai — is liye staff delete se orders/profit/revenue/analytics sab pehle jaise rehte hain (name waisa hi dikhta hai).
 - **Cascade sirf pos_orders par:** `DELETE /pos/orders/:id` cleanup karta hai (rider_order_requests + rider_orders). Staff par koi cascade/cleanup nahi.
-## Task: Stock app strict roles + photo verify (local proof) � DONE (Sep 2026, server only)
-- **User wants:** sirf exact Administrator? NO � sirf exact role Admin ? ADMIN, Manager ? MANAGER, Cashier ? CASHIER. Substring matching (pichle d4ecee6) ne Admin Order Taker/Admin Rider ko bhi admin bana diya tha � user ne mana kiya.
+## Task: Stock app strict roles + photo verify (local proof) � DONE (Sep 2026, server only)
+- **User wants:** sirf exact Administrator? NO � sirf exact role Admin ? ADMIN, Manager ? MANAGER, Cashier ? CASHIER. Substring matching (pichle d4ecee6) ne Admin Order Taker/Admin Rider ko bhi admin bana diya tha � user ne mana kiya.
 - **Fix (server/routes.js /stock/login ~line 425):** STRICT mapping ^^admin^^i/^^manager^^i/^^cashier^^i (exact match); baqi sab roles (Admin Order Taker, Admin Rider, Waiter, Biker, Takeaway Order Taker, Table Order Taker) ? 403 Only Admin, Manager and Cashier roles can login to the Stock App. App side (Session.isAdmin/isManager) pehle se exact tha.
-- **Photo issue root cause:** app code DURUST hai (camera ? base64 data URL ? POST photo ? GET par photo render). Problem ye tha ke DEPLOYED Railway server OLD commit par tha jo photo field store hi nahi karta � is liye photo order par show nahi hui + admin accounts MANAGER dikhte thay. Fix = push latest server/routes.js (usme photo store + approve/reject admin + strict roles).
+- **Photo issue root cause:** app code DURUST hai (camera ? base64 data URL ? POST photo ? GET par photo render). Problem ye tha ke DEPLOYED Railway server OLD commit par tha jo photo field store hi nahi karta � is liye photo order par show nahi hui + admin accounts MANAGER dikhte thay. Fix = push latest server/routes.js (usme photo store + approve/reject admin + strict roles).
 - **Verified LOCALLY (photo-roundtrip-test.mjs pattern, disposable):** local mode (DATABASE_URL='' + PORT=4001) par 5 temp staff with known bcrypt hash: exact Admin?admin(200), Manager?manager(200), Cashier?cashier(200); Admin Order Taker?403, Waiter?403. POST /stock/orders photo===sent true; GET roundtrip true; admin DELETE 403; manager DELETE 200. db.json backup/restore karke test clean.
 - **User impact:** Usman ke Admin Order Taker accounts ab stock app login NAHI kar sakte jab tak role exact Admin na change ho (web dashboard Staff screen se). Manager/Cashier waisay hi chalte hain (ab sahi tags ke saath).
 - **Deploy:** git push ? Railway auto-deploy. NEW APK NAHI bani (sirf server change).
