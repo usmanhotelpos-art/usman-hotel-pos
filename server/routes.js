@@ -702,6 +702,79 @@ router.put('/stock/orders/:id/reply', authenticate, (req, res) => {
   res.send(orders[idx]);
 });
 
+// Any stock user (admin/manager/cashier) can delete the main message content
+// (text + voice) while keeping the replies thread. Deletes the whole message
+// object when there are no replies left.
+router.delete('/stock/orders/:id/message', authenticate, (req, res) => {
+  const orders = getCollection('stock_orders') || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).send({ error: 'Order not found' });
+
+  const prev = (orders[idx].message && typeof orders[idx].message === 'object') ? orders[idx].message : null;
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+  if (!prev) return res.send(orders[idx]);
+
+  const replies = Array.isArray(prev.replies) ? prev.replies : [];
+  if (replies.length > 0) {
+    orders[idx] = {
+      ...orders[idx],
+      message: { ...prev, text: '', voice: '', voiceDuration: 0 },
+      updatedAt: pkTime.toISOString(),
+    };
+  } else {
+    const copy = { ...orders[idx] };
+    delete copy.message;
+    orders[idx] = { ...copy, updatedAt: pkTime.toISOString() };
+  }
+
+  const db = readDb();
+  db.stock_orders = orders;
+  writeDb(db);
+
+  res.send(orders[idx]);
+});
+
+// Any stock user can delete a single reply from the order's message thread.
+router.delete('/stock/orders/:id/reply/:replyIndex', authenticate, (req, res) => {
+  const orders = getCollection('stock_orders') || [];
+  const idx = orders.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).send({ error: 'Order not found' });
+
+  const prev = (orders[idx].message && typeof orders[idx].message === 'object') ? orders[idx].message : null;
+  if (!prev) return res.send(orders[idx]);
+
+  const replyIndex = Number(req.params.replyIndex);
+  const replies = Array.isArray(prev.replies) ? prev.replies : [];
+  if (!Number.isInteger(replyIndex) || replyIndex < 0 || replyIndex >= replies.length) {
+    return res.status(400).send({ error: 'Invalid reply index' });
+  }
+
+  const now = new Date();
+  const pkTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+  const remaining = replies.filter((_, i) => i !== replyIndex);
+  const hasMain = ((prev.text || '') + (prev.voice || '')).toString().trim().length > 0;
+
+  if (!hasMain && remaining.length === 0) {
+    const copy = { ...orders[idx] };
+    delete copy.message;
+    orders[idx] = { ...copy, updatedAt: pkTime.toISOString() };
+  } else {
+    orders[idx] = {
+      ...orders[idx],
+      message: { ...prev, replies: remaining },
+      updatedAt: pkTime.toISOString(),
+    };
+  }
+
+  const db = readDb();
+  db.stock_orders = orders;
+  writeDb(db);
+
+  res.send(orders[idx]);
+});
+
 // Delete stock order (manager only)
 router.delete('/stock/orders/:id', authenticate, (req, res) => {
   if (req.user.role !== 'manager') {
