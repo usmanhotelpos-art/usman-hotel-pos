@@ -134,7 +134,9 @@ class _VoicePlayerChipState extends State<VoicePlayerChip> {
               const Icon(Icons.graphic_eq, size: 14),
               const SizedBox(width: 4),
               Text(
-                fmtVoiceDur(_durationMs).isEmpty ? 'Voice' : fmtVoiceDur(_durationMs),
+                fmtVoiceDur(_durationMs).isEmpty
+                    ? 'Voice'
+                    : fmtVoiceDur(_durationMs),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -143,12 +145,18 @@ class _VoicePlayerChipState extends State<VoicePlayerChip> {
               ),
             ],
           ),
-          if (_playing && widget.durationMs > 0 && _total != null && _total!.inMilliseconds > 0) ...[
+          if (_playing &&
+              widget.durationMs > 0 &&
+              _total != null &&
+              _total!.inMilliseconds > 0) ...[
             const SizedBox(height: 4),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: (_pos.inMilliseconds / _total!.inMilliseconds).clamp(0.0, 1.0),
+                value: (_pos.inMilliseconds / _total!.inMilliseconds).clamp(
+                  0.0,
+                  1.0,
+                ),
                 minHeight: 3,
                 backgroundColor: c.withOpacity(0.15),
                 valueColor: AlwaysStoppedAnimation(c),
@@ -207,7 +215,8 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
     String path = '';
     try {
       final dir = await getTemporaryDirectory();
-      path = '${dir.path}/stock_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      path =
+          '${dir.path}/stock_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,
@@ -224,10 +233,11 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
           if (el > const Duration(seconds: 60)) _stopRecord();
         }
       });
-      if (mounted) setState(() {
-        _recording = true;
-        _err = null;
-      });
+      if (mounted)
+        setState(() {
+          _recording = true;
+          _err = null;
+        });
     } catch (e) {
       if (mounted) setState(() => _err = 'Record start fail');
     }
@@ -236,7 +246,9 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
   Future<void> _stopRecord() async {
     _ticker?.cancel();
     _ticker = null;
-    final dur = _started == null ? Duration.zero : DateTime.now().difference(_started!);
+    final dur = _started == null
+        ? Duration.zero
+        : DateTime.now().difference(_started!);
     _started = null;
     String? p;
     try {
@@ -265,7 +277,9 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
     if (mounted) {
       setState(() {
         _recording = false;
-        _err = dur.inSeconds < 1 ? 'Recording bht chhoti hai (1s se kam)' : 'Recording save nahi hui';
+        _err = dur.inSeconds < 1
+            ? 'Recording bht chhoti hai (1s se kam)'
+            : 'Recording save nahi hui';
       });
     }
   }
@@ -285,7 +299,11 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          VoicePlayerChip(bytes: res.bytes, durationMs: res.durationMs, color: c),
+          VoicePlayerChip(
+            bytes: res.bytes,
+            durationMs: res.durationMs,
+            color: c,
+          ),
           const SizedBox(width: 6),
           GestureDetector(
             onTap: () {
@@ -297,8 +315,9 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
         ],
       );
     }
-    final elapsed =
-        _recording && _started != null ? DateTime.now().difference(_started!) : Duration.zero;
+    final elapsed = _recording && _started != null
+        ? DateTime.now().difference(_started!)
+        : Duration.zero;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -313,7 +332,9 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
                   : c.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _recording ? const Color(0xFFDC2626) : c.withOpacity(0.4),
+                color: _recording
+                    ? const Color(0xFFDC2626)
+                    : c.withOpacity(0.4),
               ),
             ),
             child: Row(
@@ -342,7 +363,10 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton> {
         if (_err != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(_err!, style: const TextStyle(fontSize: 10, color: Colors.redAccent)),
+            child: Text(
+              _err!,
+              style: const TextStyle(fontSize: 10, color: Colors.redAccent),
+            ),
           ),
       ],
     );

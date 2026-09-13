@@ -78,8 +78,12 @@ class StockListScreenState extends State<StockListScreen> {
       _error = null;
     });
     try {
-      final start = _startDate != null ? DateFormat('yyyy-MM-dd').format(_startDate!) : null;
-      final end = _endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : null;
+      final start = _startDate != null
+          ? DateFormat('yyyy-MM-dd').format(_startDate!)
+          : null;
+      final end = _endDate != null
+          ? DateFormat('yyyy-MM-dd').format(_endDate!)
+          : null;
       final orders = await ApiClient.getStockOrders(
         token: Session.token,
         startDate: start,
@@ -100,7 +104,9 @@ class StockListScreenState extends State<StockListScreen> {
   Future<void> _pickDate(bool isStart) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now()),
+      initialDate: isStart
+          ? (_startDate ?? DateTime.now())
+          : (_endDate ?? DateTime.now()),
       firstDate: DateTime(2024),
       lastDate: DateTime.now(),
       builder: (context, child) {
@@ -189,7 +195,10 @@ class StockListScreenState extends State<StockListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Delete stock order?', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Delete stock order?',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           '${order['orderNumber'] ?? ''} delete karein?',
           style: const TextStyle(color: Colors.white70),
@@ -197,13 +206,19 @@ class StockListScreenState extends State<StockListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text(
               'Delete',
-              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -211,10 +226,16 @@ class StockListScreenState extends State<StockListScreen> {
     );
     if (confirmed != true) return;
     try {
-      await ApiClient.deleteStockOrder(order['id'].toString(), token: Session.token);
+      await ApiClient.deleteStockOrder(
+        order['id'].toString(),
+        token: Session.token,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Stock order deleted'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Stock order deleted'),
+            backgroundColor: Colors.green,
+          ),
         );
         _load();
       }
@@ -272,7 +293,11 @@ class StockListScreenState extends State<StockListScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(ok ? 'Printed successfully' : 'Print failed: ${BtService.lastError}'),
+          content: Text(
+            ok
+                ? 'Printed successfully'
+                : 'Print failed: ${BtService.lastError}',
+          ),
           backgroundColor: ok ? Colors.green : Colors.red,
         ),
       );
@@ -323,18 +348,24 @@ class StockListScreenState extends State<StockListScreen> {
                   const SizedBox(width: 8),
                   _filterChip(
                     icon: Icons.calendar_today,
-                    label: _startDate != null ? DateFormat('dd MMM').format(_startDate!) : 'Start',
+                    label: _startDate != null
+                        ? DateFormat('dd MMM').format(_startDate!)
+                        : 'Start',
                     onTap: () => _pickDate(true),
                     active: _startDate != null,
                   ),
                   const SizedBox(width: 8),
                   _filterChip(
                     icon: Icons.calendar_today,
-                    label: _endDate != null ? DateFormat('dd MMM').format(_endDate!) : 'End',
+                    label: _endDate != null
+                        ? DateFormat('dd MMM').format(_endDate!)
+                        : 'End',
                     onTap: () => _pickDate(false),
                     active: _endDate != null,
                   ),
-                  if (_startDate != null || _endDate != null || _statusFilter.isNotEmpty) ...[
+                  if (_startDate != null ||
+                      _endDate != null ||
+                      _statusFilter.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: _clearFilters,
@@ -344,7 +375,11 @@ class StockListScreenState extends State<StockListScreen> {
                           color: Colors.red.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.close, size: 18, color: Colors.redAccent),
+                        child: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
                       ),
                     ),
                   ],
@@ -356,7 +391,11 @@ class StockListScreenState extends State<StockListScreen> {
                   children: [
                     _quickChip('Today', 'today', icon: Icons.today),
                     const SizedBox(width: 8),
-                    _quickChip('Yesterday', 'yesterday', icon: Icons.chevron_left),
+                    _quickChip(
+                      'Yesterday',
+                      'yesterday',
+                      icon: Icons.chevron_left,
+                    ),
                     if (_datePreset.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       _quickChip('All Dates', '', icon: Icons.event_available),
@@ -386,43 +425,62 @@ class StockListScreenState extends State<StockListScreen> {
         // Orders list
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF38BDF8)),
+                )
               : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.error_outline, size: 48, color: Colors.white.withOpacity(0.3)),
-                          const SizedBox(height: 12),
-                          Text(_error!, style: TextStyle(color: Colors.white.withOpacity(0.5))),
-                          const SizedBox(height: 16),
-                          ElevatedButton(onPressed: _load, child: const Text('Retry')),
-                        ],
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.white.withOpacity(0.3),
                       ),
-                    )
-                  : _orders.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.inventory_2_outlined, size: 56, color: Colors.white.withOpacity(0.15)),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No stock orders',
-                                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: _load,
-                          color: const Color(0xFF38BDF8),
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _orders.length,
-                            itemBuilder: (ctx, i) => _orderCard(_orders[i]),
-                          ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _load,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : _orders.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 56,
+                        color: Colors.white.withOpacity(0.15),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No stock orders',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 16,
                         ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  color: const Color(0xFF38BDF8),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _orders.length,
+                    itemBuilder: (ctx, i) => _orderCard(_orders[i]),
+                  ),
+                ),
         ),
       ],
     );
@@ -439,16 +497,24 @@ class StockListScreenState extends State<StockListScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF38BDF8).withOpacity(0.15) : Colors.white.withOpacity(0.06),
+          color: active
+              ? const Color(0xFF38BDF8).withOpacity(0.15)
+              : Colors.white.withOpacity(0.06),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: active ? const Color(0xFF38BDF8).withOpacity(0.4) : Colors.white.withOpacity(0.1),
+            color: active
+                ? const Color(0xFF38BDF8).withOpacity(0.4)
+                : Colors.white.withOpacity(0.1),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: active ? const Color(0xFF38BDF8) : Colors.white38),
+            Icon(
+              icon,
+              size: 16,
+              color: active ? const Color(0xFF38BDF8) : Colors.white38,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -474,10 +540,14 @@ class StockListScreenState extends State<StockListScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF38BDF8).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+          color: active
+              ? const Color(0xFF38BDF8).withOpacity(0.2)
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? const Color(0xFF38BDF8).withOpacity(0.5) : Colors.white.withOpacity(0.08),
+            color: active
+                ? const Color(0xFF38BDF8).withOpacity(0.5)
+                : Colors.white.withOpacity(0.08),
           ),
         ),
         child: Text(
@@ -499,16 +569,24 @@ class StockListScreenState extends State<StockListScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFF59E0B).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+          color: active
+              ? const Color(0xFFF59E0B).withOpacity(0.2)
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? const Color(0xFFF59E0B).withOpacity(0.5) : Colors.white.withOpacity(0.08),
+            color: active
+                ? const Color(0xFFF59E0B).withOpacity(0.5)
+                : Colors.white.withOpacity(0.08),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: active ? const Color(0xFFF59E0B) : Colors.white38),
+            Icon(
+              icon,
+              size: 14,
+              color: active ? const Color(0xFFF59E0B) : Colors.white38,
+            ),
             const SizedBox(width: 4),
             Text(
               label,
@@ -535,7 +613,11 @@ class StockListScreenState extends State<StockListScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.menu_book_outlined, size: 16, color: Colors.white.withOpacity(0.4)),
+          Icon(
+            Icons.menu_book_outlined,
+            size: 16,
+            color: Colors.white.withOpacity(0.4),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: DropdownButton<String>(
@@ -544,7 +626,10 @@ class StockListScreenState extends State<StockListScreen> {
               isDense: true,
               underline: const SizedBox(),
               dropdownColor: const Color(0xFF1E293B),
-              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white.withOpacity(0.8),
+              ),
               items: [
                 const DropdownMenuItem(value: all, child: Text(all)),
                 ..._headings.map((h) {
@@ -607,7 +692,9 @@ class StockListScreenState extends State<StockListScreen> {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             decoration: BoxDecoration(
               color: _statusColor(status).withOpacity(0.08),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
@@ -617,7 +704,11 @@ class StockListScreenState extends State<StockListScreen> {
                     color: _statusColor(status).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(_statusIcon(status), size: 18, color: _statusColor(status)),
+                  child: Icon(
+                    _statusIcon(status),
+                    size: 18,
+                    color: _statusColor(status),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -627,22 +718,29 @@ class StockListScreenState extends State<StockListScreen> {
                       if ((order['heading'] ?? '').isNotEmpty) ...[
                         Container(
                           margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                _headingColor('${order['heading']}').withOpacity(0.22),
-                                _headingColor('${order['heading']}').withOpacity(0.08),
+                                _headingColor('${order['heading']}')
+                                    .withOpacity(0.22),
+                                _headingColor('${order['heading']}')
+                                    .withOpacity(0.08),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _headingColor('${order['heading']}').withOpacity(0.45),
+                              color: _headingColor('${order['heading']}')
+                                  .withOpacity(0.45),
                               width: 1,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: _headingColor('${order['heading']}').withOpacity(0.2),
+                                color: _headingColor('${order['heading']}')
+                                    .withOpacity(0.2),
                                 blurRadius: 8,
                                 spreadRadius: 1,
                               ),
@@ -654,7 +752,9 @@ class StockListScreenState extends State<StockListScreen> {
                               stockCirclePhoto(
                                 _headingPhoto('${order['heading']}'),
                                 fallbackIcon: Icons.label_important,
-                                fallbackColor: _headingColor('${order['heading']}'),
+                                fallbackColor: _headingColor(
+                                  '${order['heading']}',
+                                ),
                                 radius: 11,
                               ),
                               const SizedBox(width: 6),
@@ -686,7 +786,10 @@ class StockListScreenState extends State<StockListScreen> {
                       const SizedBox(height: 4),
                       // Bold highlighted date/time with glowing effect
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -710,7 +813,11 @@ class StockListScreenState extends State<StockListScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.access_time_filled, size: 14, color: Color(0xFFFBBF24)),
+                            const Icon(
+                              Icons.access_time_filled,
+                              size: 14,
+                              color: Color(0xFFFBBF24),
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               '${order['date'] ?? ''}',
@@ -744,7 +851,10 @@ class StockListScreenState extends State<StockListScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor(status).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -773,7 +883,9 @@ class StockListScreenState extends State<StockListScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _statusColor(status).withOpacity(0.15)),
+                    border: Border.all(
+                      color: _statusColor(status).withOpacity(0.15),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -785,7 +897,11 @@ class StockListScreenState extends State<StockListScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Center(
-                          child: Icon(Icons.inventory_2, size: 18, color: Color(0xFF38BDF8)),
+                          child: Icon(
+                            Icons.inventory_2,
+                            size: 18,
+                            color: Color(0xFF38BDF8),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -822,7 +938,10 @@ class StockListScreenState extends State<StockListScreen> {
                         _itemPhotoThumb(item['photo']),
                       ],
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: _statusColor(status).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(8),
@@ -845,10 +964,7 @@ class StockListScreenState extends State<StockListScreen> {
           // Attached photo
           if (photoBytes != null) _photoSection(photoBytes),
           // Message thread
-          if (message != null &&
-              ((message['text'] ?? '').toString().isNotEmpty ||
-                  (message['voice'] ?? '').toString().isNotEmpty))
-            _messageSection(order),
+          if (_hasMessage(order)) _messageSection(order),
           // Info & Actions
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -859,7 +975,10 @@ class StockListScreenState extends State<StockListScreen> {
                     _infoTag(Icons.person, 'By: ${order['addedBy'] ?? ''}'),
                     const SizedBox(width: 8),
                     if ((order['counterName'] ?? '').isNotEmpty) ...[
-                      _infoTag(Icons.storefront, 'Counter: ${order['counterName']}'),
+                      _infoTag(
+                        Icons.storefront,
+                        'Counter: ${order['counterName']}',
+                      ),
                       const SizedBox(width: 8),
                     ],
                     if ((order['approvedBy'] ?? '').isNotEmpty)
@@ -872,7 +991,10 @@ class StockListScreenState extends State<StockListScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       order['notes'],
-                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.4),
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -937,8 +1059,14 @@ class StockListScreenState extends State<StockListScreen> {
             children: [
               Icon(Icons.print, size: 16, color: Colors.white54),
               SizedBox(width: 6),
-              Text('Print',
-                  style: TextStyle(fontSize: 12, color: Colors.white54, fontWeight: FontWeight.w600)),
+              Text(
+                'Print',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white54,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -961,8 +1089,14 @@ class StockListScreenState extends State<StockListScreen> {
             children: [
               Icon(Icons.check, size: 16, color: Color(0xFF22C55E)),
               SizedBox(width: 6),
-              Text('Approve',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF22C55E), fontWeight: FontWeight.w700)),
+              Text(
+                'Approve',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF22C55E),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
@@ -985,8 +1119,14 @@ class StockListScreenState extends State<StockListScreen> {
             children: [
               Icon(Icons.close, size: 16, color: Colors.redAccent),
               SizedBox(width: 6),
-              Text('Reject',
-                  style: TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.w700)),
+              Text(
+                'Reject',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
@@ -1004,7 +1144,11 @@ class StockListScreenState extends State<StockListScreen> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.red.withOpacity(0.2)),
         ),
-        child: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+        child: const Icon(
+          Icons.delete_outline,
+          size: 18,
+          color: Colors.redAccent,
+        ),
       ),
     );
   }
@@ -1021,7 +1165,13 @@ class StockListScreenState extends State<StockListScreen> {
         children: [
           Icon(icon, size: 12, color: Colors.white.withOpacity(0.35)),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.5))),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withOpacity(0.5),
+            ),
+          ),
         ],
       ),
     );
@@ -1096,7 +1246,11 @@ class StockListScreenState extends State<StockListScreen> {
                   color: Colors.black.withOpacity(0.55),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Icon(Icons.fullscreen, size: 10, color: Colors.white70),
+                child: const Icon(
+                  Icons.fullscreen,
+                  size: 10,
+                  color: Colors.white70,
+                ),
               ),
             ),
           ],
@@ -1166,16 +1320,25 @@ class StockListScreenState extends State<StockListScreen> {
               GestureDetector(
                 onTap: () => _viewPhoto(bytes),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF38BDF8).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withOpacity(0.35),
+                    ),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.fullscreen, size: 14, color: Color(0xFF38BDF8)),
+                      Icon(
+                        Icons.fullscreen,
+                        size: 14,
+                        color: Color(0xFF38BDF8),
+                      ),
                       SizedBox(width: 4),
                       Text(
                         'View Photo',
@@ -1224,7 +1387,11 @@ class StockListScreenState extends State<StockListScreen> {
                     left: 12,
                     child: Row(
                       children: [
-                        const Icon(Icons.fullscreen, size: 16, color: Colors.white70),
+                        const Icon(
+                          Icons.fullscreen,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'Tap to view full photo',
@@ -1246,6 +1413,17 @@ class StockListScreenState extends State<StockListScreen> {
     );
   }
 
+  bool _hasMessage(Map<String, dynamic> order) {
+    final m = order['message'];
+    if (m is! Map) return false;
+    if (((m['text'] ?? '') as String? ?? '').toString().trim().isNotEmpty)
+      return true;
+    if (((m['voice'] ?? '') as String? ?? '').toString().trim().isNotEmpty)
+      return true;
+    final r = m['replies'];
+    return r is List && r.isNotEmpty;
+  }
+
   Widget _messageSection(Map<String, dynamic> order) {
     final msg = (order['message'] is Map)
         ? Map<String, dynamic>.from(order['message'] as Map)
@@ -1253,8 +1431,12 @@ class StockListScreenState extends State<StockListScreen> {
     final repliesRaw = msg['replies'];
     final replies = (repliesRaw is List)
         ? repliesRaw
-            .map((r) => r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{})
-            .toList()
+              .map(
+                (r) => r is Map
+                    ? Map<String, dynamic>.from(r)
+                    : <String, dynamic>{},
+              )
+              .toList()
         : <Map<String, dynamic>>[];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1286,11 +1468,16 @@ class StockListScreenState extends State<StockListScreen> {
                 GestureDetector(
                   onTap: () => _replyToOrder(order),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D9488).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.4)),
+                      border: Border.all(
+                        color: const Color(0xFF0D9488).withOpacity(0.4),
+                      ),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1315,29 +1502,45 @@ class StockListScreenState extends State<StockListScreen> {
             FractionallySizedBox(
               widthFactor: 0.88,
               alignment: Alignment.centerRight,
-              child: _msgBubble(msg),
+              child: _msgBubble(msg, orderId: order['id']),
             ),
-            ...replies.map((r) => FractionallySizedBox(
-                  widthFactor: 0.88,
-                  alignment: r['role'] == 'admin'
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: _msgBubble(r),
-                )),
+            ...replies.asMap().entries.map(
+              (e) => FractionallySizedBox(
+                widthFactor: 0.88,
+                alignment: Alignment.centerRight,
+                child: _msgBubble(
+                  e.value,
+                  orderId: order['id'],
+                  replyIndex: e.key,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _msgBubble(Map<String, dynamic> msg) {
+  Widget _msgBubble(
+    Map<String, dynamic> msg, {
+    String? orderId,
+    int? replyIndex,
+  }) {
     final role = (msg['role'] ?? '').toString();
     final isAdminSide = role == 'admin';
-    final c = isAdminSide ? const Color(0xFFA78BFA) : const Color(0xFF0D9488);
+    late final Color c;
+    if (role == 'manager') {
+      c = const Color(0xFF0D9488);
+    } else if (role == 'cashier') {
+      c = const Color(0xFFFACC15);
+    } else {
+      c = const Color(0xFFA78BFA);
+    }
     final text = (msg['text'] ?? '').toString();
     final voiceRaw = (msg['voice'] ?? '').toString();
     final voiceBytes = voiceRaw.isNotEmpty ? stockVoiceBytes(voiceRaw) : null;
-    final voiceDur = (num.tryParse('${msg['voiceDuration'] ?? 0}') ?? 0).toInt();
+    final voiceDur = (num.tryParse('${msg['voiceDuration'] ?? 0}') ?? 0)
+        .toInt();
     final sentBy = (msg['sentBy'] ?? '').toString();
     final sentAt = (msg['sentAt'] ?? '').toString();
     final type = ((msg['type'] ?? '').toString()).isEmpty
@@ -1353,12 +1556,10 @@ class StockListScreenState extends State<StockListScreen> {
         border: Border.all(color: c.withOpacity(0.35)),
       ),
       child: Column(
-        crossAxisAlignment:
-            isAdminSide ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 isAdminSide ? Icons.admin_panel_settings : Icons.person,
@@ -1366,9 +1567,16 @@ class StockListScreenState extends State<StockListScreen> {
                 color: c,
               ),
               const SizedBox(width: 4),
-              Text(
-                sentBy.isEmpty ? (isAdminSide ? 'Admin' : 'Staff') : sentBy,
-                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c),
+              Flexible(
+                child: Text(
+                  sentBy.isEmpty ? (isAdminSide ? 'Admin' : 'Staff') : sentBy,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: c,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
               const SizedBox(width: 6),
               Container(
@@ -1387,6 +1595,16 @@ class StockListScreenState extends State<StockListScreen> {
                   ),
                 ),
               ),
+              const Spacer(),
+              if (orderId != null)
+                GestureDetector(
+                  onTap: () => _deleteMessage(orderId, replyIndex),
+                  child: Icon(
+                    Icons.delete_outline,
+                    size: 14,
+                    color: c.withOpacity(0.7),
+                  ),
+                ),
             ],
           ),
           if (voiceBytes != null) ...[
@@ -1395,18 +1613,93 @@ class StockListScreenState extends State<StockListScreen> {
           ],
           if (text.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(text, style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.35)),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.white,
+                height: 1.35,
+              ),
+            ),
           ],
           if (sentAt.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               sentAt,
-              style: TextStyle(fontSize: 9.5, color: Colors.white.withOpacity(0.35)),
+              style: TextStyle(
+                fontSize: 9.5,
+                color: Colors.white.withOpacity(0.35),
+              ),
             ),
           ],
         ],
       ),
     );
+  }
+
+  Future<void> _deleteMessage(String orderId, int? replyIndex) async {
+    final okay = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'Delete message?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          replyIndex == null
+              ? 'Yeh message (text/voice) delete karein?'
+              : 'Yeh reply delete karein?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (okay != true) return;
+    try {
+      if (replyIndex == null) {
+        await ApiClient.deleteStockOrderMessage(orderId, token: Session.token);
+      } else {
+        await ApiClient.deleteStockOrderReply(
+          orderId,
+          replyIndex,
+          token: Session.token,
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message removed'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _load();
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _replyToOrder(Map<String, dynamic> order) async {
@@ -1436,20 +1729,29 @@ class StockListScreenState extends State<StockListScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Reply likhein...',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.3),
+                      ),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
                       focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(10)),
-                        borderSide: BorderSide(color: Color(0xFF0D9488), width: 1.2),
+                        borderSide: BorderSide(
+                          color: Color(0xFF0D9488),
+                          width: 1.2,
+                        ),
                       ),
                     ),
                   ),
@@ -1458,7 +1760,8 @@ class StockListScreenState extends State<StockListScreen> {
                     color: const Color(0xFF0D9488),
                     label: 'Voice reply record',
                     onRecorded: (res) {
-                      voiceDataUrl = 'data:audio/m4a;base64,${base64Encode(res.bytes)}';
+                      voiceDataUrl =
+                          'data:audio/m4a;base64,${base64Encode(res.bytes)}';
                       voiceDur = res.durationMs;
                     },
                     onCleared: () {
@@ -1472,7 +1775,10 @@ class StockListScreenState extends State<StockListScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.white54),
+                ),
               ),
               TextButton(
                 onPressed: sending
@@ -1501,7 +1807,10 @@ class StockListScreenState extends State<StockListScreen> {
                         } on ApiException catch (e) {
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+                              SnackBar(
+                                content: Text(e.message),
+                                backgroundColor: Colors.red,
+                              ),
                             );
                           }
                           setDialogState(() => sending = false);
@@ -1511,11 +1820,17 @@ class StockListScreenState extends State<StockListScreen> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D9488)),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF0D9488),
+                        ),
                       )
                     : const Text(
                         'Send',
-                        style: TextStyle(color: Color(0xFF0D9488), fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Color(0xFF0D9488),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
               ),
             ],
@@ -1525,14 +1840,18 @@ class StockListScreenState extends State<StockListScreen> {
     );
     if (result == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reply sent'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Reply sent'),
+          backgroundColor: Colors.green,
+        ),
       );
       _load();
     }
   }
 
   Widget _adminMessageButton(Map<String, dynamic> order) {
-    final hasMsg = (order['message'] is Map) &&
+    final hasMsg =
+        (order['message'] is Map) &&
         (((order['message']['text'] ?? '').toString()).isNotEmpty ||
             ((order['message']['voice'] ?? '').toString()).isNotEmpty);
     return GestureDetector(
@@ -1556,7 +1875,11 @@ class StockListScreenState extends State<StockListScreen> {
             const SizedBox(width: 6),
             const Text(
               'Send Message',
-              style: TextStyle(fontSize: 12, color: Color(0xFFA78BFA), fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFFA78BFA),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
@@ -1576,7 +1899,10 @@ class StockListScreenState extends State<StockListScreen> {
         builder: (ctx, setDialogState) {
           return AlertDialog(
             backgroundColor: const Color(0xFF1E293B),
-            title: const Text('Admin Message', style: TextStyle(color: Colors.white, fontSize: 16)),
+            title: const Text(
+              'Admin Message',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1584,12 +1910,18 @@ class StockListScreenState extends State<StockListScreen> {
                 children: [
                   Text(
                     'Order: ${order['orderNumber'] ?? ''}',
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Message Type',
-                    style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -1605,11 +1937,17 @@ class StockListScreenState extends State<StockListScreen> {
                       isDense: true,
                       underline: const SizedBox(),
                       dropdownColor: const Color(0xFF1E293B),
-                      style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.85)),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
                       items: _messageTypes
-                          .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                          .map(
+                            (t) => DropdownMenuItem(value: t, child: Text(t)),
+                          )
                           .toList(),
-                      onChanged: (v) => setDialogState(() => type = v ?? 'Note'),
+                      onChanged: (v) =>
+                          setDialogState(() => type = v ?? 'Note'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1620,43 +1958,56 @@ class StockListScreenState extends State<StockListScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Message likhein...',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.3),
+                      ),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.05),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
                       ),
                       focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(10)),
-                        borderSide: BorderSide(color: Color(0xFFA78BFA), width: 1.2),
+                        borderSide: BorderSide(
+                          color: Color(0xFFA78BFA),
+                          width: 1.2,
+                        ),
                       ),
                     ),
                   ),
-                const SizedBox(height: 4),
-                      VoiceRecorderButton(
-                        color: const Color(0xFFA78BFA),
-                        label: 'Voice message record',
-                        onRecorded: (res) {
-                          voiceDataUrl = 'data:audio/m4a;base64,${base64Encode(res.bytes)}';
-                          voiceDur = res.durationMs;
-                        },
-                        onCleared: () {
-                          voiceDataUrl = null;
-                          voiceDur = 0;
-                        },
-                      ),
+                  const SizedBox(height: 4),
+                  VoiceRecorderButton(
+                    color: const Color(0xFFA78BFA),
+                    label: 'Voice message record',
+                    onRecorded: (res) {
+                      voiceDataUrl =
+                          'data:audio/m4a;base64,${base64Encode(res.bytes)}';
+                      voiceDur = res.durationMs;
+                    },
+                    onCleared: () {
+                      voiceDataUrl = null;
+                      voiceDur = 0;
+                    },
+                  ),
                 ],
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.white54),
+                ),
               ),
               TextButton(
                 onPressed: sending
@@ -1686,7 +2037,10 @@ class StockListScreenState extends State<StockListScreen> {
                         } on ApiException catch (e) {
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+                              SnackBar(
+                                content: Text(e.message),
+                                backgroundColor: Colors.red,
+                              ),
                             );
                           }
                           setDialogState(() => sending = false);
@@ -1703,7 +2057,10 @@ class StockListScreenState extends State<StockListScreen> {
                       )
                     : const Text(
                         'Send',
-                        style: TextStyle(color: Color(0xFFA78BFA), fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Color(0xFFA78BFA),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
               ),
             ],
@@ -1713,7 +2070,10 @@ class StockListScreenState extends State<StockListScreen> {
     );
     if (result == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message sent'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Message sent'),
+          backgroundColor: Colors.green,
+        ),
       );
       _load();
     }

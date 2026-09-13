@@ -160,7 +160,9 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                bytes == null ? 'Heading ke saath photo (Camera)' : 'Heading photo',
+                bytes == null
+                    ? 'Heading ke saath photo (Camera)'
+                    : 'Heading photo',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -172,7 +174,10 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
                 bytes == null
                     ? 'Circle par tap karke photo lein'
                     : 'Circle par tap karke poori photo dekhein',
-                style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.4)),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withOpacity(0.4),
+                ),
               ),
               if (bytes != null) ...[
                 const SizedBox(height: 10),
@@ -223,7 +228,11 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -236,7 +245,10 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Delete heading?', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Delete heading?',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           "'${heading['name'] ?? ''}' delete karein?",
           style: const TextStyle(color: Colors.white70),
@@ -244,13 +256,19 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text(
               'Delete',
-              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -258,7 +276,10 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
     );
     if (confirmed != true) return;
     try {
-      await ApiClient.deleteStockHeading(heading['id'].toString(), token: Session.token);
+      await ApiClient.deleteStockHeading(
+        heading['id'].toString(),
+        token: Session.token,
+      );
       _showMsg('Heading deleted');
       _load();
     } on ApiException catch (e) {
@@ -291,7 +312,11 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
                   color: const Color(0xFF8B5CF6).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.menu_book, size: 20, color: Color(0xFF8B5CF6)),
+                child: const Icon(
+                  Icons.menu_book,
+                  size: 20,
+                  color: Color(0xFF8B5CF6),
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -318,199 +343,243 @@ class _HeadingsScreenState extends State<HeadingsScreen> {
         ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6)))
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF8B5CF6)),
+                )
               : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.cloud_off, size: 48, color: Colors.white.withOpacity(0.3)),
-                          const SizedBox(height: 12),
-                          Text(_error!, style: TextStyle(color: Colors.white.withOpacity(0.5))),
-                          const SizedBox(height: 16),
-                          ElevatedButton(onPressed: _load, child: const Text('Retry')),
-                        ],
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cloud_off,
+                        size: 48,
+                        color: Colors.white.withOpacity(0.3),
                       ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        // Add heading
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withOpacity(0.06)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.add_chart, size: 16, color: Color(0xFF8B5CF6)),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Naya Heading',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: _nameCtrl,
-                                style: const TextStyle(color: Colors.white, fontSize: 14),
-                                textCapitalization: TextCapitalization.sentences,
-                                decoration: InputDecoration(
-                                  hintText: 'Heading name...',
-                                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                                  prefixIcon: Icon(Icons.menu_book_outlined,
-                                      color: Colors.white.withOpacity(0.3), size: 20),
-                                  filled: true,
-                                  fillColor: Colors.white.withOpacity(0.05),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide:
-                                        const BorderSide(color: Color(0xFF8B5CF6), width: 1.2),
-                                  ),
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                ),
-                                onSubmitted: (_) => _add(),
-                              ),
-                              const SizedBox(height: 14),
-                              _buildPhotoAttach(),
-                              const SizedBox(height: 14),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 46,
-                                child: ElevatedButton(
-                                  onPressed: _saving ? null : _add,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF8B5CF6),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: _saving
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2.5, color: Colors.white),
-                                        )
-                                      : const Text(
-                                          'ADD HEADING',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 13,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _load,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // Add heading
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.06),
                         ),
-                        const SizedBox(height: 12),
-                        // Heading list
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withOpacity(0.06)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
                             children: [
+                              Icon(
+                                Icons.add_chart,
+                                size: 16,
+                                color: Color(0xFF8B5CF6),
+                              ),
+                              SizedBox(width: 8),
                               Text(
-                                'Headings (${_headings.length})',
-                                style: const TextStyle(
-                                  fontSize: 13,
+                                'Naya Heading',
+                                style: TextStyle(
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              if (_headings.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  child: Center(
-                                    child: Text(
-                                      'Koi heading nahi',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.35),
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              else
-                                ..._headings.asMap().entries.map((entry) {
-                                  final h = entry.value;
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.04),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        stockCirclePhoto(
-                                          stockPhotoBytes(h['photo']),
-                                          fallbackIcon: Icons.label_important,
-                                          fallbackColor: _headingColor(h['name'] ?? ''),
-                                          radius: 14,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            h['name'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () => _delete(h),
-                                          child: const Icon(
-                                            Icons.delete_outline,
-                                            size: 18,
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _nameCtrl,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              hintText: 'Heading name...',
+                              hintStyle: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.menu_book_outlined,
+                                color: Colors.white.withOpacity(0.3),
+                                size: 20,
+                              ),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.05),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF8B5CF6),
+                                  width: 1.2,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            onSubmitted: (_) => _add(),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildPhotoAttach(),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton(
+                              onPressed: _saving ? null : _add,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B5CF6),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _saving
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'ADD HEADING',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 12),
+                    // Heading list
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.06),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Headings (${_headings.length})',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (_headings.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: Text(
+                                  'Koi heading nahi',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.35),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            ..._headings.asMap().entries.map((entry) {
+                              final h = entry.value;
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.04),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.08),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    stockCirclePhoto(
+                                      stockPhotoBytes(h['photo']),
+                                      fallbackIcon: Icons.label_important,
+                                      fallbackColor: _headingColor(
+                                        h['name'] ?? '',
+                                      ),
+                                      radius: 14,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        h['name'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => _delete(h),
+                                      child: const Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
         ),
       ],
     );

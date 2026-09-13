@@ -19,30 +19,79 @@ class _FontEl {
   final String id, label, sizeKey, boldKey;
   final double defaultSize;
   final bool defaultBold;
-  const _FontEl(this.id, this.label, this.sizeKey, this.boldKey,
-      {this.defaultSize = 20, this.defaultBold = false});
+  const _FontEl(
+    this.id,
+    this.label,
+    this.sizeKey,
+    this.boldKey, {
+    this.defaultSize = 20,
+    this.defaultBold = false,
+  });
 }
 
 class _StockPrinterSettingsState extends State<StockPrinterSettings> {
   static const String _overridesKey = 'stockBtPrinterOverrides';
 
   static const List<_FontEl> fontElements = [
-    _FontEl('header', 'Receipt Header (Usman Hotel)', 'stBtFontSize', 'stBtHeaderBold',
-        defaultSize: 24, defaultBold: true),
-    _FontEl('heading', 'Slip Heading (Stock List Daily)', 'stBtHeadingFontSize',
-        'stBtHeadingBold', defaultSize: 18, defaultBold: true),
-    _FontEl('orderNo', 'Order Number (SO-0001)', 'stBtOrderNoFontSize',
-        'stBtOrderNoBold', defaultSize: 17, defaultBold: true),
-    _FontEl('info', 'Date / Time / Status', 'stBtInfoFontSize', 'stBtInfoBold',
-        defaultSize: 17),
-    _FontEl('product', 'Item Name', 'stBtProductFontSize', 'stBtProductBold',
-        defaultSize: 20),
-    _FontEl('desc', 'Description (QTY + Desc)', 'stBtDescFontSize', 'stBtDescBold',
-        defaultSize: 15),
-    _FontEl('names', 'Employee / Counter', 'stBtNamesFontSize', 'stBtNamesBold',
-        defaultSize: 17),
-    _FontEl('footer', 'Footer', 'stBtFooterFontSize', 'stBtFooterBold',
-        defaultSize: 17),
+    _FontEl(
+      'header',
+      'Receipt Header (Usman Hotel)',
+      'stBtFontSize',
+      'stBtHeaderBold',
+      defaultSize: 24,
+      defaultBold: true,
+    ),
+    _FontEl(
+      'heading',
+      'Slip Heading (Stock List Daily)',
+      'stBtHeadingFontSize',
+      'stBtHeadingBold',
+      defaultSize: 18,
+      defaultBold: true,
+    ),
+    _FontEl(
+      'orderNo',
+      'Order Number (SO-0001)',
+      'stBtOrderNoFontSize',
+      'stBtOrderNoBold',
+      defaultSize: 17,
+      defaultBold: true,
+    ),
+    _FontEl(
+      'info',
+      'Date / Time / Status',
+      'stBtInfoFontSize',
+      'stBtInfoBold',
+      defaultSize: 17,
+    ),
+    _FontEl(
+      'product',
+      'Item Name',
+      'stBtProductFontSize',
+      'stBtProductBold',
+      defaultSize: 20,
+    ),
+    _FontEl(
+      'desc',
+      'Description (QTY + Desc)',
+      'stBtDescFontSize',
+      'stBtDescBold',
+      defaultSize: 15,
+    ),
+    _FontEl(
+      'names',
+      'Employee / Counter',
+      'stBtNamesFontSize',
+      'stBtNamesBold',
+      defaultSize: 17,
+    ),
+    _FontEl(
+      'footer',
+      'Footer',
+      'stBtFooterFontSize',
+      'stBtFooterBold',
+      defaultSize: 17,
+    ),
   ];
 
   bool _loading = true;
@@ -67,7 +116,8 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
   void initState() {
     super.initState();
     _sizeCtrls.addEntries(
-        fontElements.map((e) => MapEntry(e.id, TextEditingController())));
+      fontElements.map((e) => MapEntry(e.id, TextEditingController())),
+    );
     _boot();
   }
 
@@ -89,7 +139,8 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
     _btEncoding = prefs.getString('st_encoding') ?? 'cp1256';
     _receiptHeader = prefs.getString('st_header') ?? 'Usman Hotel';
     _slipHeading = prefs.getString('st_slipHeading') ?? 'Stock List Daily';
-    _receiptFooter = prefs.getString('st_footer') ?? 'Thank you for your business';
+    _receiptFooter =
+        prefs.getString('st_footer') ?? 'Thank you for your business';
 
     Map<String, dynamic> ov = {};
     final raw = prefs.getString(_overridesKey);
@@ -185,9 +236,14 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
     }
     _showMsg('Testing print...');
     final testOrder = <String, dynamic>{
-      'id': 'TEST-001', 'orderNumber': 'SO-20260911-0001',
-      'status': 'pending', 'date': '2026-09-11', 'time': '12:00',
-      'addedBy': 'Rashid', 'counterName': 'Counter 1', 'heading': 'Morning',
+      'id': 'TEST-001',
+      'orderNumber': 'SO-20260911-0001',
+      'status': 'pending',
+      'date': '2026-09-11',
+      'time': '12:00',
+      'addedBy': 'Rashid',
+      'counterName': 'Counter 1',
+      'heading': 'Morning',
       'items': [
         {'productName': 'Chicken', 'quantity': 10, 'description': 'Whole fry'},
         {'productName': 'Oil', 'quantity': 5, 'description': ''},
@@ -223,7 +279,9 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
     if (_loading) {
       return const Scaffold(
         backgroundColor: Color(0xFF0F172A),
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF38BDF8)),
+        ),
       );
     }
     return Scaffold(
@@ -262,7 +320,11 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white),
+            child: const Icon(
+              Icons.arrow_back_ios_new,
+              size: 20,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(width: 12),
           Container(
@@ -275,19 +337,35 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
           ),
           const SizedBox(width: 10),
           const Expanded(
-            child: Text('Printer Settings',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white)),
+            child: Text(
+              'Printer Settings',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
+                color: Colors.white,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: _saving ? null : _saveSettings,
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF38BDF8),
-                foregroundColor: const Color(0xFF0F172A),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
+              backgroundColor: const Color(0xFF38BDF8),
+              foregroundColor: const Color(0xFF0F172A),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
             child: _saving
-                ? const SizedBox(width: 14, height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('SAVE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'SAVE',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                  ),
           ),
         ],
       ),
@@ -305,8 +383,14 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3)),
         ),
-        child: Text(_message,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF22C55E))),
+        child: Text(
+          _message,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF22C55E),
+          ),
+        ),
       ),
     );
   }
@@ -331,8 +415,14 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
         children: [
           const Icon(Icons.circle, size: 6, color: Color(0xFF38BDF8)),
           const SizedBox(width: 8),
-          Text(text,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white)),
+          Text(
+            text,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: Colors.white,
+            ),
+          ),
         ],
       ),
     );
@@ -343,26 +433,43 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
       child: Row(
         children: [
           Switch(
-            value: value, onChanged: onChanged,
+            value: value,
+            onChanged: onChanged,
             activeColor: const Color(0xFF38BDF8),
             activeTrackColor: const Color(0xFF38BDF8).withOpacity(0.3),
           ),
           const SizedBox(width: 2),
           Expanded(
-            child: Text(label, style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _drop(String label, String value, List<String> opts, ValueChanged<String> onChanged,
-      {Map<String, String>? labels}) {
+  Widget _drop(
+    String label,
+    String value,
+    List<String> opts,
+    ValueChanged<String> onChanged, {
+    Map<String, String>? labels,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14, color: Colors.white))),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+            ),
+          ),
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -372,11 +479,25 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
                 border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: DropdownButton<String>(
-                value: value, isDense: true, underline: const SizedBox(),
+                value: value,
+                isDense: true,
+                underline: const SizedBox(),
                 dropdownColor: const Color(0xFF1E293B),
-                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.8)),
-                items: opts.map((o) => DropdownMenuItem(value: o, child: Text(labels?[o] ?? o))).toList(),
-                onChanged: (v) { if (v != null) onChanged(v); },
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.8),
+                ),
+                items: opts
+                    .map(
+                      (o) => DropdownMenuItem(
+                        value: o,
+                        child: Text(labels?[o] ?? o),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) onChanged(v);
+                },
               ),
             ),
           ),
@@ -385,21 +506,37 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
     );
   }
 
-  Widget _text(String label, String value, ValueChanged<String> onChanged, {String hint = ''}) {
+  Widget _text(
+    String label,
+    String value,
+    ValueChanged<String> onChanged, {
+    String hint = '',
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5))),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withOpacity(0.5),
+            ),
+          ),
           const SizedBox(height: 4),
           TextField(
             controller: TextEditingController(text: value),
             style: const TextStyle(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(
-              hintText: hint, hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              filled: true, fillColor: Colors.white.withOpacity(0.05),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
@@ -429,7 +566,8 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
           Row(
             children: [
               Container(
-                width: 10, height: 10,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _btConnected
@@ -444,15 +582,25 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
                   children: [
                     Text(
                       _btEnabled
-                          ? (_savedPrinter != null ? _savedPrinter!.name : 'No printer selected')
+                          ? (_savedPrinter != null
+                                ? _savedPrinter!.name
+                                : 'No printer selected')
                           : 'Bluetooth is OFF',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                     Text(
-                      _btConnected ? 'Connected' : '${_pairedDevices.length} paired devices',
+                      _btConnected
+                          ? 'Connected'
+                          : '${_pairedDevices.length} paired devices',
                       style: TextStyle(
                         fontSize: 12,
-                        color: _btConnected ? const Color(0xFF22C55E) : Colors.white.withOpacity(0.4),
+                        color: _btConnected
+                            ? const Color(0xFF22C55E)
+                            : Colors.white.withOpacity(0.4),
                       ),
                     ),
                   ],
@@ -467,7 +615,9 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
                 child: ElevatedButton.icon(
                   onPressed: _selectPrinter,
                   icon: const Icon(Icons.bluetooth_searching, size: 16),
-                  label: Text(_savedPrinter != null ? 'Change' : 'Select Printer'),
+                  label: Text(
+                    _savedPrinter != null ? 'Change' : 'Select Printer',
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF38BDF8),
                     foregroundColor: const Color(0xFF0F172A),
@@ -480,8 +630,15 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _disconnectPrinter,
-                    icon: const Icon(Icons.bluetooth_disabled, size: 16, color: Colors.redAccent),
-                    label: const Text('Disconnect', style: TextStyle(color: Colors.redAccent)),
+                    icon: const Icon(
+                      Icons.bluetooth_disabled,
+                      size: 16,
+                      color: Colors.redAccent,
+                    ),
+                    label: const Text(
+                      'Disconnect',
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.redAccent),
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -502,18 +659,37 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _title('Print Options'),
-          _drop('Paper Width', _paperWidth, ['58', '80'], (v) => setState(() => _paperWidth = v)),
-          _drop('Encoding', _btEncoding, ['utf-8', 'cp1256', 'cp864', 'bmp'],
-              (v) => setState(() => _btEncoding = v),
-              labels: const {
-                'utf-8': 'UTF-8',
-                'cp1256': 'CP-1256 (Arabic)',
-                'cp864': 'CP-864 (Arabic)',
-                'bmp': 'BMP Fonts (Raster Image)',
-              }),
-          _text('Receipt Header', _receiptHeader, (v) => setState(() => _receiptHeader = v)),
-          _text('Slip Heading', _slipHeading, (v) => setState(() => _slipHeading = v)),
-          _text('Receipt Footer', _receiptFooter, (v) => setState(() => _receiptFooter = v)),
+          _drop('Paper Width', _paperWidth, [
+            '58',
+            '80',
+          ], (v) => setState(() => _paperWidth = v)),
+          _drop(
+            'Encoding',
+            _btEncoding,
+            ['utf-8', 'cp1256', 'cp864', 'bmp'],
+            (v) => setState(() => _btEncoding = v),
+            labels: const {
+              'utf-8': 'UTF-8',
+              'cp1256': 'CP-1256 (Arabic)',
+              'cp864': 'CP-864 (Arabic)',
+              'bmp': 'BMP Fonts (Raster Image)',
+            },
+          ),
+          _text(
+            'Receipt Header',
+            _receiptHeader,
+            (v) => setState(() => _receiptHeader = v),
+          ),
+          _text(
+            'Slip Heading',
+            _slipHeading,
+            (v) => setState(() => _slipHeading = v),
+          ),
+          _text(
+            'Receipt Footer',
+            _receiptFooter,
+            (v) => setState(() => _receiptFooter = v),
+          ),
         ],
       ),
     );
@@ -529,7 +705,10 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               'Har line ka apna size aur bold set karein. Bara size printer pe text 2x / 3x bana deta hai.',
-              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.4),
+              ),
             ),
           ),
           ...fontElements.map((el) => _fontElementCard(el)),
@@ -551,17 +730,34 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(el.label,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white)),
+          Text(
+            el.label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Text('Size', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4))),
+              Text(
+                'Size',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.4),
+                ),
+              ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.remove_circle_outline, size: 18, color: Color(0xFF38BDF8)),
+                icon: const Icon(
+                  Icons.remove_circle_outline,
+                  size: 18,
+                  color: Color(0xFF38BDF8),
+                ),
                 visualDensity: VisualDensity.compact,
-                onPressed: () => _setSize(el.id, (_fontSizes[el.id] ?? el.defaultSize) - 1),
+                onPressed: () =>
+                    _setSize(el.id, (_fontSizes[el.id] ?? el.defaultSize) - 1),
               ),
               SizedBox(
                 width: 64,
@@ -574,27 +770,43 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.06),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 8,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                      borderSide: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                      borderSide: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
                     ),
                   ),
-                  onSubmitted: (v) => _setSize(el.id, double.tryParse(v) ?? el.defaultSize),
+                  onSubmitted: (v) =>
+                      _setSize(el.id, double.tryParse(v) ?? el.defaultSize),
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.add_circle_outline, size: 18, color: Color(0xFF38BDF8)),
+                icon: const Icon(
+                  Icons.add_circle_outline,
+                  size: 18,
+                  color: Color(0xFF38BDF8),
+                ),
                 visualDensity: VisualDensity.compact,
-                onPressed: () => _setSize(el.id, (_fontSizes[el.id] ?? el.defaultSize) + 1),
+                onPressed: () =>
+                    _setSize(el.id, (_fontSizes[el.id] ?? el.defaultSize) + 1),
               ),
               const SizedBox(width: 8),
-              _miniToggle('Bold', _fontBold[el.id] == true,
-                  (v) => setState(() => _fontBold[el.id] = v)),
+              _miniToggle(
+                'Bold',
+                _fontBold[el.id] == true,
+                (v) => setState(() => _fontBold[el.id] = v),
+              ),
             ],
           ),
         ],
@@ -653,19 +865,34 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
           children: [
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Select Bluetooth Printer',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+              child: Text(
+                'Select Bluetooth Printer',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
             ),
-            ...list.map((p) => ListTile(
-                  leading: const Icon(Icons.print, color: Color(0xFF38BDF8)),
-                  title: Text(p.name, style: const TextStyle(fontSize: 14, color: Colors.white)),
-                  subtitle: Text(p.mac,
-                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.4))),
-                  trailing: _savedPrinter?.mac == p.mac
-                      ? const Icon(Icons.check_circle, color: Color(0xFF38BDF8))
-                      : null,
-                  onTap: () => Navigator.pop(ctx, p),
-                )),
+            ...list.map(
+              (p) => ListTile(
+                leading: const Icon(Icons.print, color: Color(0xFF38BDF8)),
+                title: Text(
+                  p.name,
+                  style: const TextStyle(fontSize: 14, color: Colors.white),
+                ),
+                subtitle: Text(
+                  p.mac,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withOpacity(0.4),
+                  ),
+                ),
+                trailing: _savedPrinter?.mac == p.mac
+                    ? const Icon(Icons.check_circle, color: Color(0xFF38BDF8))
+                    : null,
+                onTap: () => Navigator.pop(ctx, p),
+              ),
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -676,7 +903,9 @@ class _StockPrinterSettingsState extends State<StockPrinterSettings> {
       _savedPrinter = picked;
       final connected = await BtService.connect(picked.mac);
       _btConnected = connected;
-      _showMsg(connected ? 'Connected: ${picked.name}' : 'Selected but not connected');
+      _showMsg(
+        connected ? 'Connected: ${picked.name}' : 'Selected but not connected',
+      );
       if (mounted) setState(() {});
     }
   }

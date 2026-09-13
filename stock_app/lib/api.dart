@@ -45,7 +45,8 @@ class ApiClient {
     final uri = Uri.tryParse(h.startsWith('http') ? h : 'http://$h');
     final hostName = uri?.host ?? '';
     if (hostName == 'localhost' || hostName == '127.0.0.1') return true;
-    if (hostName.startsWith('10.') || hostName.startsWith('192.168.')) return true;
+    if (hostName.startsWith('10.') || hostName.startsWith('192.168.'))
+      return true;
     final parts = hostName.split('.');
     if (parts.length == 4 && parts.first == '172') {
       final second = int.tryParse(parts[1]);
@@ -73,16 +74,32 @@ class ApiClient {
     try {
       switch (method) {
         case 'GET':
-          res = await http.get(uri, headers: _headers(token)).timeout(const Duration(seconds: 20));
+          res = await http
+              .get(uri, headers: _headers(token))
+              .timeout(const Duration(seconds: 20));
           break;
         case 'POST':
-          res = await http.post(uri, headers: _headers(token), body: body != null ? jsonEncode(body) : null).timeout(const Duration(seconds: 20));
+          res = await http
+              .post(
+                uri,
+                headers: _headers(token),
+                body: body != null ? jsonEncode(body) : null,
+              )
+              .timeout(const Duration(seconds: 20));
           break;
         case 'PUT':
-          res = await http.put(uri, headers: _headers(token), body: body != null ? jsonEncode(body) : null).timeout(const Duration(seconds: 20));
+          res = await http
+              .put(
+                uri,
+                headers: _headers(token),
+                body: body != null ? jsonEncode(body) : null,
+              )
+              .timeout(const Duration(seconds: 20));
           break;
         case 'DELETE':
-          res = await http.delete(uri, headers: _headers(token)).timeout(const Duration(seconds: 20));
+          res = await http
+              .delete(uri, headers: _headers(token))
+              .timeout(const Duration(seconds: 20));
           break;
         default:
           throw ApiException('Unsupported method: $method');
@@ -100,7 +117,9 @@ class ApiClient {
     } catch (_) {}
 
     if (res.statusCode >= 400) {
-      final msg = (json is Map && json['error'] != null) ? json['error'].toString() : 'Request failed (${res.statusCode})';
+      final msg = (json is Map && json['error'] != null)
+          ? json['error'].toString()
+          : 'Request failed (${res.statusCode})';
       final err = ApiException(msg, statusCode: res.statusCode);
       if (err.isAuthError && !path.contains('/stock/login')) {
         onAuthError?.call();
@@ -113,8 +132,15 @@ class ApiClient {
 
   // ─── Stock API Methods ───
 
-  static Future<Map<String, dynamic>> stockLogin(String username, String password) async {
-    final res = await send('POST', '/stock/login', body: {'username': username, 'password': password});
+  static Future<Map<String, dynamic>> stockLogin(
+    String username,
+    String password,
+  ) async {
+    final res = await send(
+      'POST',
+      '/stock/login',
+      body: {'username': username, 'password': password},
+    );
     return res as Map<String, dynamic>;
   }
 
@@ -123,7 +149,10 @@ class ApiClient {
     return res as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> data, {String? token}) async {
+  static Future<Map<String, dynamic>> updateSettings(
+    Map<String, dynamic> data, {
+    String? token,
+  }) async {
     final res = await send('PUT', '/stock/settings', token: token, body: data);
     return res as Map<String, dynamic>;
   }
@@ -141,7 +170,8 @@ class ApiClient {
     String? heading,
   }) async {
     final params = <String>[];
-    if (startDate != null && startDate.isNotEmpty) params.add('startDate=$startDate');
+    if (startDate != null && startDate.isNotEmpty)
+      params.add('startDate=$startDate');
     if (endDate != null && endDate.isNotEmpty) params.add('endDate=$endDate');
     if (status != null && status.isNotEmpty) params.add('status=$status');
     if (heading != null && heading.isNotEmpty) {
@@ -152,17 +182,26 @@ class ApiClient {
     return res as List<dynamic>;
   }
 
-  static Future<Map<String, dynamic>> createStockOrder(Map<String, dynamic> data, {String? token}) async {
+  static Future<Map<String, dynamic>> createStockOrder(
+    Map<String, dynamic> data, {
+    String? token,
+  }) async {
     final res = await send('POST', '/stock/orders', token: token, body: data);
     return res as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> approveStockOrder(String id, {String? token}) async {
+  static Future<Map<String, dynamic>> approveStockOrder(
+    String id, {
+    String? token,
+  }) async {
     final res = await send('PUT', '/stock/orders/$id/approve', token: token);
     return res as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>> rejectStockOrder(String id, {String? token}) async {
+  static Future<Map<String, dynamic>> rejectStockOrder(
+    String id, {
+    String? token,
+  }) async {
     final res = await send('PUT', '/stock/orders/$id/reject', token: token);
     return res as Map<String, dynamic>;
   }
@@ -183,7 +222,12 @@ class ApiClient {
       'PUT',
       '/stock/orders/$id/message',
       token: token,
-      body: {'type': type, 'text': text, 'voice': voice, 'voiceDuration': voiceDuration},
+      body: {
+        'type': type,
+        'text': text,
+        'voice': voice,
+        'voiceDuration': voiceDuration,
+      },
     );
     return res as Map<String, dynamic>;
   }
@@ -199,7 +243,33 @@ class ApiClient {
       'PUT',
       '/stock/orders/$id/reply',
       token: token,
-      body: {'type': 'Reply', 'text': text, 'voice': voice, 'voiceDuration': voiceDuration},
+      body: {
+        'type': 'Reply',
+        'text': text,
+        'voice': voice,
+        'voiceDuration': voiceDuration,
+      },
+    );
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> deleteStockOrderMessage(
+    String id, {
+    String? token,
+  }) async {
+    final res = await send('DELETE', '/stock/orders/$id/message', token: token);
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> deleteStockOrderReply(
+    String id,
+    int replyIndex, {
+    String? token,
+  }) async {
+    final res = await send(
+      'DELETE',
+      '/stock/orders/$id/reply/$replyIndex',
+      token: token,
     );
     return res as Map<String, dynamic>;
   }
@@ -209,12 +279,24 @@ class ApiClient {
     return res as List<dynamic>;
   }
 
-  static Future<List<dynamic>> createMessageType(String name, {String? token}) async {
-    final res = await send('POST', '/stock/message-types', token: token, body: {'name': name});
+  static Future<List<dynamic>> createMessageType(
+    String name, {
+    String? token,
+  }) async {
+    final res = await send(
+      'POST',
+      '/stock/message-types',
+      token: token,
+      body: {'name': name},
+    );
     return res as List<dynamic>;
   }
 
-  static Future<List<dynamic>> updateMessageType(String oldName, String newName, {String? token}) async {
+  static Future<List<dynamic>> updateMessageType(
+    String oldName,
+    String newName, {
+    String? token,
+  }) async {
     final res = await send(
       'PUT',
       '/stock/message-types',
@@ -224,7 +306,10 @@ class ApiClient {
     return res as List<dynamic>;
   }
 
-  static Future<List<dynamic>> deleteMessageType(String name, {String? token}) async {
+  static Future<List<dynamic>> deleteMessageType(
+    String name, {
+    String? token,
+  }) async {
     final res = await send(
       'DELETE',
       '/stock/message-types?name=${Uri.encodeQueryComponent(name)}',

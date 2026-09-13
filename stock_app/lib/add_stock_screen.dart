@@ -85,7 +85,12 @@ class _AddStockScreenState extends State<AddStockScreen> {
       return;
     }
     setState(() {
-      _customItems.add({'name': name, 'quantity': qty, 'description': desc, 'photo': ''});
+      _customItems.add({
+        'name': name,
+        'quantity': qty,
+        'description': desc,
+        'photo': '',
+      });
       _customNameCtrl.clear();
       _customQtyCtrl.clear();
       _customDescCtrl.clear();
@@ -178,7 +183,8 @@ class _AddStockScreenState extends State<AddStockScreen> {
       final bytes = await x.readAsBytes();
       if (!mounted) return;
       setState(() {
-        _customItems[idx]['photo'] = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        _customItems[idx]['photo'] =
+            'data:image/jpeg;base64,${base64Encode(bytes)}';
       });
     } catch (_) {
       if (mounted) _showMsg('Item photo attach failed (camera)', isError: true);
@@ -211,7 +217,11 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       color: Colors.white.withOpacity(0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close, color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -241,7 +251,11 @@ class _AddStockScreenState extends State<AddStockScreen> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
           ),
-          child: const Icon(Icons.photo_camera, size: 16, color: Color(0xFF38BDF8)),
+          child: const Icon(
+            Icons.photo_camera,
+            size: 16,
+            color: Color(0xFF38BDF8),
+          ),
         ),
       );
     }
@@ -262,7 +276,11 @@ class _AddStockScreenState extends State<AddStockScreen> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
           ),
-          child: const Icon(Icons.photo_camera, size: 16, color: Color(0xFF38BDF8)),
+          child: const Icon(
+            Icons.photo_camera,
+            size: 16,
+            color: Color(0xFF38BDF8),
+          ),
         ),
       );
     }
@@ -311,7 +329,9 @@ class _AddStockScreenState extends State<AddStockScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF38BDF8).withOpacity(0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+            border: Border.all(
+              color: const Color(0xFF38BDF8).withOpacity(0.35),
+            ),
           ),
           child: const Column(
             children: [
@@ -348,7 +368,10 @@ class _AddStockScreenState extends State<AddStockScreen> {
             children: [
               Text(
                 'Photo attached',
-                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.7)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.7),
+                ),
               ),
               const SizedBox(height: 4),
               const Text(
@@ -402,7 +425,11 @@ class _AddStockScreenState extends State<AddStockScreen> {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -441,18 +468,15 @@ class _AddStockScreenState extends State<AddStockScreen> {
 
     setState(() => _saving = true);
     try {
-      await ApiClient.createStockOrder(
-        {
-          'items': items,
-          'notes': _notesCtrl.text.trim(),
-          'heading': _selectedHeading,
-          'addedBy': _addedByCtrl.text.trim(),
-          'counterName': _counterCtrl.text.trim(),
-          'approvedBy': Session.isManager ? _approvedBy : '',
-          'photo': _photoDataUrl,
-        },
-        token: Session.token,
-      );
+      await ApiClient.createStockOrder({
+        'items': items,
+        'notes': _notesCtrl.text.trim(),
+        'heading': _selectedHeading,
+        'addedBy': _addedByCtrl.text.trim(),
+        'counterName': _counterCtrl.text.trim(),
+        'approvedBy': Session.isManager ? _approvedBy : '',
+        'photo': _photoDataUrl,
+      }, token: Session.token);
       if (mounted) {
         _showMsg('Stock order created successfully');
         setState(() {
@@ -495,7 +519,11 @@ class _AddStockScreenState extends State<AddStockScreen> {
                   color: const Color(0xFF38BDF8).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.add_box, size: 20, color: Color(0xFF38BDF8)),
+                child: const Icon(
+                  Icons.add_box,
+                  size: 20,
+                  color: Color(0xFF38BDF8),
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -539,27 +567,46 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           flex: 3,
                           child: TextField(
                             controller: _customNameCtrl,
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                             textCapitalization: TextCapitalization.words,
                             decoration: InputDecoration(
                               hintText: 'Product ka naam...',
-                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                              prefixIcon: Icon(Icons.inventory_2_outlined, color: Colors.white.withOpacity(0.3), size: 20),
+                              hintStyle: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.inventory_2_outlined,
+                                color: Colors.white.withOpacity(0.3),
+                                size: 20,
+                              ),
                               filled: true,
                               fillColor: Colors.white.withOpacity(0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF38BDF8),
+                                  width: 1.2,
+                                ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -570,25 +617,40 @@ class _AddStockScreenState extends State<AddStockScreen> {
                             controller: _customQtyCtrl,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                             decoration: InputDecoration(
                               hintText: 'Qty',
-                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                              hintStyle: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
                               filled: true,
                               fillColor: Colors.white.withOpacity(0.05),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF38BDF8),
+                                  width: 1.2,
+                                ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -600,9 +662,15 @@ class _AddStockScreenState extends State<AddStockScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF22C55E).withOpacity(0.2),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3)),
+                              border: Border.all(
+                                color: const Color(0xFF22C55E).withOpacity(0.3),
+                              ),
                             ),
-                            child: const Icon(Icons.add_circle, size: 22, color: Color(0xFF22C55E)),
+                            child: const Icon(
+                              Icons.add_circle,
+                              size: 22,
+                              color: Color(0xFF22C55E),
+                            ),
                           ),
                         ),
                       ],
@@ -615,23 +683,39 @@ class _AddStockScreenState extends State<AddStockScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
                         hintText: 'Description (optional)...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                        prefixIcon: Icon(Icons.notes, color: Colors.white.withOpacity(0.3), size: 20),
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.notes,
+                          color: Colors.white.withOpacity(0.3),
+                          size: 20,
+                        ),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF38BDF8),
+                            width: 1.2,
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
                     ),
                     // Custom items list
@@ -642,7 +726,9 @@ class _AddStockScreenState extends State<AddStockScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF22C55E).withOpacity(0.06),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.15)),
+                          border: Border.all(
+                            color: const Color(0xFF22C55E).withOpacity(0.15),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,24 +749,35 @@ class _AddStockScreenState extends State<AddStockScreen> {
                                 padding: const EdgeInsets.only(bottom: 6),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.label_important, size: 14, color: Color(0xFF22C55E)),
+                                    const Icon(
+                                      Icons.label_important,
+                                      size: 14,
+                                      color: Color(0xFF22C55E),
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             ci['name'] ?? '',
-                                            style: const TextStyle(fontSize: 13, color: Colors.white),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.white,
+                                            ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          if ((ci['description'] ?? '').isNotEmpty)
+                                          if ((ci['description'] ?? '')
+                                              .isNotEmpty)
                                             Text(
                                               ci['description'] ?? '',
                                               style: TextStyle(
                                                 fontSize: 11,
-                                                color: Colors.white.withOpacity(0.45),
+                                                color: Colors.white.withOpacity(
+                                                  0.45,
+                                                ),
                                               ),
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
@@ -689,9 +786,13 @@ class _AddStockScreenState extends State<AddStockScreen> {
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF22C55E).withOpacity(0.15),
+                                        color: const Color(0xFF22C55E)
+                                            .withOpacity(0.15),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -708,92 +809,115 @@ class _AddStockScreenState extends State<AddStockScreen> {
                                     const SizedBox(width: 6),
                                     GestureDetector(
                                       onTap: () => _removeCustomItem(idx),
-                                      child: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.redAccent),
+                                      child: const Icon(
+                                        Icons.remove_circle_outline,
+                                        size: 18,
+                                        color: Colors.redAccent,
+                                      ),
                                     ),
                                   ],
                                 ),
                               );
-}),
-                           ],
-                         ),
-                       ),
-],
-                  const SizedBox(height: 12),
-                  _sectionCard(
-                    title: 'Photo Attach (Camera)',
-                    icon: Icons.photo_camera_outlined,
-                    child: _buildPhotoAttach(),
-                  ),
-                  const SizedBox(height: 14),
-                 Container(height: 1, color: Colors.white.withOpacity(0.08)),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.receipt_long_outlined, size: 16, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Order Details',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _addedByCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: _inputDecoration('Employee Name', Icons.person_outline),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _counterCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: _inputDecoration('Counter Name', Icons.storefront_outlined),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _notesCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  maxLines: 2,
-                  decoration: _inputDecoration('Notes (optional)', Icons.notes),
-                ),
-                const SizedBox(height: 12),
-                if (Session.isManager) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Approve this stock',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.7),
-                          ),
+                            }),
+                          ],
                         ),
                       ),
-                      Switch(
-                        value: _showApprover,
-                        onChanged: (v) => setState(() => _showApprover = v),
-                        activeColor: const Color(0xFF38BDF8),
-                      ),
                     ],
-                  ),
-                  if (_showApprover) ...[
-                    const SizedBox(height: 8),
-                    TextField(
-                      onChanged: (v) => _approvedBy = v,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      decoration: _inputDecoration('Approver name', Icons.verified_outlined),
+                    const SizedBox(height: 12),
+                    _sectionCard(
+                      title: 'Photo Attach (Camera)',
+                      icon: Icons.photo_camera_outlined,
+                      child: _buildPhotoAttach(),
                     ),
+                    const SizedBox(height: 14),
+                    Container(height: 1, color: Colors.white.withOpacity(0.08)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.receipt_long_outlined,
+                          size: 16,
+                          color: Color(0xFF38BDF8),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Order Details',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _addedByCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDecoration(
+                        'Employee Name',
+                        Icons.person_outline,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _counterCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: _inputDecoration(
+                        'Counter Name',
+                        Icons.storefront_outlined,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _notesCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      maxLines: 2,
+                      decoration: _inputDecoration(
+                        'Notes (optional)',
+                        Icons.notes,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (Session.isManager) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Approve this stock',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.7),
+                              ),
+                            ),
+                          ),
+                          Switch(
+                            value: _showApprover,
+                            onChanged: (v) => setState(() => _showApprover = v),
+                            activeColor: const Color(0xFF38BDF8),
+                          ),
+                        ],
+                      ),
+                      if (_showApprover) ...[
+                        const SizedBox(height: 8),
+                        TextField(
+                          onChanged: (v) => _approvedBy = v,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          decoration: _inputDecoration(
+                            'Approver name',
+                            Icons.verified_outlined,
+                          ),
+                        ),
+                      ],
+                    ],
                   ],
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+                ),
+              ),
+              const SizedBox(height: 16),
               // Save button
               SizedBox(
                 width: double.infinity,
@@ -813,7 +937,9 @@ class _AddStockScreenState extends State<AddStockScreen> {
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2.5, color: Color(0xFF0F172A)),
+                            strokeWidth: 2.5,
+                            color: Color(0xFF0F172A),
+                          ),
                         )
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -868,11 +994,17 @@ class _AddStockScreenState extends State<AddStockScreen> {
           ),
           const SizedBox(height: 12),
           if (_headingsLoading)
-            const LinearProgressIndicator(minHeight: 2, color: Color(0xFF38BDF8))
+            const LinearProgressIndicator(
+              minHeight: 2,
+              color: Color(0xFF38BDF8),
+            )
           else if (_headings.isEmpty)
             Text(
               'No headings - Manager "Add Headings" tab mein banayein',
-              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.4),
+              ),
             )
           else
             Container(
@@ -888,7 +1020,10 @@ class _AddStockScreenState extends State<AddStockScreen> {
                 isDense: true,
                 underline: const SizedBox(),
                 dropdownColor: const Color(0xFF1E293B),
-                style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.85)),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.85),
+                ),
                 items: _headings.map((h) {
                   final name = (h['name'] ?? '').toString();
                   return DropdownMenuItem(
