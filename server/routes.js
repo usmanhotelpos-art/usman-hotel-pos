@@ -422,15 +422,22 @@ router.post('/stock/login', safe(async (req, res) => {
     return res.status(401).send({ error: 'Invalid credentials' });
   }
 
+  // STRICT role mapping: only exact role values (case-insensitive) are honored.
+  // "Admin Order Taker", "Admin Rider", "Waiter", "Biker" etc. are NOT admin —
+  // only literally role "Admin" is admin, "Manager" is manager, "Cashier" is cashier.
   const roleString = (staff.role || '').toString().trim();
-  const isAdmin = /admin/i.test(roleString);
-  const isManager = /manager/i.test(roleString);
-  const isCashier = /cashier/i.test(roleString);
-  if (!isAdmin && !isManager && !isCashier) {
-    return res.status(403).send({ error: 'Only Admin, Manager and Cashier can login to the Stock App' });
+  const role = /^admin$/i.test(roleString)
+    ? 'admin'
+    : /^manager$/i.test(roleString)
+      ? 'manager'
+      : /^cashier$/i.test(roleString)
+        ? 'cashier'
+        : null;
+  if (!role) {
+    return res.status(403).send({
+      error: 'Only Admin, Manager and Cashier roles can login to the Stock App'
+    });
   }
-
-  const role = isAdmin ? 'admin' : isManager ? 'manager' : 'cashier';
   const token = jwt.sign(
     { id: staff.id, name: staff.name, role, username: staff.username },
     JWT_SECRET,
