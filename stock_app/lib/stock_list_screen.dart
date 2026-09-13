@@ -670,9 +670,6 @@ class StockListScreenState extends State<StockListScreen> {
     final status = order['status'] ?? 'pending';
     final items = (order['items'] as List?) ?? [];
     final photoBytes = stockPhotoBytes(order['photo']);
-    final message = (order['message'] is Map)
-        ? Map<String, dynamic>.from(order['message'] as Map)
-        : null;
 
     final isManager = Session.isManager;
     final isAdmin = Session.isAdmin;
