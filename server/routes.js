@@ -24,6 +24,35 @@ import {
 
 export const router = express.Router();
 
+// ---- App-permission model for staff (per-cashier app/screen access) ----
+function defaultAppPermissions() {
+  return {
+    delivery: true,
+    nashta: true,
+    orderTaker: true,
+    table: { pos: true, orders: true, printer: true },
+    takeaway: { pos: true, orders: true, printer: true },
+  };
+}
+
+function staffAppPermissions(staff) {
+  const a = staff && typeof staff.apps === 'object' && staff.apps !== null ? staff.apps : {};
+  const t = typeof a.table === 'object' && a.table !== null ? a.table : {};
+  const tk = typeof a.takeaway === 'object' && a.takeaway !== null ? a.takeaway : {};
+  return {
+    delivery: a.delivery !== false,
+    nashta: a.nashta !== false,
+    orderTaker: a.orderTaker !== false,
+    table: { pos: t.pos !== false, orders: t.orders !== false, printer: t.printer !== false },
+    takeaway: { pos: tk.pos !== false, orders: tk.orders !== false, printer: tk.printer !== false },
+  };
+}
+
+function canManageAppPermissions(req) {
+  const role = String((req.user && req.user.role) || '').trim().toLowerCase();
+  return role === 'manager' || role === 'admin' || role === 'admin order taker';
+}
+
 // Simple in-memory login rate limiter (5 failed attempts per IP per 15 min)
 const loginAttempts = new Map();
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -163,7 +192,7 @@ router.post('/auth/login', safe(async (req, res) => {
     clearLoginFailures(clientIp);
 
     const token = createToken({ id: staff.id, email: staff.username || staff.email, role: staff.role, name: staff.name });
-    return res.send({ token, user: { id: staff.id, name: staff.name, email: staff.username || staff.email, username: staff.username || '', role: staff.role } });
+    return res.send({ token, user: { id: staff.id, name: staff.name, email: staff.username || staff.email, username: staff.username || '', role: staff.role, apps: staffAppPermissions(staff) } });
   }
 
   const valid = await bcrypt.compare(password || '', user.passwordHash);
@@ -184,7 +213,7 @@ router.get('/auth/me', authenticate, (req, res) => {
     // Try staff collection
     user = (db.staff || []).find((s) => s.id === req.user.id);
     if (user) {
-      return res.send({ id: user.id, name: user.name, email: user.username || user.email, username: user.username || '', role: user.role });
+      return res.send({ id: user.id, name: user.name, email: user.username || user.email, username: user.username || '', role: user.role, apps: staffAppPermissions(user) });
     }
     // Try riders
     user = (db.riders || []).find((r) => r.id === req.user.id);
@@ -204,7 +233,7 @@ router.post('/auth/refresh', authenticate, safe(async (req, res) => {
   if (!user) return res.status(401).send({ error: 'User not found' });
   const email = user.username || user.email || req.user.email || '';
   const token = createToken({ id: user.id, email, role: user.role, name: user.name });
-  res.send({ token, user: { id: user.id, name: user.name, email, username: user.username || '', role: user.role } });
+  res.send({ token, user: { id: user.id, name: user.name, email, username: user.username || '', role: user.role, apps: staffAppPermissions(user) } });
 }));
 
 // Rider Authentication Routes
@@ -983,6 +1012,43 @@ router.get('/pos/update/apk/:id', safe(async (req, res) => {
 
 router.use(authenticate);
 
+// Staff app-permissions for the "Roles" tab (Manager / Admin Order Taker only)
+router.get('/pos/staff', (req, res) => {
+  if (!canManageAppPermissions(req)) return res.status(403).send({ error: 'Only Manager / Admin can manage roles' });
+  const db = readDb();
+  const staff = (db.staff || []).map((s) => ({
+    id: s.id,
+    name: s.name || '',
+    username: s.username || '',
+    role: s.role || '',
+    apps: staffAppPermissions(s),
+  }));
+  res.send({ staff });
+});
+
+router.put('/pos/staff/:id/permissions', (req, res) => {
+  if (!canManageAppPermissions(req)) return res.status(403).send({ error: 'Only Manager / Admin can manage roles' });
+  const apps = req.body && req.body.apps;
+  if (!apps || typeof apps !== 'object') return res.status(400).send({ error: 'apps object required' });
+  const db = readDb();
+  const staff = (db.staff || []).find((s) => s.id === req.params.id);
+  if (!staff) return res.status(404).send({ error: 'Staff not found' });
+  const merged = defaultAppPermissions();
+  if (typeof apps.delivery === 'boolean') merged.delivery = apps.delivery;
+  if (typeof apps.nashta === 'boolean') merged.nashta = apps.nashta;
+  if (typeof apps.orderTaker === 'boolean') merged.orderTaker = apps.orderTaker;
+  ['table', 'takeaway'].forEach((k) => {
+    const sub = apps[k];
+    if (sub && typeof sub === 'object') {
+      ['pos', 'orders', 'printer'].forEach((f) => {
+        if (typeof sub[f] === 'boolean') merged[k][f] = sub[f];
+      });
+    }
+  });
+  updateRecord('staff', staff.id, { ...staff, apps: merged });
+  res.send({ ok: true, apps: merged });
+});
+
 const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests', 'stock_headings'];
 
 router.get('/dashboard', (req, res) => {
@@ -1042,7 +1108,12 @@ router.get('/dashboard', (req, res) => {
     return true;
   };
 
-  const paidOrders = (db.pos_orders || []).filter((order) => isPaidOrder(order) && matchesDateRange(order));
+  const paidOrders = (db.pos_orders || []).filter(
+    (order) =>
+      sOf(order.source).toLowerCase() !== 'usman_hotel_beta' &&
+      isPaidOrder(order) &&
+      matchesDateRange(order)
+  );
 
   // Normalize order types (handle variants like 'Dine-In', 'Dine In', etc.)
   const getOrderTypeKey = (order) => {
@@ -1370,6 +1441,10 @@ function sOf(v) { return v == null ? '' : v.toString(); }
 router.get('/pos/orders', authenticate, (req, res) => {
   let orders = getCollection('pos_orders');
   const { status, orderType, source } = req.query;
+  const wantBeta = source && source.toLowerCase() === 'usman_hotel_beta';
+  if (!wantBeta) {
+    orders = orders.filter((order) => sOf(order.source).toLowerCase() !== 'usman_hotel_beta');
+  }
   if (status) {
     orders = orders.filter((order) => order.status === status);
   }
@@ -1549,13 +1624,16 @@ router.post('/pos/orders', async (req, res) => {
     updatedAt: req.body.createdAt ? new Date(req.body.createdAt).toISOString() : new Date().toISOString()
   });
 
-  products.forEach((product) => {
-    const orderItem = orderItems.find((item) => item.productId === product.id);
-    if (orderItem) {
-      const updatedQty = Math.max(0, product.availableStock - orderItem.quantity);
-      updateRecord('pos_products', product.id, { availableStock: updatedQty });
-    }
-  });
+  const isBetaOrder = String(source || '').toLowerCase() === 'usman_hotel_beta';
+  if (!isBetaOrder) {
+    products.forEach((product) => {
+      const orderItem = orderItems.find((item) => item.productId === product.id);
+      if (orderItem) {
+        const updatedQty = Math.max(0, product.availableStock - orderItem.quantity);
+        updateRecord('pos_products', product.id, { availableStock: updatedQty });
+      }
+    });
+  }
 
   const persisted = await waitForPersist();
   if (!persisted) {
