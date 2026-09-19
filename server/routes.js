@@ -14,6 +14,13 @@ import {
   writeDb
 } from './db.js';
 import { createBackup, listBackups, restoreBackup, deleteBackup } from './backup-restore.js';
+import {
+  attachApk,
+  getAllUpdateMeta,
+  getApkBuffer,
+  getUpdateMeta,
+  publishUpdateMeta
+} from './updates.js';
 
 export const router = express.Router();
 
@@ -890,6 +897,86 @@ router.delete('/stock/message-types', authenticate, (req, res) => {
   setStockMessageTypes(list);
   res.send(getStockMessageTypes());
 });
+
+// ---------------------------------------------------------------------------
+// In-app auto-update endpoints (Usman Hotel app)
+//   GET  /pos/update          -> metadata list + latest (public)
+//   POST /pos/update          -> publish/update metadata (manager/admin)
+//   PUT  /pos/update/apk/:id  -> upload raw APK bytes (manager/admin)
+//   GET  /pos/update/apk/:id  -> stream APK with Content-Length (public)
+// NOTE: registered BEFORE router.use(authenticate) below so the two GET
+// endpoints stay public (any phone can check/download without a token).
+// ---------------------------------------------------------------------------
+
+function isManagerOrAdmin(req) {
+  const role = (req.user?.role || '').toString().toLowerCase();
+  return role === 'manager' || role === 'admin';
+}
+
+function decorateUpdate(meta) {
+  return {
+    ...meta,
+    hasApk: Boolean(meta.apkUploadedAt),
+    downloadUrl: meta.apkUploadedAt ? `/pos/update/apk/${meta.id}` : null,
+  };
+}
+
+router.get('/pos/update', (req, res) => {
+  const updates = getAllUpdateMeta()
+    .slice()
+    .sort((a, b) => {
+      const byBuild = (Number(b.buildCode) || 0) - (Number(a.buildCode) || 0);
+      if (byBuild !== 0) return byBuild;
+      return String(b.publishedAt || '').localeCompare(String(a.publishedAt || ''));
+    })
+    .map(decorateUpdate);
+  const latest = updates[0] || null;
+  res.send({ latest, count: updates.length, updates });
+});
+
+router.post('/pos/update', authenticate, safe(async (req, res) => {
+  if (!isManagerOrAdmin(req)) {
+    return res.status(403).send({ error: 'Only Manager/Admin can publish updates' });
+  }
+  const { platform, version, buildCode, notes, fileName } = req.body || {};
+  if (!version) return res.status(400).send({ error: 'version is required' });
+  const meta = await publishUpdateMeta({ platform, version, buildCode, notes, fileName });
+  res.status(201).send({ success: true, update: decorateUpdate(meta) });
+}));
+
+router.put('/pos/update/apk/:id', authenticate, safe(async (req, res) => {
+  if (!isManagerOrAdmin(req)) {
+    return res.status(403).send({ error: 'Only Manager/Admin can publish updates' });
+  }
+  const meta = getUpdateMeta(req.params.id);
+  if (!meta) return res.status(404).send({ error: 'Update record not found. POST /pos/update first.' });
+  const buffer = req.body;
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    return res.status(400).send({ error: 'Expected raw APK binary body (Content-Type: application/octet-stream)' });
+  }
+  const updated = await attachApk(meta.id, buffer);
+  res.send({ success: true, update: decorateUpdate(updated) });
+}));
+
+router.get('/pos/update/apk/:id', safe(async (req, res) => {
+  const meta = getUpdateMeta(req.params.id);
+  if (!meta || !meta.apkUploadedAt) {
+    return res.status(404).send({ error: 'APK not found' });
+  }
+  const bytes = await getApkBuffer(req.params.id);
+  if (!bytes || bytes.length === 0) {
+    return res.status(404).send({ error: 'APK not found' });
+  }
+  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  res.setHeader('Content-Length', bytes.length);
+  // Bypass compression so the app can track download progress via Content-Length.
+  res.setHeader('Content-Encoding', 'identity');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  const fileName = meta.fileName || `${meta.id}.apk`;
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(bytes);
+}));
+
 router.use(authenticate);
 
 const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests', 'stock_headings'];

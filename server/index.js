@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import bcrypt from 'bcryptjs';
 import { router } from './routes.js';
 import { initDatabase, readDb, getCollection, createRecord } from './db.js';
+import { initUpdatesTable } from './updates.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { join } from 'path';
@@ -21,6 +22,12 @@ const port = process.env.PORT || 4000;
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(compression());
+
+// Raw APK binary upload for the in-app updater. Placed BEFORE the JSON parser
+// so multi-MB APK bodies bypass the 10mb JSON limit (and body-parser skips it
+// because req._body is already set).
+app.use('/api/pos/update/apk', express.raw({ type: () => true, limit: '250mb' }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -46,6 +53,7 @@ app.use((err, req, res, next) => {
 // Validate DB before serving requests. If the DB is invalid, it will be reset safely.
 try {
   await initDatabase();
+  await initUpdatesTable();
   readDb();
 
   // Seed default Order Taker staff members if none exists

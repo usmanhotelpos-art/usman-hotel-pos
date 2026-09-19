@@ -488,6 +488,17 @@ export function getCollection(name) {
   return db[name] || [];
 }
 
+// Access to the shared Postgres client (null when running in local JSON mode).
+// Used by updates.js to keep APK binaries in a separate lightweight table so
+// the big base64 blob is never part of the main `db` row.
+export function getPg() {
+  return pgClient;
+}
+
+export function isPgConnected() {
+  return pgConnected;
+}
+
 export function saveCollection(name, items) {
   const db = readDb();
   db[name] = items;
