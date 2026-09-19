@@ -33,12 +33,13 @@ const PASS = arg('pass', '');
 const PLATFORM = arg('platform', 'usman_hotel');
 const VERSION = arg('version', '');
 const BUILD = Number(arg('build', 0)) || 0;
+const NAME = arg('name', '');
 const NOTES = arg('notes', '');
 const APK = arg('apk', '');
 
 if (!USER || !PASS || !VERSION || !APK) {
   console.error(
-    'Missing required args. Need: --user --pass --version --apk (optional: --build --notes --platform --host)'
+    'Missing required args. Need: --user --pass --version --apk (optional: --build --notes --name --platform --host)'
   );
   process.exit(1);
 }
@@ -72,6 +73,7 @@ async function main() {
     platform: PLATFORM,
     version: VERSION,
     buildCode: BUILD,
+    name: NAME,
     notes: NOTES,
     fileName: `${PLATFORM}_v${VERSION}_${BUILD}.apk`,
   };

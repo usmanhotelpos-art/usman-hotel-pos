@@ -49,7 +49,7 @@ export function getUpdateMeta(id) {
 
 // Creates (or replaces) the metadata record for a published update. The binary
 // is attached later via attachApk() so the metadata POST stays small.
-export async function publishUpdateMeta({ platform, version, buildCode, notes, fileName }) {
+export async function publishUpdateMeta({ platform, version, buildCode, notes, name, fileName }) {
   if (!version) throw new Error('version is required');
   const id = metaId(platform, version);
   const meta = {
@@ -57,6 +57,7 @@ export async function publishUpdateMeta({ platform, version, buildCode, notes, f
     platform: String(platform || 'usman_hotel'),
     version: String(version),
     buildCode: Number(buildCode) || 0,
+    name: String(name || ''),
     notes: String(notes || ''),
     fileName: String(fileName || `usman_hotel_app_v${version}_${Number(buildCode) || 0}.apk`),
     sizeBytes: 0,
@@ -64,7 +65,12 @@ export async function publishUpdateMeta({ platform, version, buildCode, notes, f
     publishedAt: new Date().toISOString(),
   };
   const existing = getUpdateMeta(id);
-  if (existing) meta.publishedAt = existing.publishedAt || meta.publishedAt;
+  if (existing) {
+    meta.publishedAt = existing.publishedAt || meta.publishedAt;
+    meta.fileName = existing.fileName || meta.fileName;
+    meta.sizeBytes = existing.sizeBytes || 0;
+    meta.apkUploadedAt = existing.apkUploadedAt || null;
+  }
   const all = getAllUpdateMeta().filter((m) => m.id !== id);
   all.push(meta);
   saveCollection('app_updates', all);

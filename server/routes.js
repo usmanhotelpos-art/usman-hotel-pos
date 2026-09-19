@@ -971,9 +971,9 @@ router.post('/pos/update', authenticate, safe(async (req, res) => {
   if (!isManagerOrAdmin(req)) {
     return res.status(403).send({ error: 'Only Manager/Admin can publish updates' });
   }
-  const { platform, version, buildCode, notes, fileName } = req.body || {};
+  const { platform, version, buildCode, notes, name, fileName } = req.body || {};
   if (!version) return res.status(400).send({ error: 'version is required' });
-  const meta = await publishUpdateMeta({ platform, version, buildCode, notes, fileName });
+  const meta = await publishUpdateMeta({ platform, version, buildCode, notes, name, fileName });
   res.status(201).send({ success: true, update: decorateUpdate(meta) });
 }));
 
