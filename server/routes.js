@@ -910,7 +910,11 @@ router.delete('/stock/message-types', authenticate, (req, res) => {
 
 function isManagerOrAdmin(req) {
   const role = (req.user?.role || '').toString().toLowerCase();
-  return role === 'manager' || role === 'admin';
+  return (
+    role === 'manager' ||
+    role === 'admin' ||
+    role === 'admin order taker'
+  );
 }
 
 function decorateUpdate(meta) {
