@@ -21,6 +21,7 @@ import {
   getUpdateMeta,
   publishUpdateMeta
 } from './updates.js';
+import { uhRouter } from './uh.js';
 
 export const router = express.Router();
 
@@ -1009,6 +1010,10 @@ router.get('/pos/update/apk/:id', safe(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
   res.send(bytes);
 }));
+
+// Usman Hotel online-ordering subsystem (/uh) — public routes stay token-free
+// (menu + customer auth + customer orders); admin/owner routes gate themselves.
+router.use('/uh', uhRouter);
 
 router.use(authenticate);
 
