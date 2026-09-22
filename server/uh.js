@@ -36,6 +36,19 @@ function uhAuth(req, res, next) {
   }
 }
 
+// Same extraction as uhAuth but non-blocking (for public routes that still want
+// to scope results to the bearer's phone when a token is supplied).
+function uhPayloadFromReq(req) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (_) {
+    return null;
+  }
+}
+
 function isUhManager(req) {
   const role = String(req.uh && req.uh.role || '').toUpperCase();
   return role === 'STAFF_ADMIN' || role === 'HOTEL_OWNER';
@@ -173,6 +186,58 @@ function normalizePhone(raw) {
   return String(raw || '').replace(/[^0-9]/g, '');
 }
 
+// Convert a Pakistani mobile (03XXXXXXXXX) to E.164 (+92XXXXXXXXX) for SMS.
+function phoneE164(raw) {
+  const digits = normalizePhone(raw);
+  if (digits.startsWith('92') && digits.length === 12) return `+${digits}`;
+  if (digits.startsWith('0') && digits.length === 11) return `+92${digits.slice(1)}`;
+  if (digits.length === 10) return `+92${digits}`;
+  return digits ? `+${digits}` : '';
+}
+
+function twilioConfigured() {
+  return !!(
+    process.env.TWILIO_ACCOUNT_SID &&
+    process.env.TWILIO_AUTH_TOKEN &&
+    process.env.TWILIO_FROM_NUMBER
+  );
+}
+
+// Send a verification code via the Twilio REST API (no extra npm dependency —
+// uses global fetch, available on Node 18+). Resolves true when delivered ok.
+async function sendSmsCode(phone, code) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  if (!sid || !token || !from) return false;
+  const to = phoneE164(phone);
+  if (!to) return false;
+  const body = 'Your Usman Hotel verification code is: ' + code + '. Do not share it.';
+  const auth = 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64');
+  const form = new URLSearchParams();
+  form.set('To', to);
+  form.set('From', from);
+  form.set('Body', body);
+  try {
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+    if (!res.ok) {
+      try {
+        const err = await res.json();
+        console.error('[uh-sms] Twilio error:', err && err.message ? err.message : res.status);
+      } catch (_) {}
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[uh-sms] Twilio send failed:', error && error.message ? error.message : error);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public routes (no auth gate)
 // ---------------------------------------------------------------------------
@@ -184,9 +249,10 @@ uhRouter.get('/menu', (req, res) => {
 });
 
 // POST /uh/auth/request-code -> create/find user + issue a verification code.
-// The code is returned in the response (there is no SMS gateway in this demo
-// build; the app shows it in-app exactly like the Kotlin reference did).
-uhRouter.post('/auth/request-code', (req, res) => {
+// If Twilio is configured (TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER env vars),
+// the code is sent as a real SMS and NOT included in the response. When the
+// gateway is unconfigured/unreachable the code is returned in-app (dev fallback).
+uhRouter.post('/auth/request-code', async (req, res) => {
   ensureUhSeeded();
   const phone = normalizePhone(req.body.phone);
   const name = String(req.body.fullName || '').trim();
@@ -205,14 +271,23 @@ uhRouter.post('/auth/request-code', (req, res) => {
       fullName: name || 'Usman Customer',
       role: 'CUSTOMER',
       deliveryAddress: '',
-      zone: 'Model Town',
+      zone: 'My Location',
       loginCode: code
     });
   }
-  res.send({ success: true, code, phone });
+  // Try to deliver the code by SMS first.
+  const smsOk = await sendSmsCode(phone, code);
+  if (smsOk) {
+    return res.send({ success: true, smsSent: true, phone });
+  }
+  // Dev/demo fallback: no gateway or delivery failed -> reveal code in-app.
+  console.warn(`[uh-sms] SMS not sent for ${phone} (Twilio not configured); falling back to in-app code.`);
+  return res.send({ success: true, smsSent: false, code, phone });
 });
 
 // POST /uh/auth/login -> phone + code -> token + user
+// Only the exact stored code (issued by request-code and delivered via SMS)
+// is accepted. There is NO universal fallback code anymore.
 uhRouter.post('/auth/login', (req, res) => {
   ensureUhSeeded();
   const phone = normalizePhone(req.body.phone);
@@ -222,8 +297,8 @@ uhRouter.post('/auth/login', (req, res) => {
   if (!user) {
     return res.status(401).send({ error: 'Invalid credentials' });
   }
-  if (user.loginCode !== code && code !== '1234') {
-    return res.status(401).send({ error: 'کوڈ غلط ہے۔ درست کوڈ درج کریں' });
+  if (user.loginCode !== code) {
+    return res.status(401).send({ error: 'کوڈ غلط ہے۔ درست کوڈ درج کریں جو SMS پر موصول ہوا' });
   }
   updateRecord('uh_app_users', user.id, { lastLoginAt: new Date().toISOString(), loginCode: '' });
   const token = jwt.sign(
@@ -297,21 +372,35 @@ uhRouter.post('/orders', (req, res) => {
   res.status(201).send(order);
 });
 
-// GET /uh/orders?phone= -> a customer's own orders
+// GET /uh/orders?phone= -> a customer's OWN orders only.
+// - If a Bearer token is present, the phone is ALWAYS taken from the token
+//   (a customer can only ever see their own orders).
+// - Without a token it falls back to the ?phone= param (guest/dev demo).
+// - Never returns all orders.
 uhRouter.get('/orders', (req, res) => {
-  const phone = normalizePhone(req.query.phone);
+  const uh = uhPayloadFromReq(req);
+  let phone = normalizePhone(req.query.phone);
+  const authedPhone = uh ? normalizePhone(uh.phone) : '';
+  if (authedPhone) phone = authedPhone;
   const orders = getCollection('uh_customer_orders');
   const filtered = phone
     ? orders.filter((o) => normalizePhone(o.customerPhone) === phone)
-    : orders;
+    : [];
   res.send(filtered.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))));
 });
 
-// GET /uh/orders/:id -> single order by order id
+// GET /uh/orders/:id -> single order (only if it belongs to the caller's phone)
 uhRouter.get('/orders/:id', (req, res) => {
   const order = getCollection('uh_customer_orders').find((o) => o.id === req.params.id);
   if (!order) {
     return res.status(404).send({ error: 'Order not found' });
+  }
+  const uh = uhPayloadFromReq(req);
+  const authedPhone = uh ? normalizePhone(uh.phone) : '';
+  const queryPhone = normalizePhone(req.query.phone);
+  const allowedPhone = authedPhone || queryPhone;
+  if (allowedPhone && normalizePhone(order.customerPhone) !== allowedPhone) {
+    return res.status(403).send({ error: 'Forbidden: not your order' });
   }
   res.send(order);
 });
