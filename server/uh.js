@@ -195,6 +195,10 @@ function phoneE164(raw) {
   return digits ? `+${digits}` : '';
 }
 
+function sendpkConfigured() {
+  return !!process.env.SENDPK_API_KEY;
+}
+
 function twilioConfigured() {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
@@ -203,9 +207,51 @@ function twilioConfigured() {
   );
 }
 
+// Send a verification code via SendPK (free Pakistani gateway, PTA-approved,
+// no extra npm dep — global fetch). The `sender` defaults to the pre-approved
+// shared name 'SMS Alert' (instant approval, works on Jazz/Zong/Ufone/Telenor).
+// Resolves true when the gateway accepted the message (response starts with OK).
+async function sendpkSendCode(phone, code) {
+  const apiKey = process.env.SENDPK_API_KEY;
+  const sender = process.env.SENDPK_SENDER || 'SMS Alert';
+  const to = phoneE164(phone);
+  if (!apiKey || !to) return false;
+  const mobile = to.replace('+', '');
+  const body =
+    'Your Usman Hotel verification code is: ' + code + '. Do not share it.';
+  const form = new URLSearchParams();
+  form.set('api_key', apiKey);
+  form.set('sender', sender);
+  form.set('mobile', mobile);
+  form.set('message', body);
+  form.set('format', 'json');
+  form.set('network', 'Jazz');
+  try {
+    const res = await fetch('https://sendpk.com/api/sms.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+    const text = await res.text();
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch (_) {}
+    const statusLine = parsed && (parsed.status || parsed.response || parsed.result || '');
+    const ok = /^OK/i.test(text.trim()) || (statusLine && /^OK/i.test(String(statusLine)));
+    if (!ok) {
+      console.error('[uh-sms] SendPK error:', res.status, text.slice(0, 300));
+    }
+    return ok && res.ok;
+  } catch (error) {
+    console.error('[uh-sms] SendPK send failed:', error && error.message ? error.message : error);
+    return false;
+  }
+}
+
 // Send a verification code via the Twilio REST API (no extra npm dependency —
 // uses global fetch, available on Node 18+). Resolves true when delivered ok.
-async function sendSmsCode(phone, code) {
+async function twilioSendCode(phone, code) {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_FROM_NUMBER;
@@ -236,6 +282,21 @@ async function sendSmsCode(phone, code) {
     console.error('[uh-sms] Twilio send failed:', error && error.message ? error.message : error);
     return false;
   }
+}
+
+// Deliver the login code over SMS. SendPK is the primary gateway (free
+// Pakistani provider, chosen by the owner); Twilio is the fallback. Returns
+// true only when a real SMS was accepted.
+async function sendSmsCode(phone, code) {
+  if (sendpkConfigured()) {
+    const ok = await sendpkSendCode(phone, code);
+    if (ok) return true;
+    console.error('[uh-sms] SendPK failed, trying Twilio fallback...');
+  }
+  if (twilioConfigured()) {
+    return twilioSendCode(phone, code);
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +342,11 @@ uhRouter.post('/auth/request-code', async (req, res) => {
     return res.send({ success: true, smsSent: true, phone });
   }
   // Dev/demo fallback: no gateway or delivery failed -> reveal code in-app.
-  console.warn(`[uh-sms] SMS not sent for ${phone} (Twilio not configured); falling back to in-app code.`);
+  if (sendpkConfigured() || twilioConfigured()) {
+    console.warn(`[uh-sms] SMS gateway failed for ${phone}; falling back to in-app code.`);
+  } else {
+    console.warn(`[uh-sms] No SMS gateway configured for ${phone} (set SENDPK_API_KEY or Twilio vars); falling back to in-app code.`);
+  }
   return res.send({ success: true, smsSent: false, code, phone });
 });
 
