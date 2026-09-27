@@ -1054,7 +1054,7 @@ router.put('/pos/staff/:id/permissions', (req, res) => {
   res.send({ ok: true, apps: merged });
 });
 
-const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests', 'stock_headings'];
+const collections = ['rooms', 'reservations', 'inventory', 'staff', 'sales', 'invoices', 'pos_categories', 'pos_products', 'pos_tables', 'delivery_agents', 'delivery_service_types', 'delivery_locations', 'pos_customers', 'pos_payments', 'pos_orders', 'riders', 'rider_orders', 'rider_order_requests', 'stock_headings', 'pos_taker_names'];
 
 router.get('/dashboard', (req, res) => {
   const db = readDb();
@@ -1433,9 +1433,13 @@ router.put('/pos/mashallah-slots', (req, res) => {
   res.send(slots);
 });
 
-// Names-only staff list for the POS "Order Taker" / "Takeaway" dropdowns.
+// Names for the POS "Order Taker" / "Takeaway" dropdowns.
 // Deliberately narrow: the generic /staff route also ships passwordHash rows,
 // which must never reach a phone.
+//   staff  = live staff accounts (auto)
+//   manual = names typed by the manager from the dashboard Delivery > Addons
+//            tab (group: 'delivery' | 'takeaway'); CRUD lives on the generic
+//            /pos_taker_names collection routes.
 router.get('/pos/taker-names', (req, res) => {
   const staff = (getCollection('staff') || [])
     .map((s) => ({
@@ -1445,7 +1449,16 @@ router.get('/pos/taker-names', (req, res) => {
       role: String(s.role || '').trim(),
     }))
     .filter((s) => s.name || s.username);
-  res.send({ staff });
+  const manual = (getCollection('pos_taker_names') || [])
+    .map((m) => ({
+      id: m.id,
+      name: String(m.name || '').trim(),
+      group: ['delivery', 'takeaway'].includes(String(m.group || ''))
+        ? m.group
+        : 'delivery',
+    }))
+    .filter((m) => m.name);
+  res.send({ staff, manual });
 });
 
 router.get('/pos/delivery-agents', (req, res) => {
