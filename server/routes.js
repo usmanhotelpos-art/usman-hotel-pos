@@ -1433,6 +1433,21 @@ router.put('/pos/mashallah-slots', (req, res) => {
   res.send(slots);
 });
 
+// Names-only staff list for the POS "Order Taker" / "Takeaway" dropdowns.
+// Deliberately narrow: the generic /staff route also ships passwordHash rows,
+// which must never reach a phone.
+router.get('/pos/taker-names', (req, res) => {
+  const staff = (getCollection('staff') || [])
+    .map((s) => ({
+      id: s.id,
+      name: String(s.name || '').trim(),
+      username: String(s.username || '').trim(),
+      role: String(s.role || '').trim(),
+    }))
+    .filter((s) => s.name || s.username);
+  res.send({ staff });
+});
+
 router.get('/pos/delivery-agents', (req, res) => {
   res.send(getCollection('delivery_agents'));
 });
