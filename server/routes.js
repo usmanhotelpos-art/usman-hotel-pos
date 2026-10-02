@@ -19,7 +19,8 @@ import {
   getAllUpdateMeta,
   getApkBuffer,
   getUpdateMeta,
-  publishUpdateMeta
+  publishUpdateMeta,
+  deleteUpdate
 } from './updates.js';
 import { uhRouter } from './uh.js';
 
@@ -1009,6 +1010,18 @@ router.get('/pos/update/apk/:id', safe(async (req, res) => {
   const fileName = meta.fileName || `${meta.id}.apk`;
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
   res.send(bytes);
+}));
+
+router.delete('/pos/update/:id', authenticate, safe(async (req, res) => {
+  if (!isManagerOrAdmin(req)) {
+    return res.status(403).send({ error: 'Only Manager/Admin can delete updates' });
+  }
+  const meta = getUpdateMeta(req.params.id);
+  if (!meta) {
+    return res.status(404).send({ error: 'Update record not found' });
+  }
+  await deleteUpdate(req.params.id);
+  res.send({ success: true, message: 'Update deleted' });
 }));
 
 // Usman Hotel online-ordering subsystem (/uh) — public routes stay token-free

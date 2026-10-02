@@ -119,4 +119,17 @@ export async function getApkBuffer(id) {
   return fs.readFileSync(file);
 }
 
+export async function deleteUpdate(id) {
+  const pg = getPg();
+  if (pg && isPgConnected()) {
+    await pg.query('DELETE FROM app_updates WHERE id = $1', [id]);
+  } else {
+    const file = path.join(updatesDir, `${id}.apk`);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+  const all = getAllUpdateMeta().filter((m) => m.id !== id);
+  saveCollection('app_updates', all);
+  return { success: true };
+}
+
 export { metaId, updatesDir };
