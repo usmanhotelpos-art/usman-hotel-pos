@@ -35,8 +35,20 @@ export async function initUpdatesTable() {
   }
 }
 
-function metaId(platform, version) {
-  return `${String(platform || 'usman_hotel')}_${String(version || '').replace(/[^A-Za-z0-9._-]/g, '_')}`;
+// Builds the record id for a published update.
+//
+// The id MUST include the build code. It used to be `<platform>_<version>`
+// only, which meant republishing a new build under an unchanged version
+// silently overwrote the previous record (and its APK), collapsing the
+// "Old Version Updates" history down to a single row per version.
+//
+// `<platform>_<version>_<buildCode>` keeps every build addressable, so
+// history + per-build download/restore URLs work.
+function metaId(platform, version, buildCode) {
+  const p = String(platform || 'usman_hotel');
+  const v = String(version || '').replace(/[^A-Za-z0-9._-]/g, '_');
+  const b = Number(buildCode) || 0;
+  return b > 0 ? `${p}_${v}_${b}` : `${p}_${v}`;
 }
 
 export function getAllUpdateMeta() {
@@ -51,7 +63,7 @@ export function getUpdateMeta(id) {
 // is attached later via attachApk() so the metadata POST stays small.
 export async function publishUpdateMeta({ platform, version, buildCode, notes, name, fileName }) {
   if (!version) throw new Error('version is required');
-  const id = metaId(platform, version);
+  const id = metaId(platform, version, buildCode);
   const meta = {
     id,
     platform: String(platform || 'usman_hotel'),
